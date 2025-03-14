@@ -1,0 +1,18 @@
+// HEADER START
+#include <core.p4>
+// HEADER END
+
+// TO FILL IN: Header and struct definitions
+
+parser Parser(packet_in pkt, out headers_t hdr) {
+
+    // TO FILL IN: Parser states
+
+}
+
+// FOOTER START
+parser Parser_t(packet_in pkt, out headers_t hdr);
+package Package(Parser_t p);
+
+Package(Parser()) main;
+// FOOTER END
