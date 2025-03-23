@@ -7,19 +7,23 @@ License: MIT
 
 import argparse
 import json
+import logging
 import os
 import shutil
 import subprocess
 import tempfile
+from typing import Tuple, Any
 
 from src.parse import parse_json
+
+logger = logging.getLogger(__name__)
 
 
 def parse_arguments() -> argparse.Namespace:
     """
-    Parse CLI arguments.
+    Parse the CLI arguments.
 
-    :return: a namespace containing the parsed arguments
+    :return: an argparse namespace containing the parsed arguments
     """
     parser = argparse.ArgumentParser(
         description="Kangaroo is an equivalence checker for P4 packet parsers.",
@@ -31,34 +35,57 @@ def parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="specify that both inputs are in IR (p4c) JSON format",
     )
-    parser.add_argument("file1", help="a path to the first P4 program")
-    parser.add_argument("file2", help="a path to the second P4 program")
-
+    parser.add_argument(
+        "file1", metavar="file 1", help="a path to the first P4 program"
+    )
+    parser.add_argument(
+        "file2", metavar="file 2", help="a path to the second P4 program"
+    )
+    parser.add_argument(
+        "-v",
+        "--verbosity",
+        action="count",
+        default=0,
+        help="increase output verbosity (-v, -vv, -vvv)",
+    )
     return parser.parse_args()
 
 
-def read_p4_files(args: argparse.Namespace) -> [dict]:
+def setup_logging(verbosity: int):
+    """Set up the logging configuration based on the verbosity level."""
+    if verbosity >= 3:
+        level = logging.DEBUG
+    elif verbosity == 2:
+        level = logging.INFO
+    elif verbosity == 1:
+        level = logging.WARNING
+    else:
+        level = logging.ERROR
+
+    logging.basicConfig(format="[%(levelname)s]: %(message)s", level=level)
+
+
+def read_p4_files(files: list[str], in_json: bool) -> list[Any]:
     """
-    Read the provided P4 files and return their JSON representations.
+    Read the provided (IR) P4 files and return their JSON representations.
 
-    It expects an argparse.Name as defined by :func:`parse_arguments`.
-
-    :param args: parsed arguments from :func:`parse_arguments`
-    :return: a tuple containing the JSON representations of the two P4 files
+    :param files: the files to read
+    :param in_json: whether the files are already in IR JSON format
+    :return: a list containing the JSON representations of the files
     """
     if shutil.which("p4c-graphs") is None:
-        raise FileNotFoundError("p4c-graphs could not be found on PATH")
+        raise FileNotFoundError("P4c-graphs could not be found")
 
     jsons = []
-    for file in [args.file1, args.file2]:
-        if args.json:
+    for file in files:
+        if in_json:
             try:
                 with open(file, encoding="utf-8") as f:
                     jsons.append(json.load(f))
-            except OSError:
-                raise FileNotFoundError(f"Could not open file {file}")
-            except json.JSONDecodeError:
-                raise ValueError(f"Error decoding JSON input from {file}")
+            except OSError as e:
+                raise FileNotFoundError(f"Could not open file {file}") from e
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Error decoding JSON input from {file}") from e
 
         else:
             try:
@@ -78,29 +105,34 @@ def read_p4_files(args: argparse.Namespace) -> [dict]:
                         text=True,
                         check=True,
                     )
+                    logger.info(f"Converted {file} to IR JSON format")
 
                     with open(temp_json_file, "r", encoding="utf-8") as f:
                         jsons.append(json.load(f))
 
             except subprocess.CalledProcessError as e:
-                raise RuntimeError(f"p4c-graphs failed with exit code {e.returncode}")
-            except json.JSONDecodeError:
-                raise ValueError("Error decoding JSON output from p4c-graphs")
+                raise RuntimeError("P4c-graphs Failed with a non-zero exit code") from e
+            except json.JSONDecodeError as e:
+                raise ValueError("Error decoding JSON output from p4c-graphs") from e
 
-            finally:
-                if os.path.exists(temp_json_file):
-                    try:
-                        os.remove(temp_json_file)
-                    except OSError:
-                        print(f"Could not remove temporary file {temp_json_file}")
-
-        return jsons
+    return jsons
 
 
 def main():
     """Entry point of the program."""
     args = parse_arguments()
-    parsers = [parse_json(obj) for obj in read_p4_files(args)]
+    setup_logging(args.verbosity)
+
+    logger.info("Starting Kangaroo...")
+    logger.debug(f"Parsed CLI argument values: {args}")
+
+    ir_jsons = read_p4_files([args.file1, args.file2], args.json)
+
+    logger.info("Parsed P4 files into IR JSON format")
+    logger.debug(f"IR JSON of file 1: {ir_jsons[0]}")
+    logger.debug(f"IR JSON of file 2: {ir_jsons[1]}")
+
+    parsers = [parse_json(j) for j in ir_jsons]
     print(parsers)
 
 
