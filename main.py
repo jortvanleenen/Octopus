@@ -12,9 +12,9 @@ import os
 import shutil
 import subprocess
 import tempfile
-from typing import Tuple, Any
+from typing import Dict
 
-from src.parse import parse_json
+from src.parser.Parser import Parser
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ def setup_logging(verbosity: int):
     logging.basicConfig(format="[%(levelname)s]: %(message)s", level=level)
 
 
-def read_p4_files(files: list[str], in_json: bool) -> list[Any]:
+def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
     """
     Read the provided (IR) P4 files and return their JSON representations.
 
@@ -83,9 +83,9 @@ def read_p4_files(files: list[str], in_json: bool) -> list[Any]:
                 with open(file, encoding="utf-8") as f:
                     jsons.append(json.load(f))
             except OSError as e:
-                raise FileNotFoundError(f"Could not open file {file}") from e
+                raise FileNotFoundError(f"Could not open file '{file}'") from e
             except json.JSONDecodeError as e:
-                raise ValueError(f"Error decoding JSON input from {file}") from e
+                raise ValueError(f"Error decoding JSON input from '{file}'") from e
 
         else:
             try:
@@ -105,7 +105,7 @@ def read_p4_files(files: list[str], in_json: bool) -> list[Any]:
                         text=True,
                         check=True,
                     )
-                    logger.info(f"Converted {file} to IR JSON format")
+                    logger.info(f"Converted '{file}' to IR JSON format")
 
                     with open(temp_json_file, "r", encoding="utf-8") as f:
                         jsons.append(json.load(f))
@@ -124,16 +124,18 @@ def main():
     setup_logging(args.verbosity)
 
     logger.info("Starting Kangaroo...")
-    logger.debug(f"Parsed CLI argument values: {args}")
+    logger.debug(f"Parsed CLI argument values: '{args}'")
 
     ir_jsons = read_p4_files([args.file1, args.file2], args.json)
 
     logger.info("Parsed P4 files into IR JSON format")
-    logger.debug(f"IR JSON of file 1: {ir_jsons[0]}")
-    logger.debug(f"IR JSON of file 2: {ir_jsons[1]}")
+    logger.debug(f"IR JSON of file 1: '{ir_jsons[0]}'")
+    logger.debug(f"IR JSON of file 2: '{ir_jsons[1]}'")
 
-    parsers = [parse_json(j) for j in ir_jsons]
+    parsers = [Parser(j) for j in ir_jsons]
     print(parsers)
+
+    print(str(parsers[0]))
 
 
 if __name__ == "__main__":

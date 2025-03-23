@@ -10,9 +10,14 @@ header udp_t {
     bit<64> data;
 }
 
+struct test_t {
+    bit<32> field;
+}
+
 struct headers_t {
     mpls_t mpls;
     udp_t udp;
+    test_t test;
 }
 
 parser Parser(packet_in pkt, out headers_t hdr) {

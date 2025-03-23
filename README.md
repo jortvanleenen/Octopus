@@ -1,3 +1,6 @@
 # Kangaroo
-Kangaroo is an equivalence checker of packet parsers written in P4.
+Kangaroo is an equivalence checker of P4 packet parsers.
 Its implementation is based on Leapfrog, a formal verifier for packet parsers.
+
+## Dependencies and Compatability
+Kangaroo depends on p4c-graphs. It has been tested with version 1.2.4.2.
