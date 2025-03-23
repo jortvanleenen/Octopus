@@ -26,9 +26,9 @@ class Parser:
         self.states = {}
 
         if json is not None:
-            self.parse_json(json)
+            self.parse(json)
 
-    def parse_json(self, data: Dict) -> None:
+    def parse(self, data: Dict) -> None:
         """Parse IR JSON data into a Parser object.
 
         At the moment, only the first parser that is found is parsed.
@@ -39,18 +39,18 @@ class Parser:
         for obj in data["objects"]["vec"]:
             match obj["Node_Type"]:
                 case "Type_Header" | "Type_Struct":
-                    self._parse_data_type(obj)
-                    logger.info(f"Parsed type '{obj['Node_Type']}'")
+                    logger.info(f"Parsing type '{obj['Node_Type']}'...")
                     logger.debug(f"For: '{obj}'")
+                    self._parse_data_type(obj)
                 case "P4Parser":
                     if len(self.states) > 0:
                         logger.warning(
                             "Multiple parsers found, only the first one is parsed"
                         )
                         continue
-                    self._parse_parser(obj)
-                    logger.info("Parsed parser")
+                    logger.info("Parsing parser...")
                     logger.debug(f"For: '{obj}'")
+                    self._parse_parser(obj)
                 case _:
                     logger.debug(f"Ignoring type '{obj['Node_Type']} of '{obj}'")
 
@@ -68,18 +68,21 @@ class Parser:
             )
 
         for parameter in parameters:
+            name = parameter["name"]
+            logger.info(f"Parsing parameter '{name}'...")
             if parameter["direction"] == "out":
-                self.output_name = parameter["name"]
+                self.output_name = name
                 self.output_type = parameter["type"]["path"]["name"]
             else:
-                self.input_name = parameter["name"]
+                self.input_name = name
 
         states = obj["states"]["vec"]
         for state in states:
-            state_name = state["name"]
-            if state_name in ["reject", "accept"]:
+            name = state["name"]
+            logger.info(f"Parsing state '{name}'...")
+            if name in ["reject", "accept"]:
                 continue
-            self.states[state_name] = ParserState(
+            self.states[name] = ParserState(
                 state["components"], state["selectExpression"]
             )
 

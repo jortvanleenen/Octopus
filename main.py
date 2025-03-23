@@ -124,14 +124,16 @@ def main():
     setup_logging(args.verbosity)
 
     logger.info("Starting Kangaroo...")
-    logger.debug(f"Parsed CLI argument values: '{args}'")
+    logger.debug(f"Parsed CLI argument values: {args}")
 
+    logger.info("Reading P4 files...")
     ir_jsons = read_p4_files([args.file1, args.file2], args.json)
 
-    logger.info("Parsed P4 files into IR JSON format")
+    logger.info("Parsed all P4 files into IR JSON format")
     logger.debug(f"IR JSON of file 1: '{ir_jsons[0]}'")
     logger.debug(f"IR JSON of file 2: '{ir_jsons[1]}'")
 
+    logger.info("Creating Parser objects...")
     parsers = [Parser(j) for j in ir_jsons]
     print(parsers)
 
