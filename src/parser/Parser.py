@@ -16,7 +16,11 @@ logger = logging.getLogger(__name__)
 class Parser:
     """A class representing a P4 parser with its input and output types."""
 
-    def __init__(self, json: Dict = None):
+    def __init__(self, json: Dict = None) -> None:
+        """Initialize a Parser object.
+
+        :param json: The IR JSON data to parse
+        """
         self.types = {}
 
         self.input_name = None
@@ -32,6 +36,8 @@ class Parser:
         """Parse IR JSON data into a Parser object.
 
         At the moment, only the first parser that is found is parsed.
+
+        :param data: The IR JSON data to parse
         """
         if "objects" not in data or "vec" not in data["objects"]:
             raise ValueError("Invalid JSON data")
@@ -54,12 +60,14 @@ class Parser:
                 case _:
                     logger.debug(f"Ignoring type '{obj['Node_Type']} of '{obj}'")
 
-    def _parse_parser(self, obj: Dict):
+    def _parse_parser(self, obj: Dict) -> None:
         """Parse a Parser object in a P4 program.
 
         At the moment, a parser is expected to have two parameters:
           - a packet_in parameter (the 'input to parse')
           - a parameter with direction 'out' (the parsed packet/store)
+
+        :param obj: The parser object to parse
         """
         parameters = obj["type"]["applyParams"]["parameters"]["vec"]
         if len(parameters) != 2:
@@ -93,6 +101,8 @@ class Parser:
         Additionally, fields must be either:
           - Type_Bits (unsigned integers only)
           - Type_Name (another, supported type, i.e. header or struct)
+
+        :param obj: The data type to parse
         """
         type_name = obj["name"]
         fields = {}
@@ -128,7 +138,7 @@ class Parser:
             lines.append(f"    {name}: {fields}")
 
         lines.append("  States:")
-        for state_name in self.states:
-            lines.append(f"    {state_name}")
+        for name, content in self.states.items():
+            lines.append(f"    {name}: {content}")
 
         return "\n".join(lines)

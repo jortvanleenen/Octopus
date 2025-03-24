@@ -51,8 +51,11 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def setup_logging(verbosity: int):
-    """Set up the logging configuration based on the verbosity level."""
+def setup_logging(verbosity: int) -> None:
+    """Set up the logging configuration based on the verbosity level.
+
+    :param verbosity: the verbosity level
+    """
     if verbosity >= 3:
         level = logging.DEBUG
     elif verbosity == 2:
@@ -118,7 +121,7 @@ def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
     return jsons
 
 
-def main():
+def main() -> None:
     """Entry point of the program."""
     args = parse_arguments()
     setup_logging(args.verbosity)
@@ -135,8 +138,8 @@ def main():
 
     logger.info("Creating Parser objects...")
     parsers = [Parser(j) for j in ir_jsons]
+    # TODO: continue on code here...
     print(parsers)
-
     print(str(parsers[0]))
 
 
