@@ -2,7 +2,7 @@
 This module defines Slice, a class representing a slice operation in a P4 parser state.
 
 Author: Jort van Leenen
-License: MIT
+License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
 
@@ -28,6 +28,10 @@ class Slice:
         self.base = store
         self.hi = slice["e1"]["value"]
         self.lo = slice["e2"]["value"]
+
+    def eval(self, parser):
+        value = parser.getValue(self.base)
+        return value[self.lo : self.hi]
 
     def __repr__(self) -> str:
         return f"Slice(base={self.base!r}, hi={self.hi}, lo={self.lo})"

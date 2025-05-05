@@ -2,7 +2,7 @@
 This module defines Parser, a class representing a P4 program's parser.
 
 Author: Jort van Leenen
-License: MIT
+License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
 import logging
@@ -17,7 +17,8 @@ class Parser:
     """A class representing a P4 parser with its input and output types."""
 
     def __init__(self, json: Dict = None) -> None:
-        """Initialize a Parser object.
+        """
+        Initialise a Parser object.
 
         :param json: The IR JSON data to parse
         """
@@ -33,7 +34,8 @@ class Parser:
             self.parse(json)
 
     def parse(self, data: Dict) -> None:
-        """Parse IR JSON data into a Parser object.
+        """
+        Parse IR JSON data into a Parser object.
 
         At the moment, only the first parser that is found is parsed.
 
@@ -61,7 +63,8 @@ class Parser:
                     logger.debug(f"Ignoring type '{obj['Node_Type']} of '{obj}'")
 
     def _parse_parser(self, obj: Dict) -> None:
-        """Parse a Parser object in a P4 program.
+        """
+        Parse a Parser object in a P4 program.
 
         At the moment, a parser is expected to have two parameters:
           - a packet_in parameter (the 'input to parse')
@@ -95,7 +98,8 @@ class Parser:
             )
 
     def _parse_data_type(self, obj: Dict) -> None:
-        """Parse a data type in a P4 program.
+        """
+        Parse a data type in a P4 program.
 
         At the moment, only the Type_Header and Type_Struct types are supported.
         Additionally, fields must be either:

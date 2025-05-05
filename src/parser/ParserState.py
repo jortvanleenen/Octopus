@@ -2,7 +2,7 @@
 This module defines ParserState, a class representing a state in a P4 parser.
 
 Author: Jort van Leenen
-License: MIT
+License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
 import logging

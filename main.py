@@ -2,7 +2,7 @@
 This module contains the main entry point of the program.
 
 Author: Jort van Leenen
-License: MIT
+License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
 import argparse
@@ -52,7 +52,8 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def setup_logging(verbosity: int) -> None:
-    """Set up the logging configuration based on the verbosity level.
+    """
+    Set up the logging configuration based on the verbosity level.
 
     :param verbosity: the verbosity level
     """
@@ -89,7 +90,6 @@ def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
                 raise FileNotFoundError(f"Could not open file '{file}'") from e
             except json.JSONDecodeError as e:
                 raise ValueError(f"Error decoding JSON input from '{file}'") from e
-
         else:
             try:
                 with tempfile.TemporaryDirectory() as temp_dir:

@@ -2,7 +2,7 @@
 This module defines SelectExpression, a class representing the transition block of a P4 parser state.
 
 Author: Jort van Leenen
-License: MIT
+License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
 import logging
