@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 from typing import Dict
 
-from src.parser.Parser import Parser
+from src.parser_program.ParserProgram import ParserProgram
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ def main() -> None:
     logger.debug(f"IR JSON of file 2: '{ir_jsons[1]}'")
 
     logger.info("Creating Parser objects...")
-    parsers = [Parser(j) for j in ir_jsons]
+    parsers = [ParserProgram(j) for j in ir_jsons]
     # TODO: continue on code here...
     print(parsers)
     print(str(parsers[0]))

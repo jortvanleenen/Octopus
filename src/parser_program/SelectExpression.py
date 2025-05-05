@@ -7,7 +7,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 
-from src.parser.Slice import Slice
+from src.parser_program.Slice import Slice
 
 logger = logging.getLogger(__name__)
 

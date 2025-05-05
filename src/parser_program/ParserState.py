@@ -7,8 +7,8 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 
-from src.parser.SelectExpression import SelectExpression
-from src.parser.Component import Component
+from src.parser_program.SelectExpression import SelectExpression
+from src.parser_program.Component import Component
 
 logger = logging.getLogger(__name__)
 

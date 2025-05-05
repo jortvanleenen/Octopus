@@ -1,5 +1,6 @@
 """
-This module defines Parser, a class representing a P4 program's parser.
+This module defines ParserProgram, a class that represents that parser block of
+a P4 program. Additionally, it contains the types that are used in the block.
 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
@@ -8,19 +9,19 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import logging
 from typing import Dict
 
-from src.parser.ParserState import ParserState
+from src.parser_program.ParserState import ParserState
 
 logger = logging.getLogger(__name__)
 
 
-class Parser:
-    """A class representing a P4 parser with its input and output types."""
+class ParserProgram:
+    """A class representing a P4 parser program with its input and output types."""
 
     def __init__(self, json: Dict = None) -> None:
         """
         Initialise a Parser object.
 
-        :param json: The IR JSON data to parse
+        :param json: the IR JSON data to parse
         """
         self.types = {}
 
@@ -37,9 +38,9 @@ class Parser:
         """
         Parse IR JSON data into a Parser object.
 
-        At the moment, only the first parser that is found is parsed.
+        At the moment, only the first parser block that is found is parsed.
 
-        :param data: The IR JSON data to parse
+        :param data: the IR JSON data to parse
         """
         if "objects" not in data or "vec" not in data["objects"]:
             raise ValueError("Invalid JSON data")
@@ -58,19 +59,48 @@ class Parser:
                         continue
                     logger.info("Parsing parser...")
                     logger.debug(f"For: '{obj}'")
-                    self._parse_parser(obj)
+                    self._parse_parser_block(obj)
                 case _:
                     logger.debug(f"Ignoring type '{obj['Node_Type']} of '{obj}'")
 
-    def _parse_parser(self, obj: Dict) -> None:
+        self.get_type_reference_size("hdr.mpls")
+        self.get_type_reference_size("hdr.mpls.label")
+
+    def _parse_data_type(self, obj: Dict) -> None:
         """
-        Parse a Parser object in a P4 program.
+        Parse a data type object of a P4 program.
+
+        At the moment, only the Type_Header and Type_Struct types are supported.
+        Additionally, fields must be either:
+          - Type_Bits (fixed-width, unsigned integers only)
+          - Type_Name (a supported container type, i.e. header or struct)
+
+        :param obj: the data type object to parse
+        """
+        type_name = obj["name"]
+        fields = {}
+        for field in obj["fields"]["vec"]:
+            name = field["name"]
+            if field["type"]["Node_Type"] == "Type_Bits":
+                fields[name] = field["type"]["size"]
+            elif field["type"]["Node_Type"] == "Type_Name":
+                fields[name] = field["type"]["path"]["name"]
+            else:
+                logger.warning(
+                    f"Unknown node type '{field['type']['Node_Type']}' for '{name}'"
+                )
+
+        self.types[type_name] = fields
+
+    def _parse_parser_block(self, obj: Dict) -> None:
+        """
+        Parse a Parser block object of a P4 program.
 
         At the moment, a parser is expected to have two parameters:
           - a packet_in parameter (the 'input to parse')
           - a parameter with direction 'out' (the parsed packet/store)
 
-        :param obj: The parser object to parse
+        :param obj: the parser object to parse
         """
         parameters = obj["type"]["applyParams"]["parameters"]["vec"]
         if len(parameters) != 2:
@@ -97,31 +127,32 @@ class Parser:
                 state["components"], state["selectExpression"]
             )
 
-    def _parse_data_type(self, obj: Dict) -> None:
+    def get_type_reference_size(self, reference: str) -> int:
         """
-        Parse a data type in a P4 program.
+        Get the size of a referenced type in bits.
 
-        At the moment, only the Type_Header and Type_Struct types are supported.
-        Additionally, fields must be either:
-          - Type_Bits (unsigned integers only)
-          - Type_Name (another, supported type, i.e. header or struct)
+        For example, get_type_reference_size(hdr.mpls.label) = 32.
 
-        :param obj: The data type to parse
+        As a P4 program is statically typed and compiled, the type of a field
+        must be known at compile time and valid. This eliminates the need
+        for type checking at runtime.
+
+        :param reference: the reference to the type
+        :return: the size of the type in bits
         """
-        type_name = obj["name"]
-        fields = {}
-        for field in obj["fields"]["vec"]:
-            name = field["name"]
-            if field["type"]["Node_Type"] == "Type_Bits":
-                fields[name] = field["type"]["size"]
-            elif field["type"]["Node_Type"] == "Type_Name":
-                fields[name] = field["type"]["path"]["name"]
-            else:
-                logger.warning(
-                    f"Unknown node type '{field['type']['Node_Type']}' for '{name}'"
-                )
-
-        self.types[type_name] = fields
+        type_content = self.types[self.output_type]
+        reference_components = reference.split(".")[1:]
+        for component in reference_components:
+            type_content = self.types[type_content[component]]
+            if len(type_content) == 1:
+                value = next(iter(type_content.values()))
+                if isinstance(value, int):
+                    logger.info(
+                        f"Type reference '{reference}' is a fixed-width type of size {value} bits."
+                    )
+                    return value
+        logger.error(f"Type reference '{reference}' not found.")
+        return 0
 
     def __repr__(self) -> str:
         return (
