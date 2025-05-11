@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 from typing import Dict
 
-from src.parser_program.ParserProgram import ParserProgram
+from src.program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
 

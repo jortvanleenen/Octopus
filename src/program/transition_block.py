@@ -7,12 +7,10 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 
-from src.parser_program.Slice import Slice
-
 logger = logging.getLogger(__name__)
 
 
-class SelectExpression:
+class TransitionBlock:
     """A class representing the transition block of a P4 parser state."""
 
     def __init__(self, select_expr: dict = None) -> None:
@@ -42,7 +40,9 @@ class SelectExpression:
             select_type = component["Node_Type"]
             match select_type:
                 case "Slice":
-                    self.value = Slice(component)
+                    pass
+                    # TODO
+                    # self.value = Slice(component)
                 case _:
                     logger.warning(f"Ignoring select value of type '{select_type}'")
 
@@ -50,6 +50,9 @@ class SelectExpression:
             case_value = case["keyset"]["value"]
             case_state = case["state"]["path"]["name"]
             self.cases[case_value] = case_state
+
+    def eval(self, store: dict) -> str:
+        pass
 
     def __repr__(self) -> str:
         return f"SelectExpression(value={repr(self.value)}, cases={self.cases!r})"

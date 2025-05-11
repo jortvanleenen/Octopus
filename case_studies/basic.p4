@@ -23,6 +23,8 @@ struct headers_t {
 parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
         pkt.extract(hdr.mpls);
+        bit<2> test2 = hdr.mpls.label[0:0] ++ hdr.mpls.label[1:1];
+        hdr.mpls.label[1:0] = test2;
         transition select(hdr.mpls.label[23:23]) {
             0: start;
             1: q2;

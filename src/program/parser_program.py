@@ -1,6 +1,6 @@
 """
-This module defines ParserProgram, a class that represents that parser block of
-a P4 program. Additionally, it contains the types that are used in the block.
+This module defines ParserProgram, a class that represents the parser block of
+a P4 program. Additionally, it details the types that are used within the block.
 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
@@ -9,7 +9,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import logging
 from typing import Dict
 
-from src.parser_program.ParserState import ParserState
+from src.program.parser_state import ParserState
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class ParserProgram:
         self.output_name = None
         self.output_type = None
 
-        self.states = {}
+        self.states : Dict[str, ParserState] = {}
 
         if json is not None:
             self.parse(json)
@@ -54,7 +54,7 @@ class ParserProgram:
                 case "P4Parser":
                     if len(self.states) > 0:
                         logger.warning(
-                            "Multiple parsers found, only the first one is parsed"
+                            "Multiple parsers found, only the first one is used."
                         )
                         continue
                     logger.info("Parsing parser...")
@@ -124,7 +124,7 @@ class ParserProgram:
             if name in ["reject", "accept"]:
                 continue
             self.states[name] = ParserState(
-                state["components"], state["selectExpression"]
+                self, state["components"], state["selectExpression"]
             )
 
     def get_type_reference_size(self, reference: str) -> int:
@@ -148,7 +148,7 @@ class ParserProgram:
                 value = next(iter(type_content.values()))
                 if isinstance(value, int):
                     logger.info(
-                        f"Type reference '{reference}' is a fixed-width type of size {value} bits."
+                        f"Type reference '{reference}' is a fixed-width type of {value} bits."
                     )
                     return value
         logger.error(f"Type reference '{reference}' not found.")
