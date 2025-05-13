@@ -46,13 +46,15 @@ class ParserState:
         )
 
     def __str__(self) -> str:
-        lines = ["ParserState"]
-        if self.operationBlock:
-            lines.append("  Operations:")
-            for op in self.operationBlock:
-                lines.append(f"    {op}")
-        else:
-            lines.append("  Operations: None")
-
-        lines.append(f"  Transitions: {self.transitionBlock or 'None'}")
-        return "\n".join(lines)
+        n_spaces = 2
+        output = [
+            "Operations:",
+            "\n".join(
+                n_spaces * " " + line for line in str(self.operationBlock).splitlines()
+            ),
+            "Transitions:",
+            "\n".join(
+                n_spaces * " " + line for line in str(self.transitionBlock).splitlines()
+            ),
+        ]
+        return "\n".join(output)

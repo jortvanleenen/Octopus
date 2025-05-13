@@ -29,7 +29,7 @@ class ParserProgram:
         self.output_name = None
         self.output_type = None
 
-        self.states : Dict[str, ParserState] = {}
+        self.states: Dict[str, ParserState] = {}
 
         if json is not None:
             self.parse(json)
@@ -61,10 +61,9 @@ class ParserProgram:
                     logger.debug(f"For: '{obj}'")
                     self._parse_parser_block(obj)
                 case _:
-                    logger.debug(f"Ignoring type '{obj['Node_Type']} of '{obj}'")
-
-        self.get_type_reference_size("hdr.mpls")
-        self.get_type_reference_size("hdr.mpls.label")
+                    logger.debug(
+                        f"Ignoring type '{obj['Node_Type']}' of object '{obj}'"
+                    )
 
     def _parse_data_type(self, obj: Dict) -> None:
         """
@@ -90,15 +89,16 @@ class ParserProgram:
                     f"Unknown node type '{field['type']['Node_Type']}' for '{name}'"
                 )
 
+        logger.info(f"Parsed type '{type_name}' with fields: {fields}")
         self.types[type_name] = fields
 
     def _parse_parser_block(self, obj: Dict) -> None:
         """
         Parse a Parser block object of a P4 program.
 
-        At the moment, a parser is expected to have two parameters:
+        At the moment, a parser is expected to have exactly two parameters:
           - a packet_in parameter (the 'input to parse')
-          - a parameter with direction 'out' (the parsed packet/store)
+          - a parameter with as direction 'out' (the parsed packet/'store')
 
         :param obj: the parser object to parse
         """
@@ -138,7 +138,7 @@ class ParserProgram:
         for type checking at runtime.
 
         :param reference: the reference to the type
-        :return: the size of the type in bits
+        :return: the size of the type as number of bits
         """
         type_content = self.types[self.output_type]
         reference_components = reference.split(".")[1:]
@@ -148,9 +148,10 @@ class ParserProgram:
                 value = next(iter(type_content.values()))
                 if isinstance(value, int):
                     logger.info(
-                        f"Type reference '{reference}' is a fixed-width type of {value} bits."
+                        f"Parsed type reference '{reference}', a fixed-width type of {value} bits."
                     )
                     return value
+
         logger.error(f"Type reference '{reference}' not found.")
         return 0
 
@@ -163,17 +164,19 @@ class ParserProgram:
         )
 
     def __str__(self) -> str:
-        lines = [
+        n_spaces = 2
+        output = [
             "Parser",
-            f"  Input: {self.input_name}",
-            f"  Output: {self.output_name} ({self.output_type})",
-            "  Types:",
+            n_spaces * " " + f"Input name: {self.input_name}",
+            n_spaces * " " + f"Output: {self.output_name} ({self.output_type})",
+            n_spaces * " " + "Types:",
         ]
         for name, fields in self.types.items():
-            lines.append(f"    {name}: {fields}")
+            output.append(2 * n_spaces * " " + f"{name}: {fields}")
 
-        lines.append("  States:")
+        output.append(n_spaces * " " + "States:")
         for name, content in self.states.items():
-            lines.append(f"    {name}: {content}")
+            output.append(2 * n_spaces * " " + f"{name}:")
+            output.append("\n".join(3 * n_spaces * " " + line for line in str(content).splitlines()))
 
-        return "\n".join(lines)
+        return "\n".join(output)

@@ -8,7 +8,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import logging
 from typing import TYPE_CHECKING, Dict
 
-from src.program.component import Component, Extract
+from src.program.component import Component, Extract, Assignment
 
 if TYPE_CHECKING:
     from src.program.parser_program import ParserProgram
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class OperationBlock:
+class OperationBlock(Component):
     """A class representing the operation block of a P4 parser state."""
 
     def __init__(self, program: "ParserProgram", components: dict = None) -> None:
@@ -37,7 +37,10 @@ class OperationBlock:
                     parsed_component = Extract(self.program, component)
                     self.size += parsed_component.size
                 case _:
-                    logger.warning(f"Ignoring unknown component type '{component["Node_Type"]}'")
+                    logger.warning(
+                        f"Ignoring unknown component type '{component['Node_Type']}'"
+                    )
+                    continue
             self.components.append(parsed_component)
 
     def eval(self, store: Dict[str, str], buffer: str):
@@ -46,7 +49,7 @@ class OperationBlock:
             store, buffer = component.eval(store, buffer)
 
     def __repr__(self) -> str:
-        return f"OperationBlock(components={self.components!r})"
+        return f"OperationBlock(size= {self.size!r}, components={self.components!r})"
 
     def __str__(self) -> str:
-        return f"OperationBlock: {self.components}"
+        return "\n".join(f"{component}" for component in self.components)

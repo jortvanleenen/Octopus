@@ -78,7 +78,7 @@ def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
     :return: a list containing the JSON representations of the files
     """
     if shutil.which("p4c-graphs") is None:
-        raise FileNotFoundError("P4c-graphs could not be found")
+        raise FileNotFoundError("p4c-graphs could not be found")
 
     jsons = []
     for file in files:
@@ -87,9 +87,9 @@ def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
                 with open(file, encoding="utf-8") as f:
                     jsons.append(json.load(f))
             except OSError as e:
-                raise FileNotFoundError(f"Could not open file '{file}'") from e
+                raise FileNotFoundError(f"could not open file '{file}'") from e
             except json.JSONDecodeError as e:
-                raise ValueError(f"Error decoding JSON input from '{file}'") from e
+                raise ValueError(f"could not decode JSON from '{file}'") from e
         else:
             try:
                 with tempfile.TemporaryDirectory() as temp_dir:
@@ -114,9 +114,9 @@ def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
                         jsons.append(json.load(f))
 
             except subprocess.CalledProcessError as e:
-                raise RuntimeError("P4c-graphs Failed with a non-zero exit code") from e
+                raise RuntimeError("p4c-graphs Failed with a non-zero exit code") from e
             except json.JSONDecodeError as e:
-                raise ValueError("Error decoding JSON output from p4c-graphs") from e
+                raise ValueError("could not decode JSON from p4c-graphs") from e
 
     return jsons
 
@@ -139,7 +139,7 @@ def main() -> None:
     logger.info("Creating Parser objects...")
     parsers = [ParserProgram(j) for j in ir_jsons]
     # TODO: continue on code here...
-    print(parsers)
+    print(repr(parsers[0]))
     print(str(parsers[0]))
 
 

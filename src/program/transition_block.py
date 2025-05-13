@@ -7,6 +7,8 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 
+from src.program.expression import Expression
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,7 +16,7 @@ class TransitionBlock:
     """A class representing the transition block of a P4 parser state."""
 
     def __init__(self, select_expr: dict = None) -> None:
-        self.value = None
+        self.values = []
         self.cases = {}
         if select_expr is not None:
             self.parse(select_expr)
@@ -28,37 +30,50 @@ class TransitionBlock:
             case "PathExpression":
                 self.cases["*"] = select_expr["path"]["name"]
             case _:
-                logger.warning(f"Ignoring selectExpression of type: {select_type}")
+                logger.warning(f"Ignoring selectExpression of type '{select_type}'")
 
     def _parse_select_expression(self, select_expr: dict) -> None:
         """Parse a selectExpression JSON into a SelectExpression object."""
-        selectValue = select_expr["select"]["components"]["vec"]
-        if len(selectValue) != 1:
-            logger.warning("Select value has more than one component")
 
-        for component in selectValue:
-            select_type = component["Node_Type"]
-            match select_type:
-                case "Slice":
-                    pass
-                    # TODO
-                    # self.value = Slice(component)
-                case _:
-                    logger.warning(f"Ignoring select value of type '{select_type}'")
+        for expression in select_expr["select"]["components"]["vec"]:
+            self.values.append(Expression(expression))
 
         for case in select_expr["selectCases"]["vec"]:
-            case_value = case["keyset"]["value"]
-            case_state = case["state"]["path"]["name"]
-            self.cases[case_value] = case_state
+            for_values = []
+            keyset = case["keyset"]
+            if "value" in keyset:
+                for_values.append(case["keyset"]["value"])
+            else:
+                for expression in keyset["components"]["vec"]:
+                    for_values.append(Expression(expression))
+            to_state_name = case["state"]["path"]["name"]
+            self.cases[tuple(for_values)] = to_state_name
 
     def eval(self, store: dict) -> str:
-        pass
+        evaluated_values = [expression.eval(store) for expression in self.values]
+        for key, state in self.cases.items():
+            if len(key) != len(evaluated_values):
+                logger.warning(
+                    f"Key length {len(key)} does not match evaluated values length {len(evaluated_values)}"
+                )
+                continue
+
+            evaluated_for_values = [expression.eval(store) for expression in key]
+            if evaluated_for_values == evaluated_values:
+                return state
+        return "reject"
 
     def __repr__(self) -> str:
-        return f"SelectExpression(value={repr(self.value)}, cases={self.cases!r})"
+        return f"TransitionBlock(values={self.values!r}, cases={self.cases!r})"
 
     def __str__(self) -> str:
-        lines = ["SelectExpression", f"  Value: {self.value}", "  Cases:"]
+        n_spaces = 2
+        output = []
+        if self.values:
+            output.append(f"Values: ({", ".join(str(v) for v in self.values)})")
+
+        output.append("Cases:")
         for key, state in self.cases.items():
-            lines.append(f"    {key} → {state}")
-        return "\n".join(lines)
+            key_str = ", ".join(str(k) for k in key)
+            output.append(" " * n_spaces + f"({key_str}) -> {state}")
+        return "\n".join(output)
