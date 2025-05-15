@@ -12,8 +12,10 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from typing import Dict
 
+from src.bisimulation.bisimulation import naive_bisimulation
 from src.program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,12 @@ def parse_arguments() -> argparse.Namespace:
         action="count",
         default=0,
         help="increase output verbosity (-v, -vv, -vvv)",
+    )
+    parser.add_argument(
+        "-s",
+        "--symbolic",
+        action="store_true",
+        help="use symbolic bisimulation instead of naive bisimulation",
     )
     return parser.parse_args()
 
@@ -138,9 +146,25 @@ def main() -> None:
 
     logger.info("Creating Parser objects...")
     parsers = [ParserProgram(j) for j in ir_jsons]
-    # TODO: continue on code here...
-    print(repr(parsers[0]))
-    print(str(parsers[0]))
+    logger.info("Created Parser objects")
+    logger.debug(f"Parser object 1 (repr): '{parsers[0]!r}'")
+    logger.debug(f"Parser object 1 (str):\n {parsers[0]}")
+    logger.debug(f"Parser object 2 (repr): '{parsers[1]!r}'")
+    logger.debug(f"Parser object 2 (str)\n {parsers[1]}")
+
+    if args.symbolic:
+        logger.info("Using symbolic bisimulation")
+        # TODO: continue on code here...
+    else:
+        logger.info("Using naive bisimulation")
+        start = time.process_time()
+        result = naive_bisimulation(parsers[0], parsers[1])
+        end = time.process_time()
+        logger.info(f"Naive bisimulation took {end - start:.4f} seconds")
+        if result:
+            logger.info("The two parsers are equivalent")
+        else:
+            logger.info("The two parsers are not equivalent")
 
 
 if __name__ == "__main__":

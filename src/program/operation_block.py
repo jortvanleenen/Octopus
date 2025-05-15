@@ -48,6 +48,8 @@ class OperationBlock(Component):
         for component in self.components:
             store, buffer = component.eval(store, buffer)
 
+        return store, buffer
+
     def __repr__(self) -> str:
         return f"OperationBlock(size= {self.size!r}, components={self.components!r})"
 

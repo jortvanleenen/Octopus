@@ -41,4 +41,5 @@ class TemplateGuardedFormula:
 def strongest_postcondition():
     pass
 
-def transition
+def transition_r():
+    pass

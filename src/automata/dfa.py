@@ -6,6 +6,7 @@ Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
+import copy
 from typing import Dict, Optional, Set
 
 from src.program.parser_program import ParserProgram
@@ -36,7 +37,19 @@ class DFA:
 
             :return: True if terminal, False otherwise
             """
-            return self.state in {"accept", "reject"}
+            return self.state in ["accept", "reject"]
+
+        def __eq__(self, other):
+            if not isinstance(other, DFA.Configuration):
+                return NotImplemented
+            return (
+                self.state == other.state
+                and self.buffer == other.buffer
+                and self.store == other.store
+            )
+
+        def __hash__(self):
+            return hash((self.state, self.buffer, frozenset(self.store.items())))
 
         def __repr__(self):
             return f"<{self.state}, {self.store}, {self.buffer}>"
@@ -52,7 +65,9 @@ class DFA:
         :param bit: the bit to process
         :return: the next configuration
         """
-        q, s, w = configuration.state, configuration.store, configuration.buffer
+        q = configuration.state
+        s = copy.deepcopy(configuration.store)
+        w = configuration.buffer
 
         if q in self.program.states:  # Does not include accept and reject states
             state = self.program.states[q]
@@ -60,9 +75,9 @@ class DFA:
             if len(wb) < state.operationBlock.size:
                 return DFA.Configuration(q, s, wb)
 
-            s_prime = state.operationBlock.eval(s, wb)
+            s_prime, w_prime = state.operationBlock.eval(s, wb)
             next_q = state.transitionBlock.eval(s_prime)
-            return DFA.Configuration(next_q, s_prime, "")
+            return DFA.Configuration(next_q, s_prime, w_prime)
 
         return DFA.Configuration("reject", s, "")
 

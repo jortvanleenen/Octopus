@@ -4,16 +4,44 @@ This module defines Component, a class representing an operation in a P4 parser 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
+from src.automata.dfa import DFA
 from src.program.parser_program import ParserProgram
 
 
 def naive_bisimulation(parser1: ParserProgram, parser2: ParserProgram):
     """
-    Check whether two P4 parser blocks are bisimilar.
+    Check whether two P4 parser programs are bisimilar.
 
     This algorithm checks for bisimilarity by representing the two parsers as
-    DFAs. This is considered naive due to their state space explosion.
+    DFAs. This approach is considered naive due to the accompanying state
+    explosion, as no symbolic representation is used. Additionally, no
+    optimisations, such as leaps, are performed.
 
-    Additionally, note that bisimulation is performed in a forward manner.
+    The bisimulation is performed in a forward manner.
     """
 
+    # In P4, the initial state is always called 'start'
+    dfa1 = DFA(parser1)
+    dfa2 = DFA(parser2)
+    config1 = dfa1.initial_config("start", {})
+    config2 = dfa2.initial_config("start", {})
+
+    work_queue = [(config1, config2)]
+    seen = set()
+    while len(work_queue) > 0:
+        config1, config2 = work_queue.pop(0)
+
+        if (config1, config2) in seen:
+            continue
+
+        if (config1.is_accepting() and config2.is_accepting()) or ((not config1.is_accepting()) and
+                                                                   (not config2.is_accepting())):
+            seen.add((config1, config2))
+            for bit in ["0","1"]:
+                next_config1 = dfa1.step(config1, bit)
+                next_config2 = dfa2.step(config2, bit)
+                work_queue.append((next_config1, next_config2))
+        else:
+            return False
+
+    return True

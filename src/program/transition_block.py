@@ -52,6 +52,8 @@ class TransitionBlock:
     def eval(self, store: dict) -> str:
         evaluated_values = [expression.eval(store) for expression in self.values]
         for key, state in self.cases.items():
+            if key == "*":
+                return state
             if len(key) != len(evaluated_values):
                 logger.warning(
                     f"Key length {len(key)} does not match evaluated values length {len(evaluated_values)}"
