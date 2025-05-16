@@ -160,11 +160,11 @@ def main() -> None:
         start = time.process_time()
         result = naive_bisimulation(parsers[0], parsers[1])
         end = time.process_time()
-        logger.info(f"Naive bisimulation took {end - start:.4f} seconds")
+        print(f"Naive bisimulation took {end - start:.4f} seconds")
         if result:
-            logger.info("The two parsers are equivalent")
+            print("The two parsers are equivalent")
         else:
-            logger.info("The two parsers are not equivalent")
+            print("The two parsers are not equivalent")
 
 
 if __name__ == "__main__":

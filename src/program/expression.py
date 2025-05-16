@@ -55,7 +55,9 @@ class Slice:
         return value[self.lsb : self.msb]
 
     def __repr__(self) -> str:
-        return f"Slice(reference={self.reference!r}, msb={self.msb!r}, lsb={self.lsb!r})"
+        return (
+            f"Slice(reference={self.reference!r}, msb={self.msb!r}, lsb={self.lsb!r})"
+        )
 
     def __str__(self) -> str:
         return f"{self.reference}[{self.msb}:{self.lsb}]"
@@ -83,6 +85,9 @@ class Expression:
                     f"Ignoring Expression of type '{component['Node_Type']}'"
                 )
 
+    def eval(self, store: Dict[str, str]) -> str:
+        return self.value.eval(store)
+
     def __repr__(self) -> str:
         return f"Expression(value={self.value!r})"
 
@@ -92,14 +97,16 @@ class Expression:
 
 class Constant:
     def __init__(self, component: dict) -> None:
-        self.value = None
+        self.numeric_value: int | float | None = None
+        self.value: str | None = None
         if component is not None:
             self.parse(component)
 
     def parse(self, component: dict) -> None:
-        self.value = component["value"]
+        self.numeric_value = component["value"]
+        self.value = bin(self.numeric_value)[2:]  # Convert to binary string
 
-    def eval(self):
+    def eval(self, store: Dict[str, str]) -> str:
         return self.value
 
     def __repr__(self) -> str:
@@ -126,7 +133,9 @@ class Reference:
                 continue
 
             if "path" in component:
-                reference = component["path"]["name"] + ("." if reference else "") + reference
+                reference = (
+                    component["path"]["name"] + ("." if reference else "") + reference
+                )
             break
 
         self.reference = reference
@@ -138,13 +147,11 @@ class Reference:
             logger.warning(f"Reference '{self.reference}' not found in store.")
             return ""
 
-
     def __repr__(self) -> str:
         return f"Reference(reference={self.reference!r})"
 
     def __str__(self) -> str:
         return str(self.reference)
-
 
 
 # class LValue:

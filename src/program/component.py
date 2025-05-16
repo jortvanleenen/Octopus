@@ -87,6 +87,8 @@ class Extract(Component):
         if len(arguments) != 1:
             logger.warning(f"Method call '{function_name}' has more than one argument")
         store = arguments[0]["expression"]["member"]
+        # if "fields" in arguments[0]["expression"]["type"]:
+        #     store += "." + arguments[0]["expression"]["type"]["fields"]["vec"][0]["name"]
         return function_name, store
 
     def eval(self, store: Dict[str, str], buffer: str):
