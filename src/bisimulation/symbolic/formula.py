@@ -78,7 +78,10 @@ class PureFormula:
 
     class Slice(Expression):
         def __init__(self, base: "PureFormula.Expression", msb: int, lsb: int):
-            assert msb > lsb, "Invalid slice range"
+            assert msb >= 0 and lsb >= 0, "Slice indices must be non-negative"
+            assert msb >= lsb, "Invalid slice range: msb must be ≥ lsb"
+            assert msb < base.width and lsb < base.width, "Slice indices out of bounds"
+
             self.base = base
             self.hi = msb
             self.lo = lsb
