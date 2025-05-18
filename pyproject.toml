@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "Kangaroo"
+version = "0.1.0"
+description = "An equivalence checker for P4 packet parsers"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Jort van Leenen", email = "jort@vleenen.nl" },
+]
+maintainers = [
+    { name = "Jort van Leenen", email = "jort@vleenen.nl" },
+]
+keywords = ["p4", "parser", "equivalence", "checker"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Networking",
+    "Typing :: Typed",
+]
+
+[project.urls]
+"source" = "https://github.com/jortvanleenen/Kangaroo"
+"release notes" = "https://github.com/jortvanleenen/Kangaroo/releases"
+
+[project.scripts]
+kangaroo = "kangaroo.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kangaroo"]
+
+[tool.ruff]
+target-version = "py313"

@@ -18,8 +18,8 @@ from functools import partial
 from pathlib import Path
 from typing import Dict, Any, Generator
 
-from src.bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
-from src.program.parser_program import ParserProgram
+from bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
+from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
 
@@ -178,14 +178,14 @@ def select_bisimulation_method(args: argparse.Namespace) -> tuple[callable, str]
     :param args: the parsed command-line arguments
     :return: a tuple containing the selected bisimulation method and its name
     """
-    if args.symbolic:
+    if args.naive:
+        logger.info("Using naive bisimulation")
+        return naive_bisimulation, "Naive"
+    else:
         logger.info("Using symbolic bisimulation")
         return partial(
             symbolic_bisimulation, enable_leaps=not args.disable_leaps
         ), "Symbolic"
-    else:
-        logger.info("Using naive bisimulation")
-        return naive_bisimulation, "Naive"
 
 
 @contextmanager
