@@ -8,7 +8,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import logging
 from typing import TYPE_CHECKING, Dict
 
-from src.program.component import Component, Extract, Assignment
+from src.program.component import Component, MethodCall, Assignment, Extract
 
 if TYPE_CHECKING:
     from src.program.parser_program import ParserProgram
@@ -34,8 +34,9 @@ class OperationBlock(Component):
                 case "AssignmentStatement":
                     parsed_component = Assignment(self.program, component)
                 case "MethodCallStatement":
-                    parsed_component = Extract(self.program, component)
-                    self.size += parsed_component.size
+                    parsed_component = MethodCall(self.program, component)
+                    if isinstance(parsed_component, Extract):
+                        self.size += parsed_component.size
                 case _:
                     logger.warning(
                         f"Ignoring unknown component type '{component['Node_Type']}'"

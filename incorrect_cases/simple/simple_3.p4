@@ -3,7 +3,7 @@
 // HEADER END
 
 header mpls_t {
-    bit<16> label;
+    bit<3> label;
 }
 
 struct headers_t {

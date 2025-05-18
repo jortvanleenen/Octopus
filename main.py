@@ -74,7 +74,10 @@ def setup_logging(verbosity: int) -> None:
     else:
         level = logging.ERROR
 
-    logging.basicConfig(format="[%(levelname)s]: %(message)s", level=level)
+    logging.basicConfig(
+        format="[%(levelname)s - %(filename)s, line %(lineno)d]: %(message)s",
+        level=level,
+    )
 
 
 def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:

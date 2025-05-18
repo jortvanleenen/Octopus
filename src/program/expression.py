@@ -80,6 +80,8 @@ class Expression:
                 self.value = Concatenate(component)
             case "Member" | "PathExpression":
                 self.value = Reference(component)
+            case "DefaultExpression":
+                self.value = DontCare()
             case _:
                 logger.warning(
                     f"Ignoring Expression of type '{component['Node_Type']}'"
@@ -114,6 +116,26 @@ class Constant:
 
     def __str__(self) -> str:
         return str(self.value)
+
+
+class DontCare:
+    def __init__(self):
+        pass
+
+    def eval(self, store: Dict[str, str]) -> str:
+        pass
+
+    def __hash__(self) -> int:
+        return 0  # fixed value: all DontCares are "equal" and hash identically
+
+    def __eq__(self, other) -> bool:
+        return True
+
+    def __repr__(self) -> str:
+        return "DontCare()"
+
+    def __str__(self) -> str:
+        return "*"
 
 
 class Reference:

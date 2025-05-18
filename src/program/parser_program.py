@@ -127,33 +127,32 @@ class ParserProgram:
                 self, state["components"], state["selectExpression"]
             )
 
-    def get_type_reference_size(self, reference: str) -> int:
+    def get_header_fields(self, reference: str) -> dict:
         """
-        Get the size of a referenced type in bits.
+        Get the names and sizes (in bits) of the fields in a header type.
 
-        For example, get_type_reference_size(hdr.mpls.label) = 32.
+        For example, get_header_fields(hdr.mpls) = {label: 32}.
 
         As a P4 program is statically typed and compiled, the type of a field
         must be known at compile time and valid. This eliminates the need
         for type checking at runtime.
 
-        :param reference: the reference to the type
-        :return: the size of the type as number of bits
+        :param reference: a reference to the header
+        :return: a dictionary with the names and sizes of its fields
         """
-        type_content = self.types[self.output_type]
-        reference_components = reference.split(".")[1:]
-        for component in reference_components:
-            type_content = self.types[type_content[component]]
-            if len(type_content) == 1:
-                value = next(iter(type_content.values()))
-                if isinstance(value, int):
-                    logger.info(
-                        f"Parsed type reference '{reference}', a fixed-width type of {value} bits."
-                    )
-                    return value
+        type_content = self.types.get(self.output_type)
+        if type_content is None:
+            raise KeyError(f"Output type '{self.output_type}' not found in types")
 
-        logger.error(f"Type reference '{reference}' not found.")
-        return 0
+        reference_parts = reference.split(".")[1:]
+        for part in reference_parts:
+            if part not in type_content:
+                raise KeyError(f"Reference part '{part}' not found in type content")
+            type_content = self.types.get(type_content[part])
+            if type_content is None:
+                raise KeyError(f"Type '{part}' not found in types")
+
+        return type_content
 
     def __repr__(self) -> str:
         return (

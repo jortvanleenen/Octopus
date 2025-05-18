@@ -7,7 +7,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 
-from src.program.expression import Expression
+from src.program.expression import Expression, DontCare
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,9 @@ class TransitionBlock:
             case "SelectExpression":
                 self._parse_select_expression(select_expr)
             case "PathExpression":
-                self.cases["*"] = select_expr["path"]["name"]
+                to_state_name = select_expr["path"]["name"]
+                for_values = [DontCare()]
+                self.cases[tuple(for_values)] = to_state_name
             case _:
                 logger.warning(f"Ignoring selectExpression of type '{select_type}'")
 
@@ -42,7 +44,7 @@ class TransitionBlock:
             for_values = []
             keyset = case["keyset"]
             if "value" in keyset:
-                for_values.append(case["keyset"]["value"])
+                for_values.append(Expression(case["keyset"]))
             else:
                 for expression in keyset["components"]["vec"]:
                     for_values.append(Expression(expression))
@@ -52,8 +54,6 @@ class TransitionBlock:
     def eval(self, store: dict) -> str:
         evaluated_values = [expression.eval(store) for expression in self.values]
         for key, state in self.cases.items():
-            if key == "*":
-                return state
             if len(key) != len(evaluated_values):
                 logger.warning(
                     f"Key length {len(key)} does not match evaluated values length {len(evaluated_values)}"
