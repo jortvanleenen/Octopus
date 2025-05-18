@@ -8,14 +8,17 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import argparse
 import json
 import logging
-import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
-from typing import Dict
+from contextlib import contextmanager
+from functools import partial
+from pathlib import Path
+from typing import Dict, Any, Generator
 
-from src.bisimulation.bisimulation import naive_bisimulation
+from src.bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
 from src.program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
@@ -29,7 +32,7 @@ def parse_arguments() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         description="Kangaroo is an equivalence checker for P4 packet parsers.",
-        epilog="Written by Jort van Leenen.",
+        epilog="Developed by Jort van Leenen.",
     )
     parser.add_argument(
         "-j",
@@ -37,12 +40,8 @@ def parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="specify that both inputs are in IR (p4c) JSON format",
     )
-    parser.add_argument(
-        "file1", metavar="file 1", help="a path to the first P4 program"
-    )
-    parser.add_argument(
-        "file2", metavar="file 2", help="a path to the second P4 program"
-    )
+    parser.add_argument("file1", metavar="file 1", help="path to the first P4 program")
+    parser.add_argument("file2", metavar="file 2", help="path to the second P4 program")
     parser.add_argument(
         "-v",
         "--verbosity",
@@ -51,10 +50,32 @@ def parse_arguments() -> argparse.Namespace:
         help="increase output verbosity (-v, -vv, -vvv)",
     )
     parser.add_argument(
-        "-s",
-        "--symbolic",
+        "-n",
+        "--naive",
         action="store_true",
-        help="use symbolic bisimulation instead of naive bisimulation",
+        help="use naive bisimulation instead of symbolic bisimulation",
+    )
+    parser.add_argument(
+        "--disable_leaps",
+        action="store_true",
+        help="disable leaps in symbolic bisimulation (ignored if --naive is set)",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        help="write the bisimulation certificate or counterexample to this file",
+    )
+    parser.add_argument(
+        "--fail-on-mismatch",
+        action="store_true",
+        help="exit with code 1 if the parsers are not equivalent",
+    )
+    parser.add_argument(
+        "-t",
+        "--time",
+        action="store_true",
+        help="measure and print bisimulation execution time",
     )
     return parser.parse_args()
 
@@ -74,22 +95,29 @@ def setup_logging(verbosity: int) -> None:
     else:
         level = logging.ERROR
 
-    logging.basicConfig(
-        format="[%(levelname)s - %(filename)s, line %(lineno)d]: %(message)s",
-        level=level,
-    )
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        logging.basicConfig(
+            format="[%(levelname)s - %(filename)s, line %(lineno)d]: %(message)s",
+            level=level,
+        )
+    else:
+        root_logger.setLevel(level)
 
 
 def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
     """
-    Read the provided (IR) P4 files and return their JSON representations.
+    Read the provided (IR) P4 files and return their parsed JSON representations.
 
-    :param files: the files to read
+    :param files: a list of file paths to the P4 files to read
     :param in_json: whether the files are already in IR JSON format
-    :return: a list containing the JSON representations of the files
+    :return: a list containing the parsed JSON representations of the files
     """
     if shutil.which("p4c-graphs") is None:
-        raise FileNotFoundError("p4c-graphs could not be found")
+        raise FileNotFoundError(
+            "Required tool 'p4c-graphs' not found in PATH. "
+            "Please ensure it is installed and available in your system PATH."
+        )
 
     jsons = []
     for file in files:
@@ -98,13 +126,15 @@ def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
                 with open(file, encoding="utf-8") as f:
                     jsons.append(json.load(f))
             except OSError as e:
-                raise FileNotFoundError(f"could not open file '{file}'") from e
+                raise OSError(f"Error opening file '{file}': {e.strerror}") from e
             except json.JSONDecodeError as e:
-                raise ValueError(f"could not decode JSON from '{file}'") from e
+                raise ValueError(
+                    f"Invalid JSON in '{file}' at line {e.lineno} column {e.colno}: {e.msg}"
+                ) from e
         else:
             try:
                 with tempfile.TemporaryDirectory() as temp_dir:
-                    temp_json_file = os.path.join(temp_dir, "IR.json")
+                    temp_json_file = Path(temp_dir) / "IR.json"
 
                     subprocess.run(
                         [
@@ -125,11 +155,59 @@ def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
                         jsons.append(json.load(f))
 
             except subprocess.CalledProcessError as e:
-                raise RuntimeError("p4c-graphs Failed with a non-zero exit code") from e
+                logger.error(
+                    f"p4c-graphs failed, it reported:\n"
+                    f"- stdout: {e.stdout}\n"
+                    f"- stderr: {e.stderr}"
+                )
+                raise RuntimeError(
+                    f"p4c-graphs failed with exit code {e.returncode}"
+                ) from e
             except json.JSONDecodeError as e:
-                raise ValueError("could not decode JSON from p4c-graphs") from e
+                raise ValueError(
+                    f"Invalid JSON output from p4c-graphs at line {e.lineno}, column {e.colno}: {e.msg}"
+                ) from e
 
     return jsons
+
+
+def select_bisimulation_method(args: argparse.Namespace) -> tuple[callable, str]:
+    """
+    Select the bisimulation method based on the command-line arguments.
+
+    :param args: the parsed command-line arguments
+    :return: a tuple containing the selected bisimulation method and its name
+    """
+    if args.symbolic:
+        logger.info("Using symbolic bisimulation")
+        return partial(
+            symbolic_bisimulation, enable_leaps=not args.disable_leaps
+        ), "Symbolic"
+    else:
+        logger.info("Using naive bisimulation")
+        return naive_bisimulation, "Naive"
+
+
+@contextmanager
+def timed_block(label: str) -> Generator[None, Any, None]:
+    """
+    Context manager to measure the execution time of a code block.
+
+    :param label: a label for the block of code being timed
+
+    """
+    start_wall = time.perf_counter()
+    start_cpu = time.process_time()
+    yield
+    end_wall = time.perf_counter()
+    end_cpu = time.process_time()
+    duration_msg = (
+        f"{label} completed. Timing results:\n"
+        f"  Wall time: {end_wall - start_wall:.4f} s\n"
+        f"  CPU time:  {end_cpu - start_cpu:.4f} s"
+    )
+    logger.info(duration_msg)
+    print(duration_msg)
 
 
 def main() -> None:
@@ -137,13 +215,13 @@ def main() -> None:
     args = parse_arguments()
     setup_logging(args.verbosity)
 
-    logger.info("Starting Kangaroo...")
+    logger.info("Starting...")
     logger.debug(f"Parsed CLI argument values: {args}")
 
     logger.info("Reading P4 files...")
     ir_jsons = read_p4_files([args.file1, args.file2], args.json)
 
-    logger.info("Parsed all P4 files into IR JSON format")
+    logger.info("Converted both P4 files to IR JSON format")
     logger.debug(f"IR JSON of file 1: '{ir_jsons[0]}'")
     logger.debug(f"IR JSON of file 2: '{ir_jsons[1]}'")
 
@@ -155,20 +233,42 @@ def main() -> None:
     logger.debug(f"Parser object 2 (repr): '{parsers[1]!r}'")
     logger.debug(f"Parser object 2 (str)\n {parsers[1]}")
 
-    if args.symbolic:
-        logger.info("Using symbolic bisimulation")
-        # TODO: continue on code here...
+    method, method_name = select_bisimulation_method(args)
+    if args.time:
+        with timed_block(f"{method_name} bisimulation"):
+            are_equal, certificate = method(parsers[0], parsers[1])
     else:
-        logger.info("Using naive bisimulation")
-        start = time.process_time()
-        result = naive_bisimulation(parsers[0], parsers[1])
-        end = time.process_time()
-        print(f"Naive bisimulation took {end - start:.4f} seconds")
-        if result:
-            print("The two parsers are equivalent")
-        else:
-            print("The two parsers are not equivalent")
+        are_equal, certificate = method(parsers[0], parsers[1])
 
+    if are_equal:
+        message = "The two parsers are equivalent."
+        header = "--- Bisimulation Certificate ---"
+    else:
+        message = "The two parsers are NOT equivalent."
+        header = "--- Counterexample ---"
+
+    logger.info(f"{message}\n{header}\n{certificate}")
+
+    print(message)
+    print(header)
+    print(certificate)
+
+    if args.output:
+        try:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(f"{message}\n{header}\n{certificate}\n")
+        except OSError as e:
+            logger.error(
+                f"Could not write to output file '{args.output}': {e.strerror}"
+            )
+            sys.exit(1)
+
+    if args.fail_on_mismatch and not are_equal:
+        sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        logger.exception("An unexpected error occurred.")
+        sys.exit(1)

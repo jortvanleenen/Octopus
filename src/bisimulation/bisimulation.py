@@ -4,11 +4,16 @@ This module defines Component, a class representing an operation in a P4 parser 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
+
+from typing import Any
+
 from src.automata.dfa import DFA
 from src.program.parser_program import ParserProgram
 
 
-def naive_bisimulation(parser1: ParserProgram, parser2: ParserProgram):
+def naive_bisimulation(
+    parser1: ParserProgram, parser2: ParserProgram
+) -> tuple[bool, tuple[DFA.Configuration, DFA.Configuration]] | tuple[bool, set[Any]]:
     """
     Check whether two P4 parser programs are bisimilar.
 
@@ -34,14 +39,19 @@ def naive_bisimulation(parser1: ParserProgram, parser2: ParserProgram):
         if (config1, config2) in seen:
             continue
 
-        if (config1.is_accepting() and config2.is_accepting()) or ((not config1.is_accepting()) and
-                                                                   (not config2.is_accepting())):
+        if config1.is_accepting() == config2.is_accepting():
             seen.add((config1, config2))
-            for bit in ["0","1"]:
+            for bit in ["0", "1"]:
                 next_config1 = dfa1.step(config1, bit)
                 next_config2 = dfa2.step(config2, bit)
                 work_queue.append((next_config1, next_config2))
         else:
-            return False
+            return False, (config1, config2)
 
-    return True
+    return True, seen
+
+
+def symbolic_bisimulation(
+    parser1: ParserProgram, parser2: ParserProgram, enable_leaps: bool
+) -> tuple[bool, tuple[DFA.Configuration, DFA.Configuration]] | tuple[bool, set[Any]]:
+    pass
