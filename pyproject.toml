@@ -3,10 +3,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "Kangaroo"
+name = "kangaroo"
 version = "0.1.0"
 description = "An equivalence checker for P4 packet parsers"
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Jort van Leenen", email = "jort@vleenen.nl" },
@@ -27,6 +28,14 @@ classifiers = [
     "Topic :: System :: Networking",
     "Typing :: Typed",
 ]
+dependencies = [
+    "pySMT ~= 0.9.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff ~= 0.11.9",
+]
 
 [project.urls]
 "source" = "https://github.com/jortvanleenen/Kangaroo"
@@ -34,6 +43,9 @@ classifiers = [
 
 [project.scripts]
 kangaroo = "kangaroo.main:main"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "README.md", "LICENSE", "pyproject.toml"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kangaroo"]
