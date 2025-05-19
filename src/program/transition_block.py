@@ -52,6 +52,8 @@ class TransitionBlock:
             self.cases[tuple(for_values)] = to_state_name
 
     def eval(self, store: dict) -> str:
+        if len(self.values) == 0:
+            return self.cases[tuple([DontCare()])]
         evaluated_values = [expression.eval(store) for expression in self.values]
         for key, state in self.cases.items():
             if len(key) != len(evaluated_values):

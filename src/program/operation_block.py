@@ -35,8 +35,8 @@ class OperationBlock(Component):
                     parsed_component = Assignment(self.program, component)
                 case "MethodCallStatement":
                     parsed_component = MethodCall(self.program, component)
-                    if isinstance(parsed_component, Extract):
-                        self.size += parsed_component.size
+                    if isinstance(parsed_component.instance, Extract):
+                        self.size += parsed_component.instance.size
                 case _:
                     logger.warning(
                         f"Ignoring unknown component type '{component['Node_Type']}'"
