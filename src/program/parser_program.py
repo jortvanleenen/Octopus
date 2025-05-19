@@ -170,7 +170,7 @@ class ParserProgram:
     def __repr__(self) -> str:
         return (
             f"Parser(input={self.input_name!r}, "
-            f"output=({self.output_type} {self.output_name}), "
+            f"output=({self.output_type!r} {self.output_name!r}), "
             f"types={list(self.types.keys())!r}, "
             f"states={list(self.states.keys())!r})"
         )
