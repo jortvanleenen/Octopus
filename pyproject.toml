@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kangaroo"
-version = "0.1.0"
+dynamic = ["version"]
 description = "An equivalence checker for P4 packet parsers"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
@@ -49,6 +49,9 @@ include = ["src", "README.md", "LICENSE", "pyproject.toml"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kangaroo"]
+
+[tool.hatch.version]
+path = "src/kangaroo/__about__.py"
 
 [tool.ruff]
 target-version = "py313"

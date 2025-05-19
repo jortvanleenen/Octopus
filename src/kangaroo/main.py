@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Dict, Any, Generator
 
 from bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
+from kangaroo.__about__ import __version__
 from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,9 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Kangaroo is an equivalence checker for P4 packet parsers.",
         epilog="Developed by Jort van Leenen.",
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"Kangaroo v{__version__}"
     )
     parser.add_argument(
         "-j",

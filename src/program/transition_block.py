@@ -1,5 +1,5 @@
 """
-This module defines SelectExpression, a class representing the transition block of a P4 parser state.
+This module defines TransitionBlock, a class representing the transition block of a P4 parser state.
 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
@@ -74,7 +74,7 @@ class TransitionBlock:
         n_spaces = 2
         output = []
         if self.values:
-            output.append(f"Values: ({", ".join(str(v) for v in self.values)})")
+            output.append(f"Values: ({', '.join(str(v) for v in self.values)})")
 
         output.append("Cases:")
         for key, state in self.cases.items():
