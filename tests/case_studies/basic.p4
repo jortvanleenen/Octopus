@@ -25,6 +25,8 @@ parser Parser(packet_in pkt, out headers_t hdr) {
         pkt.extract(hdr.mpls);
         bit<2> test2 = hdr.mpls.label[0:0] ++ hdr.mpls.label[1:1];
         hdr.mpls.label[1:0] = test2;
+        bit<2> test3 = 2;
+        hdr.mpls.label[test3:test3] = test4;
         hdr.mpls.label = hdr.mpls.label;
         transition select(hdr.mpls.label[23:23], hdr.mpls.label[24:21]) {
             (0, 0x44): start;

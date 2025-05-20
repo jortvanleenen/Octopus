@@ -9,7 +9,7 @@ import logging
 
 from typing import TYPE_CHECKING, Dict, Tuple
 
-from src.program.expression import Expression, Slice
+from src.program.expression import Expression, Slice, parse_expression
 
 if TYPE_CHECKING:
     from src.program.parser_program import ParserProgram
@@ -36,9 +36,8 @@ class Assignment(Component):
             self.parse(component)
 
     def parse(self, component: dict) -> None:
-        # self.left = LValue(component["left"])
-        self.left = Expression(component["left"])
-        self.right = Expression(component["right"])
+        self.left = parse_expression(component["left"])
+        self.right = parse_expression(component["right"])
 
     def eval(self, store: Dict[str, str], buffer: str) -> Tuple[Dict[str, str], str]:
         right_value = self.right.eval(store)

@@ -1,73 +1,137 @@
+"""
+This module defines classes for symbolic execution.
+
+Author: Jort van Leenen
+License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
+"""
+
+from abc import ABC, abstractmethod
+
+from pysmt.shortcuts import (
+    Symbol,
+    BV,
+    BVConcat,
+    BVExtract,
+    Equals,
+    And,
+    TRUE,
+    Exists,
+    Not,
+)
+from pysmt.typing import BVType
+
+from kangaroo.bit_vector import BitVector
+from kangaroo.utils import AutoRepr
+from program.component import Assignment, MethodCall, Extract
+from program.operation_block import OperationBlock
+from program.parser_program import ParserProgram
+from program.transition_block import TransitionBlock
+
+
 class PureFormula:
-    class Expression:
+    """A formula that should be template-guarded for symbolic execution."""
+
+    class Subformula(ABC):
+        """A class representing a subformula in a PureFormula."""
+
+        @property
+        @abstractmethod
+        def size(self) -> int:
+            """Get the size of the bit vector underlying the subformula."""
+            pass
+
+        @abstractmethod
+        def to_smt(self):
+            """Get the SMT representation of the formula."""
+            pass
+
+        @abstractmethod
+        def __repr__(self) -> str:
+            pass
+
+        @abstractmethod
         def __str__(self) -> str:
-            raise NotImplementedError
+            pass
 
-        @property
-        def width(self) -> int:
-            raise NotImplementedError
-
-    class Variable(Expression):
-        def __init__(self, name: str, bits: str):
+    class Variable(Subformula, AutoRepr):
+        def __init__(self, name: str, size: int):
             self.name = name
-            self.bits = bits
-
-        def __str__(self):
-            return f"{self.name}({self.bits})"
+            self.n_bits = size
 
         @property
-        def width(self) -> int:
-            return len(self.bits)
+        def size(self) -> int:
+            return self.n_bits
 
-    class BufferLeft(Expression):
-        def __init__(self, bits: str):
-            self.bits = bits
+        def to_smt(self):
+            return Symbol(self.name, BVType(self.size))
 
         def __str__(self):
-            return f"buf<({self.bits})"
+            return f"{self.name}({self.size})"
+
+    class BufferLeft(Subformula, AutoRepr):
+        def __init__(self, bv: BitVector):
+            self.bv = bv
 
         @property
-        def width(self) -> int:
-            return len(self.bits)
+        def size(self) -> int:
+            return len(self.bv)
 
-    class BufferRight(Expression):
-        def __init__(self, bits: str):
-            self.bits = bits
+        def to_smt(self):
+            return BV(self.bv.bits, self.size)
+
+        def __str__(self):
+            return f"buf<({self.bv})"
+
+        def __repr__(self):
+            return f"{self.__class__.__name__}(bv={self.bv!r})"
+
+    class BufferRight(Subformula, AutoRepr):
+        def __init__(self, bv: BitVector):
+            self.bv = bv
 
         def __str__(self):
             return f"buf>({self.bits})"
 
         @property
-        def width(self) -> int:
-            return len(self.bits)
+        def size(self) -> int:
+            return len(self.bv)
 
-    class FieldLeft(Expression):
-        def __init__(self, field: str, bits: str):
+        def to_smt(self):
+            return BV(self.bits, self.width)
+
+    class FieldLeft(Subformula, AutoRepr):
+        def __init__(self, field: str, bv: BitVector):
             self.field = field
-            self.bits = bits
+            self.bv = bv
 
         def __str__(self):
             return f"st<.{self.field}({self.bits})"
 
         @property
-        def width(self) -> int:
-            return len(self.bits)
+        def size(self) -> int:
+            return len(self.bv)
 
-    class FieldRight(Expression):
-        def __init__(self, field: str, bits: str):
+        def to_smt(self):
+            return BV(self.bv.bits, self.size)
+
+    class FieldRight(Subformula, AutoRepr):
+        def __init__(self, field: str, bv: BitVector):
             self.field = field
-            self.bits = bits
-
-        def __str__(self):
-            return f"st>.{self.field}({self.bits})"
+            self.bv: BitVector = bv
 
         @property
         def width(self) -> int:
             return len(self.bits)
 
-    class BitString(Expression):
+        def to_smt(self):
+            return BV(self.bits, self.width)
+
+        def __str__(self):
+            return f"st>.{self.field}({self.bits})"
+
+    class BitString(Subformula, AutoRepr):
         def __init__(self, bits: str):
-            self.bits = bits
+            super().__init__(bits)
 
         def __str__(self):
             return f"bs({self.bits})"
@@ -76,16 +140,21 @@ class PureFormula:
         def width(self) -> int:
             return len(self.bits)
 
-    class Slice(Expression):
-        def __init__(self, base: "PureFormula.Expression", msb: int, lsb: int):
+        def to_smt(self):
+            return BV(self.bits, self.width)
+
+    class Slice(Subformula, AutoRepr):
+        def __init__(self, base: "PureFormula.Subformula", msb: int, lsb: int):
             assert msb >= 0 and lsb >= 0, "Slice indices must be non-negative"
             assert msb >= lsb, "Invalid slice range: msb must be ≥ lsb"
-            assert msb < base.width and lsb < base.width, "Slice indices out of bounds"
+            assert msb < base.size and lsb < base.size, "Slice indices out of bounds"
+
+            sliced_bits = base.bits[msb:lsb]
+            super().__init__(sliced_bits)
 
             self.base = base
             self.hi = msb
             self.lo = lsb
-            self.bits = base.bits[msb:lsb]
 
         def __str__(self):
             return f"{self.base}[{self.hi}:{self.lo}]"
@@ -94,9 +163,12 @@ class PureFormula:
         def width(self):
             return len(self.bits)
 
-    class Concat(Expression):
+        def to_smt(self):
+            return BVExtract(self.base.to_smt(), start=self.hi, end=self.lo)
+
+    class Concat(Subformula, AutoRepr):
         def __init__(
-            self, left: "PureFormula.Expression", right: "PureFormula.Expression"
+            self, left: "PureFormula.Subformula", right: "PureFormula.Subformula"
         ):
             self.left = left
             self.right = right
@@ -109,9 +181,12 @@ class PureFormula:
         def width(self):
             return len(self.bits)
 
-    class Equality:
+        def to_smt(self):
+            return BVConcat(self.left.to_smt(), self.right.to_smt())
+
+    class Equality(AutoRepr):
         def __init__(
-            self, left: "PureFormula.Expression", right: "PureFormula.Expression"
+            self, left: "PureFormula.Subformula", right: "PureFormula.Subformula"
         ):
             assert left.bits == right.bits, "Bitvector mismatch in equality"
             self.left = left
@@ -120,22 +195,24 @@ class PureFormula:
         def __str__(self):
             return f"{self.left} == {self.right}"
 
+        def to_smt(self):
+            # Exists <all variables in left and right>, Equals(left smt, right smt)
+            return Exists()  # TODO
+
     def __init__(self):
         self.equalities: list[PureFormula.Equality] = []
         self.used_variable_names: set[str] = set()
         self.next_free_variable_index: int = 0
 
-    def new_variable(self, bits: str) -> "PureFormula.Variable":
-        """Generate a fresh variable with a unique name and the given bitstring."""
+    def fresh_variable(self, size: int) -> "PureFormula.Variable":
         while True:
             name = str(self.next_free_variable_index)
             self.next_free_variable_index += 1
             if name not in self.used_variable_names:
                 self.used_variable_names.add(name)
-                return PureFormula.Variable(name, bits)
+                return PureFormula.Variable(name, size)
 
-    def substitute(self, mapping: dict[str, "PureFormula.Expression"]) -> None:
-        """Substitute variable names using a name → expression mapping."""
+    def substitute(self, mapping: dict[str, "PureFormula.Subformula"]) -> None:
         new_equalities = []
         for eq in self.equalities:
             left = self._substitute_expr(eq.left, mapping)
@@ -145,9 +222,9 @@ class PureFormula:
 
     def _substitute_expr(
         self,
-        expr: "PureFormula.Expression",
-        mapping: dict[str, "PureFormula.Expression"],
-    ) -> "PureFormula.Expression":
+        expr: "PureFormula.Subformula",
+        mapping: dict[str, "PureFormula.Subformula"],
+    ) -> "PureFormula.Subformula":
         if isinstance(expr, PureFormula.Variable):
             return mapping.get(expr.name, expr)
         elif isinstance(expr, PureFormula.Slice):
@@ -158,13 +235,20 @@ class PureFormula:
             right = self._substitute_expr(expr.right, mapping)
             return PureFormula.Concat(left, right)
         else:
-            return expr  # Other expressions are considered constant
+            return expr
+
+    def to_smt(self):
+        if not self.equalities:
+            return TRUE()
+        return And(*[eq.to_smt() for eq in self.equalities])
 
     def __str__(self):
         return " ∧ ".join(str(eq) for eq in self.equalities)
 
 
-class TemplateGuardedFormula:
+class TemplateGuardedFormula(AutoRepr):
+    """A template-guarded formula for symbolic execution."""
+
     def __init__(
         self,
         state_left: str = None,
@@ -180,8 +264,36 @@ class TemplateGuardedFormula:
         self.formula = formula
 
 
-def strongest_postcondition():
-    pass
+def strongest_postcondition(
+    formula: TemplateGuardedFormula, operationBlock: OperationBlock, left: bool
+):
+    pf = formula.formula
 
-def transition_r():
-    pass
+    for component in operationBlock.components:
+        if isinstance(component, Assignment):
+            pass  # TODO
+        elif isinstance(component, Extract):
+            field_name = component.header_reference
+            field_width = component.size
+
+            y = pf.fresh_variable(field_width)
+
+            if left:
+                field = PureFormula.FieldLeft(field_name, )
+                buffer = PureFormula.Equality(PureFormula.BufferLeft())
+            else:
+                field = PureFormula.FieldRight(field_name, )
+
+
+
+        else:
+            raise NotImplementedError(f"Unknown component type: {type(component)}")
+
+
+def symbolic_transition(transition_block: TransitionBlock) -> list[tuple[object, str]]:
+    symbolic_values = [v.to_symbolic() for v in transition_block.values]
+
+    for
+
+    return transitions
+

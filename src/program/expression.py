@@ -1,20 +1,30 @@
 """
-This module defines Expression, a class representing an expression in a P4 parser state.
+This module defines Expression, a class hierarchy representing an expression in a P4 parser state.
 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
 import logging
-from typing import Dict, Tuple, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from src.program.parser_program import ParserProgram
+from abc import ABC, abstractmethod
+from typing import Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
 
-class Concatenate:
+class Expression(ABC):
+    @abstractmethod
+    def eval(self, store: Dict[str, str]) -> str:
+        pass
+
+    def __str__(self) -> str:
+        return repr(self)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
+
+
+class Concatenate(Expression):
     def __init__(self, obj: dict) -> None:
         self.left = None
         self.right = None
@@ -22,12 +32,12 @@ class Concatenate:
             self.parse(obj)
 
     def parse(self, obj: dict) -> None:
-        self.left = Expression(obj["left"])
-        self.right = Expression(obj["right"])
+        self.left = parse_expression(obj["left"])
+        self.right = parse_expression(obj["right"])
 
     def eval(self, store: Dict[str, str]) -> str:
-        left_value = self.left.eval(store)
-        right_value = self.right.eval(store)
+        left_value: str = self.left.eval(store)
+        right_value: str = self.right.eval(store)
         return left_value + right_value
 
     def __repr__(self) -> str:
@@ -37,7 +47,7 @@ class Concatenate:
         return f"{self.left} ++ {self.right}"
 
 
-class Slice:
+class Slice(Expression):
     def __init__(self, slice: dict = None) -> None:
         self.reference = None
         self.msb = None
@@ -50,9 +60,11 @@ class Slice:
         self.msb = slice["e1"]["value"]
         self.lsb = slice["e2"]["value"]
 
-    def eval(self, store: Dict[str, str]) -> Tuple[Dict[str, str], str]:
+    def eval(self, store: Dict[str, str]) -> str:
         value = self.reference.eval(store)
-        return value[self.lsb : self.msb]
+        # In P4, the lsb is zero and the slices are inclusive on both ends
+        # TODO
+
 
     def __repr__(self) -> str:
         return (
@@ -63,41 +75,7 @@ class Slice:
         return f"{self.reference}[{self.msb}:{self.lsb}]"
 
 
-class Expression:
-    def __init__(self, component: dict) -> None:
-        self.value = None
-        if component is not None:
-            self.parse(component)
-
-    def parse(self, component: dict) -> None:
-        logger.debug(f"Parsing expression: {component}")
-        match component["Node_Type"]:
-            case "Constant":
-                self.value = Constant(component)
-            case "Slice":
-                self.value = Slice(component)
-            case "Concat":
-                self.value = Concatenate(component)
-            case "Member" | "PathExpression":
-                self.value = Reference(component)
-            case "DefaultExpression":
-                self.value = DontCare()
-            case _:
-                logger.warning(
-                    f"Ignoring Expression of type '{component['Node_Type']}'"
-                )
-
-    def eval(self, store: Dict[str, str]) -> str:
-        return self.value.eval(store)
-
-    def __repr__(self) -> str:
-        return f"Expression(value={self.value!r})"
-
-    def __str__(self) -> str:
-        return str(self.value)
-
-
-class Constant:
+class Constant(Expression):
     def __init__(self, component: dict) -> None:
         self.numeric_value: int | float | None = None
         self.value: str | None = None
@@ -118,10 +96,7 @@ class Constant:
         return str(self.value)
 
 
-class DontCare:
-    def __init__(self):
-        pass
-
+class DontCare(Expression):
     def eval(self, store: Dict[str, str]) -> str:
         pass
 
@@ -138,7 +113,7 @@ class DontCare:
         return "*"
 
 
-class Reference:
+class Reference(Expression):
     def __init__(self, component: dict) -> None:
         self.reference = None
         if component is not None:
@@ -176,17 +151,17 @@ class Reference:
         return str(self.reference)
 
 
-# class LValue:
-#     def __init__(self, component: dict) -> None:
-#         if component is not None:
-#             self.parse(component)
-#
-#     def parse(self, component: dict) -> None | Slice | Reference:
-#         match component["Node_Type"]:
-#             case "Slice":
-#                 return Slice(component)
-#             case "Member":
-#                 return Reference(component)
-#             case _:
-#                 logger.warning(f"Ignoring LValue of type '{component['Node_Type']}'")
-#         return None
+_expression_dispatch = {
+    "Constant": Constant,
+    "Slice": Slice,
+    "Concat": Concatenate,
+    "Member": Reference,
+    "PathExpression": Reference,
+    "DefaultExpression": DontCare,
+}
+
+
+def parse_expression(component: dict) -> Expression:
+    logger.debug(f"Parsing expression: {component}")
+    cls = _expression_dispatch.get(component["Node_Type"], DontCare)
+    return cls(component) if cls is not DontCare else cls()
