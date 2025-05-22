@@ -9,7 +9,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import logging
 from typing import Dict
 
-from src.program.parser_state import ParserState
+from program.parser_state import ParserState
 
 logger = logging.getLogger(__name__)
 

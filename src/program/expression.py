@@ -62,9 +62,14 @@ class Slice(Expression):
 
     def eval(self, store: Dict[str, str]) -> str:
         value = self.reference.eval(store)
-        # In P4, the lsb is zero and the slices are inclusive on both ends
-        # TODO
-
+        new_lsb = len(value) - self.msb - 1
+        new_msb = len(value) - self.lsb
+        if new_lsb < 0 or new_msb < 0 or new_lsb >= len(value) or new_msb > len(value):
+            logger.warning(
+                f"Slice indices out of range: lsb={self.lsb}, msb={self.msb}, value length={len(value)}"
+            )
+            return ""
+        return value[new_lsb:new_msb]
 
     def __repr__(self) -> str:
         return (
@@ -97,8 +102,9 @@ class Constant(Expression):
 
 
 class DontCare(Expression):
-    def eval(self, store: Dict[str, str]) -> str:
-        pass
+    def eval(self, store: Dict[str, str]):  # Type hint?
+        return self
+        # pass
 
     def __hash__(self) -> int:
         return 0  # fixed value: all DontCares are "equal" and hash identically
@@ -115,7 +121,7 @@ class DontCare(Expression):
 
 class Reference(Expression):
     def __init__(self, component: dict) -> None:
-        self.reference = None
+        self.reference: str | None = None
         if component is not None:
             self.parse(component)
 
@@ -139,6 +145,8 @@ class Reference(Expression):
 
     def eval(self, store: Dict[str, str]) -> str:
         if self.reference in store:
+            if self.reference == "hdr.udp.label":
+                print("test")
             return store[self.reference]
         else:
             logger.warning(f"Reference '{self.reference}' not found in store.")

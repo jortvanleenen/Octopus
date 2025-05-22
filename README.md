@@ -7,9 +7,6 @@ Kangaroo is accompanied by the paper *"Practical Equivalence Checking of P4 Pars
 The implementation builds on earlier work from [Leapfrog](https://doi.org/10.48550/arXiv.2205.08762), a Rocq-based
 formal verifier for P4 parsers.
 
-
----
-
 ## Features
 
 - Equivalence checking for P4 parsers using either naive or (optimised) symbolic bisimulation;
@@ -33,21 +30,39 @@ Ensure `p4c-graphs` is available on your system's `PATH`.
 
 ## Installation
 
-Install Kangaroo in editable/development mode:
+To install Kangaroo, the following steps can be followed.
+Step 6 installs the project in development mode, including development dependencies.
+Feel free to customise this step according to your needs.
+For example, one could decide to install only the runtime dependencies by skipping `[dev]`.
 
 ```bash
+# 1. Clone the repository
 git clone https://github.com/jortvanleenen/Kangaroo.git
 cd Kangaroo
-pip install -e .
+
+# 2. Create a virtual environment
+python3 -m venv .venv
+
+# 3. Activate the virtual environment
+source .venv/bin/activate
+
+# 4. Upgrade pip
+pip install --upgrade pip
+
+# 5. Install Hatch (build + env management tool)
+pip install hatch
+
+# 6. Install the project with dev dependencies
+pip install -e .[dev]
 ```
 
 This makes the `kangaroo` command available in your environment.
 
-Alternatively, you can run Kangaroo directly using Python without installing it:
+To use symbolic bisimulation, at least one SMT solver has to be installed locally.
+PySMT provides the `pysmt-install` command to make doing this simple.
 
-```bash
-python -m kangaroo.main [OPTIONS] FILE1 FILE2
-```
+For example, to install Z3 and cvc5, run: `pysmt-install --cvc5 --z3`.
+Afterwards, `pysmt-install --check` can be used to verify the installation.
 
 ## Usage
 

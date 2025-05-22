@@ -7,7 +7,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 
-from src.program.expression import Expression, DontCare, parse_expression
+from program.expression import Expression, DontCare, parse_expression
 
 logger = logging.getLogger(__name__)
 

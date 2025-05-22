@@ -8,10 +8,10 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import logging
 from typing import TYPE_CHECKING, Dict
 
-from src.program.component import Component, MethodCall, Assignment, Extract
+from program.component import Component, MethodCall, Assignment, Extract
 
 if TYPE_CHECKING:
-    from src.program.parser_program import ParserProgram
+    from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
 

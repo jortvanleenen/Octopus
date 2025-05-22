@@ -7,13 +7,13 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 
-from src.program.operation_block import OperationBlock
-from src.program.transition_block import TransitionBlock
+from program.operation_block import OperationBlock
+from program.transition_block import TransitionBlock
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.program.parser_program import ParserProgram
+    from program.parser_program import ParserProgram
 
 
 logger = logging.getLogger(__name__)

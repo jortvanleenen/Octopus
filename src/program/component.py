@@ -9,10 +9,10 @@ import logging
 
 from typing import TYPE_CHECKING, Dict, Tuple
 
-from src.program.expression import Expression, Slice, parse_expression
+from program.expression import Expression, Slice, parse_expression
 
 if TYPE_CHECKING:
-    from src.program.parser_program import ParserProgram
+    from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class Assignment(Component):
         if isinstance(self.left, Slice):
             store[self.left.reference][self.left.lsb : self.left.msb] = right_value
         else:
-            store[self.left] = right_value
+            store[self.left.reference] = right_value
 
         return store, buffer
 

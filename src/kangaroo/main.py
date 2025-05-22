@@ -18,6 +18,8 @@ from functools import partial
 from pathlib import Path
 from typing import Dict, Any, Generator
 
+from pysmt.shortcuts import Portfolio, get_env
+
 from bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
 from kangaroo.__about__ import __version__
 from program.parser_program import ParserProgram
@@ -81,6 +83,14 @@ def parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="measure and print bisimulation execution time",
     )
+    parser.add_argument(
+        "-s",
+        "--solvers",
+        type=str,
+        nargs="+",
+        default=["z3", "cvc5", "cvc4"],
+        help="list of solvers supported by PySMT to use for symbolic bisimulation",
+    )
     return parser.parse_args()
 
 
@@ -107,6 +117,12 @@ def setup_logging(verbosity: int) -> None:
         )
     else:
         root_logger.setLevel(level)
+
+
+def configure_solver(solvers: list[str]) -> list[str]:
+    from pysmt.logics import get_logic_by_name
+    # TODO: change to BV when supported?
+    names = list(get_env().factory.all_solvers(logic=get_logic_by_name("BVt")).keys())
 
 
 def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
@@ -221,6 +237,8 @@ def main() -> None:
 
     logger.info("Starting...")
     logger.debug(f"Parsed CLI argument values: {args}")
+
+    configure_solver(args.solvers)
 
     logger.info("Reading P4 files...")
     ir_jsons = read_p4_files([args.file1, args.file2], args.json)

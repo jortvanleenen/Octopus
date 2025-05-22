@@ -7,8 +7,8 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 from typing import Any
 
-from src.automata.dfa import DFA
-from src.program.parser_program import ParserProgram
+from automata.dfa import DFA
+from program.parser_program import ParserProgram
 
 
 def naive_bisimulation(
@@ -47,6 +47,9 @@ def naive_bisimulation(
                 work_queue.append((next_config1, next_config2))
         else:
             return False, (config1, config2)
+
+        print (f"Seen: {len(seen)}")
+        print (f"Work queue: {len(work_queue)}")
 
     return True, seen
 

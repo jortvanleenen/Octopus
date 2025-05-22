@@ -9,7 +9,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import copy
 from typing import Dict, Optional, Set
 
-from src.program.parser_program import ParserProgram
+from program.parser_program import ParserProgram
 
 
 class DFA:
