@@ -9,6 +9,7 @@ from typing import Any
 
 from automata.dfa import DFA
 from program.parser_program import ParserProgram
+from pysmt.shortcuts import Portfolio
 
 
 def naive_bisimulation(
@@ -48,13 +49,16 @@ def naive_bisimulation(
         else:
             return False, (config1, config2)
 
-        print (f"Seen: {len(seen)}")
-        print (f"Work queue: {len(work_queue)}")
+        print(f"Seen: {len(seen)}")
+        print(f"Work queue: {len(work_queue)}")
 
     return True, seen
 
 
 def symbolic_bisimulation(
-    parser1: ParserProgram, parser2: ParserProgram, enable_leaps: bool
+    parser1: ParserProgram,
+    parser2: ParserProgram,
+    enable_leaps: bool,
+    solver_portfolio: Portfolio,
 ) -> tuple[bool, tuple[DFA.Configuration, DFA.Configuration]] | tuple[bool, set[Any]]:
     pass

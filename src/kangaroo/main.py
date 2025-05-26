@@ -18,6 +18,7 @@ from functools import partial
 from pathlib import Path
 from typing import Dict, Any, Generator
 
+from pysmt.logics import get_logic_by_name
 from pysmt.shortcuts import Portfolio, get_env
 
 from bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
@@ -88,8 +89,8 @@ def parse_arguments() -> argparse.Namespace:
         "--solvers",
         type=str,
         nargs="+",
-        default=["z3", "cvc5", "cvc4"],
-        help="list of solvers supported by PySMT to use for symbolic bisimulation",
+        default=["z3", "cvc5"],
+        help="list of solvers (supported by PySMT) to use for symbolic bisimulation",
     )
     return parser.parse_args()
 
@@ -119,10 +120,31 @@ def setup_logging(verbosity: int) -> None:
         root_logger.setLevel(level)
 
 
-def configure_solver(solvers: list[str]) -> list[str]:
-    from pysmt.logics import get_logic_by_name
+def create_portfolio(solvers: list[str], **options: Any) -> Portfolio:
+    """
+    Given a list of wanted solvers, return a portfolio of available solvers.
+
+    :param solvers: a list of solver names to check for availability
+    :return: a Portfolio object containing the available solvers
+    """
     # TODO: change to BV when supported?
-    names = list(get_env().factory.all_solvers(logic=get_logic_by_name("BVt")).keys())
+    logic_name = "BVt"  # Bit-vector logic with custom types
+    available_solvers = list(
+        get_env().factory.all_solvers(logic=get_logic_by_name(logic_name)).keys()
+    )
+    logger.info(f"Available solvers: {available_solvers}")
+
+    selected_solvers = [s for s in solvers if s in available_solvers]
+    if not selected_solvers:
+        raise ValueError(
+            "None of the specified solvers are available. "
+            "Available solvers: " + ", ".join(available_solvers)
+        )
+    logger.info(f"Selected solvers: {selected_solvers}")
+
+    portfolio = Portfolio(selected_solvers, get_logic_by_name(logic_name), **options)
+
+    return portfolio
 
 
 def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
@@ -203,8 +225,11 @@ def select_bisimulation_method(args: argparse.Namespace) -> tuple[callable, str]
         return naive_bisimulation, "Naive"
     else:
         logger.info("Using symbolic bisimulation")
+        portfolio = create_portfolio(args.solvers)
         return partial(
-            symbolic_bisimulation, enable_leaps=not args.disable_leaps
+            symbolic_bisimulation,
+            enable_leaps=not args.disable_leaps,
+            solver_portfolio=portfolio,
         ), "Symbolic"
 
 
@@ -238,8 +263,6 @@ def main() -> None:
     logger.info("Starting...")
     logger.debug(f"Parsed CLI argument values: {args}")
 
-    configure_solver(args.solvers)
-
     logger.info("Reading P4 files...")
     ir_jsons = read_p4_files([args.file1, args.file2], args.json)
 
@@ -270,10 +293,7 @@ def main() -> None:
         header = "--- Counterexample ---"
 
     logger.info(f"{message}\n{header}\n{certificate}")
-
-    print(message)
-    print(header)
-    print(certificate)
+    print(message + "\n" + header + "\n" + certificate)
 
     if args.output:
         try:

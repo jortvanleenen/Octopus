@@ -25,6 +25,7 @@ class ParserProgram:
         """
         self.types: Dict[str, dict | int] = {}
 
+        # TODO _prefix private vars? getters using @property?
         self.input_name: str | None = None
         self.output_name: str | None = None
         self.output_type: str | None = None
