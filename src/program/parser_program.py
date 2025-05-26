@@ -7,7 +7,6 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import logging
-from typing import Dict
 
 from program.parser_state import ParserState
 
@@ -17,25 +16,49 @@ logger = logging.getLogger(__name__)
 class ParserProgram:
     """A class representing a P4 parser program with its input and output types."""
 
-    def __init__(self, json: Dict | None = None) -> None:
+    def __init__(self, json: dict | None = None) -> None:
         """
         Initialise a ParserProgram object.
 
         :param json: the IR JSON data to parse
         """
-        self.types: Dict[str, dict | int] = {}
+        self._types: dict[str, dict | int] = {}
 
-        # TODO _prefix private vars? getters using @property?
-        self.input_name: str | None = None
-        self.output_name: str | None = None
-        self.output_type: str | None = None
+        self._input_name: str | None = None
+        self._output_name: str | None = None
+        self._output_type: str | None = None
 
-        self.states: Dict[str, ParserState] = {}
+        self._states: dict[str, ParserState] = {}
 
         if json is not None:
             self.parse(json)
 
-    def parse(self, data: Dict) -> None:
+    @property
+    def types(self) -> dict[str, dict | int] | None:
+        """Get the types of the parser program."""
+        return self._types
+
+    @property
+    def input_name(self) -> str | None:
+        """Get the name of the input parameter."""
+        return self._input_name
+
+    @property
+    def output_name(self) -> str | None:
+        """Get the name of the output parameter."""
+        return self._output_name
+
+    @property
+    def output_type(self) -> str | None:
+        """Get the type of the output parameter."""
+        return self._output_type
+
+    @property
+    def states(self) -> dict[str, ParserState]:
+        """Get the states of the parser program."""
+        return self._states
+
+    def parse(self, data: dict) -> None:
         """
         Parse IR JSON data into a ParserProgram object.
 
@@ -53,7 +76,7 @@ class ParserProgram:
                     logger.debug(f"For: '{obj}'")
                     self._parse_data_type(obj)
                 case "P4Parser":
-                    if len(self.states) > 0:
+                    if len(self._states) > 0:
                         logger.warning(
                             "Multiple parser blocks found, only the first one is used."
                         )
@@ -66,7 +89,7 @@ class ParserProgram:
                         f"Ignoring type '{obj['Node_Type']}' of object '{obj}'"
                     )
 
-    def _parse_data_type(self, obj: Dict) -> None:
+    def _parse_data_type(self, obj: dict) -> None:
         """
         Parse a data type object of a P4 program.
 
@@ -92,9 +115,9 @@ class ParserProgram:
                     )
 
         logger.info(f"Parsed type '{type_name}' with fields: {fields}")
-        self.types[type_name] = fields
+        self._types[type_name] = fields
 
-    def _parse_parser_block(self, obj: Dict) -> None:
+    def _parse_parser_block(self, obj: dict) -> None:
         """
         Parse a parser block object of a P4 program.
 
@@ -114,15 +137,15 @@ class ParserProgram:
             name = parameter["name"]
             logger.info(f"Parsing parameter '{name}'...")
             if parameter["direction"] == "out":
-                self.output_name = name
-                self.output_type = parameter["type"]["path"]["name"]
+                self._output_name = name
+                self._output_type = parameter["type"]["path"]["name"]
             else:
-                self.input_name = name
+                self._input_name = name
 
-        if self.input_name is None or self.output_name is None:
+        if self._input_name is None or self._output_name is None:
             raise ValueError("Could not determine both input and output parameters")
         logger.info(
-            f"Parsed parameters. Input '{self.input_name}', output '{self.output_name}'"
+            f"Parsed parameters. Input '{self._input_name}', output '{self._output_name}'"
         )
 
         states = obj["states"]["vec"]
@@ -131,11 +154,11 @@ class ParserProgram:
             logger.info(f"Parsing state '{name}'...")
             if name in ["reject", "accept"]:
                 continue
-            self.states[name] = ParserState(
+            self._states[name] = ParserState(
                 self, state["components"], state["selectExpression"]
             )
 
-        logger.info(f"Parsed states (excluding terminals): {list(self.states.keys())}")
+        logger.info(f"Parsed states (excluding terminals): {list(self._states.keys())}")
 
     def get_header_fields(self, reference: str) -> dict:
         """
@@ -150,18 +173,18 @@ class ParserProgram:
         :param reference: a reference to the header
         :return: a dictionary with the names and sizes of its fields
         """
-        type_content = self.types.get(self.output_type)
+        type_content = self._types.get(self._output_type)
         if type_content is None:
-            raise KeyError(f"Output type '{self.output_type}' not found in types")
+            raise KeyError(f"Output type '{self._output_type}' not found in types")
 
-        if reference.startswith(self.output_name + "."):
-            reference_parts = reference.removeprefix(self.output_name + ".").split(".")
+        if reference.startswith(self._output_name + "."):
+            reference_parts = reference.removeprefix(self._output_name + ".").split(".")
         else:
             reference_parts = reference.split(".")
         for part in reference_parts:
             if part not in type_content:
                 raise KeyError(f"Reference part '{part}' not found in type content")
-            type_content = self.types.get(type_content[part])
+            type_content = self._types.get(type_content[part])
             if type_content is None:
                 raise KeyError(f"Type '{part}' not found in types")
 
@@ -170,26 +193,30 @@ class ParserProgram:
 
     def __repr__(self) -> str:
         return (
-            f"Parser(input={self.input_name!r}, "
-            f"output=({self.output_type!r} {self.output_name!r}), "
-            f"types={list(self.types.keys())!r}, "
-            f"states={list(self.states.keys())!r})"
+            f"Parser(input={self._input_name!r}, "
+            f"output=({self._output_type!r} {self._output_name!r}), "
+            f"types={list(self._types.keys())!r}, "
+            f"states={list(self._states.keys())!r})"
         )
 
     def __str__(self) -> str:
         n_spaces = 2
         output = [
             "Parser",
-            n_spaces * " " + f"Input name: {self.input_name}",
-            n_spaces * " " + f"Output: {self.output_name} ({self.output_type})",
+            n_spaces * " " + f"Input name: {self._input_name}",
+            n_spaces * " " + f"Output: {self._output_name} ({self._output_type})",
             n_spaces * " " + "Types:",
         ]
-        for name, fields in self.types.items():
+        for name, fields in self._types.items():
             output.append(2 * n_spaces * " " + f"{name}: {fields}")
 
         output.append(n_spaces * " " + "States:")
-        for name, content in self.states.items():
+        for name, content in self._states.items():
             output.append(2 * n_spaces * " " + f"{name}:")
-            output.append("\n".join(3 * n_spaces * " " + line for line in str(content).splitlines()))
+            output.append(
+                "\n".join(
+                    3 * n_spaces * " " + line for line in str(content).splitlines()
+                )
+            )
 
         return "\n".join(output)
