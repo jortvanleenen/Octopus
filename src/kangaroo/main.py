@@ -16,11 +16,12 @@ import time
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
-from typing import Dict, Any, Generator
+from typing import Any, Generator, Callable
 
 from pysmt.logics import get_logic_by_name
 from pysmt.shortcuts import Portfolio, get_env
 
+from automata.dfa import DFA
 from bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
 from kangaroo.__about__ import __version__
 from program.parser_program import ParserProgram
@@ -129,7 +130,7 @@ def create_portfolio(solvers: list[str], **options: Any) -> Portfolio:
     """
     # TODO: change to BV when supported?
     logic_name = "BVt"  # Bit-vector logic with custom types
-    available_solvers = list(
+    available_solvers: list[str] = list(
         get_env().factory.all_solvers(logic=get_logic_by_name(logic_name)).keys()
     )
     logger.info(f"Available solvers: {available_solvers}")
@@ -147,7 +148,7 @@ def create_portfolio(solvers: list[str], **options: Any) -> Portfolio:
     return portfolio
 
 
-def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
+def read_p4_files(files: list[str], in_json: bool) -> list[dict]:
     """
     Read the provided (IR) P4 files and return their parsed JSON representations.
 
@@ -213,7 +214,15 @@ def read_p4_files(files: list[str], in_json: bool) -> list[Dict]:
     return jsons
 
 
-def select_bisimulation_method(args: argparse.Namespace) -> tuple[callable, str]:
+def select_bisimulation_method(
+    args: argparse.Namespace,
+) -> tuple[
+    Callable[
+        [ParserProgram, ParserProgram],
+        tuple[bool, set[tuple[DFA.Configuration, DFA.Configuration]]],
+    ],
+    str,
+]:
     """
     Select the bisimulation method based on the command-line arguments.
 
@@ -293,7 +302,7 @@ def main() -> None:
         header = "--- Counterexample ---"
 
     logger.info(f"{message}\n{header}\n{certificate}")
-    print(message + "\n" + header + "\n" + certificate)
+    print(message + "\n" + header + "\n" + str(certificate))
 
     if args.output:
         try:
@@ -307,6 +316,7 @@ def main() -> None:
 
     if args.fail_on_mismatch and not are_equal:
         sys.exit(1)
+
 
 if __name__ == "__main__":
     try:
