@@ -160,7 +160,7 @@ class ParserProgram:
 
         logger.info(f"Parsed states (excluding terminals): {list(self._states.keys())}")
 
-    def get_header_fields(self, reference: str) -> dict:
+    def get_header_fields(self, reference: str) -> dict[str, int]:
         """
         Get the names and sizes (in bits) of the fields in a header type.
 

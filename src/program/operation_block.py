@@ -6,7 +6,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import logging
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 from program.component import Component, MethodCall, Assignment, Extract
 
@@ -44,7 +44,7 @@ class OperationBlock(Component):
                     continue
             self.components.append(parsed_component)
 
-    def eval(self, store: Dict[str, str], buffer: str):
+    def eval(self, store: dict[str, str], buffer: str):
         """Evaluate the operation block."""
         for component in self.components:
             store, buffer = component.eval(store, buffer)

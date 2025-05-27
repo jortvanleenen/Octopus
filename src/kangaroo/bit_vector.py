@@ -1,3 +1,10 @@
+"""
+This module defines BitVector, a class representing a vector of bits.
+
+Author: Jort van Leenen
+License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
+"""
+
 class BitVector:
     def __init__(self, bits: str):
         if not all(c in "01" for c in bits):

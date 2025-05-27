@@ -7,7 +7,6 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import copy
-from typing import Dict, Optional, Set
 
 from program.parser_program import ParserProgram
 
@@ -18,7 +17,7 @@ class DFA:
     class Configuration:
         """A class representing a state of the automaton."""
 
-        def __init__(self, state_name: str, store: Dict[str, str], buffer: str):
+        def __init__(self, state_name: str, store: dict[str, str], buffer: str):
             self.state = state_name
             self.store = store
             self.buffer = buffer
@@ -97,5 +96,5 @@ class DFA:
         final_config = self.multi_step(config, bits)
         return final_config.is_accepting()
 
-    def initial_config(self, q0: str, store: Dict[str, str]) -> "DFA.Configuration":
+    def initial_config(self, q0: str, store: dict[str, str]) -> "DFA.Configuration":
         return DFA.Configuration(q0, store, "")

@@ -7,7 +7,13 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 
+from bisimulation.symbolic.formula import PureFormula
 from program.expression import Expression, DontCare, parse_expression
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
 
@@ -15,16 +21,29 @@ logger = logging.getLogger(__name__)
 class TransitionBlock:
     """A class representing the transition block of a P4 parser state."""
 
-    def __init__(self, select_expr: dict | None = None) -> None:
+    def __init__(
+        self, program: "ParserProgram", select_expr: dict | None = None
+    ) -> None:
         """
         Initialise a TransitionBlock object.
 
         :param select_expr: the selectExpression JSON object
         """
-        self.values: list[Expression] = []
-        self.cases: dict[tuple[Expression, ...], str] = {}
+        self._program = program
+        self._selectors: list[Expression] = []
+        self._cases: dict[tuple[Expression, ...], str] = {}
         if select_expr is not None:
             self.parse(select_expr)
+
+    @property
+    def selectors(self) -> list[Expression]:
+        """Get the selectors of the transition block."""
+        return self._selectors
+
+    @property
+    def cases(self) -> dict[tuple[Expression, ...], str]:
+        """Get the cases of the transition block."""
+        return self._cases
 
     def parse(self, select_expr: dict) -> None:
         """
@@ -37,10 +56,10 @@ class TransitionBlock:
             case "SelectExpression":
                 self._parse_select_expression(select_expr)
             case "PathExpression":
+                selector: tuple[Expression] = (DontCare(),)
                 to_state_name: str = select_expr["path"]["name"]
-                for_values: tuple[Expression] = (DontCare(),)
-                self.cases[for_values] = to_state_name
-                logger.info(f"Parsed dont_care transition to {to_state_name}")
+                self._cases[selector] = to_state_name
+                logger.info(f"Parsed 'dont_care' transition to '{to_state_name}'")
             case _:
                 logger.warning(f"Ignoring selectExpression of type '{select_type}'")
 
@@ -48,48 +67,75 @@ class TransitionBlock:
         """Parse a selectExpression JSON into a SelectExpression object."""
 
         for expression in select_expr["select"]["components"]["vec"]:
-            self.values.append(parse_expression(expression))
+            self._selectors.append(parse_expression(self._program, expression))
 
-        for case in select_expr["selectCases"]["vec"]:
+        for i, case in enumerate(select_expr["selectCases"]["vec"]):
             for_values = []
             keyset = case["keyset"]
             if "value" in keyset:
-                for_values.append(parse_expression(case["keyset"]))
+                for_values.append(
+                    parse_expression(self._program, keyset, len(self._selectors[i]))
+                )
             else:
                 for expression in keyset["components"]["vec"]:
-                    for_values.append(parse_expression(expression))
+                    for_values.append(
+                        parse_expression(
+                            self._program, expression, len(self._selectors[i])
+                        )
+                    )
             to_state_name = case["state"]["path"]["name"]
-            self.cases[tuple(for_values)] = to_state_name
+            self._cases[tuple(for_values)] = to_state_name
 
-            logger.info(f"Parsed transition to {to_state_name} for {for_values}")
+            logger.info(f"Parsed transition to '{to_state_name}' for '{for_values}'")
 
     def eval(self, store: dict) -> str:
-        if len(self.values) == 0:
-            return self.cases[tuple([DontCare()])]
-        evaluated_values = [expression.eval(store) for expression in self.values]
-        for key, state in self.cases.items():
-            if len(key) != len(evaluated_values):
+        if len(self._selectors) == 0:
+            return self._cases[tuple([DontCare()])]
+
+        evaluated_selectors = [expression.eval(store) for expression in self._selectors]
+        for key, state in self._cases.items():
+            if len(key) != len(evaluated_selectors):
                 logger.warning(
-                    f"Key length {len(key)} does not match evaluated values length {len(evaluated_values)}"
+                    f"Key length {len(key)} does not match evaluated values length {len(evaluated_selectors)}"
                 )
                 continue
 
             evaluated_for_values = [expression.eval(store) for expression in key]
-            if evaluated_for_values == evaluated_values:
+            if evaluated_for_values == evaluated_selectors:
                 return state
+
         return "reject"
 
     def __repr__(self) -> str:
-        return f"TransitionBlock(values={self.values!r}, cases={self.cases!r})"
+        return f"TransitionBlock(values={self._selectors!r}, cases={self._cases!r})"
 
     def __str__(self) -> str:
         n_spaces = 2
         output = []
-        if self.values:
-            output.append(f"Values: ({', '.join(str(v) for v in self.values)})")
+        if self._selectors:
+            output.append(f"Values: ({', '.join(str(v) for v in self._selectors)})")
 
         output.append("Cases:")
-        for key, state in self.cases.items():
+        for key, state in self._cases.items():
             key_str = ", ".join(str(k) for k in key)
             output.append(" " * n_spaces + f"({key_str}) -> {state}")
         return "\n".join(output)
+
+    def symbolic_transition(self, pf: PureFormula) -> set[tuple[PureFormula, str]]:
+        symbolic_cases: set[tuple[PureFormula, str]] = set()
+        seen: set[PureFormula] = set()
+        fresh_variables = [pf.fresh_variable(len(v)) for v in self._selectors]
+        for for_values, to_state in self._cases.items():
+            formula = None
+            for i, v in enumerate(for_values):
+                if formula is None:
+                    formula = PureFormula.Equals(fresh_variables[i], v)
+                formula = PureFormula.And(
+                    formula, PureFormula.Equals(v, fresh_variables[i])
+                )
+            seen.add(formula)
+            for f in seen:
+                formula = PureFormula.And(formula, PureFormula.Not(f))
+            symbolic_cases.add((formula, to_state))
+
+        return symbolic_cases
