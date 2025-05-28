@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "kangaroo"
+name = "leapedfrog"
 dynamic = ["version"]
 description = "An equivalence checker for P4 packet parsers"
 readme = { file = "README.md", content-type = "text/markdown" }
@@ -38,20 +38,20 @@ dev = [
 ]
 
 [project.urls]
-"source" = "https://github.com/jortvanleenen/Kangaroo"
-"release notes" = "https://github.com/jortvanleenen/Kangaroo/releases"
+"source" = "https://github.com/jortvanleenen/LeapedFrog"
+"release notes" = "https://github.com/jortvanleenen/LeapedFrog/releases"
 
 [project.scripts]
-kangaroo = "kangaroo.main:main"
+leapedfrog = "leapedfrog.main:main"
 
 [tool.hatch.build.targets.sdist]
 include = ["src", "README.md", "LICENSE", "pyproject.toml"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/kangaroo"]
+packages = ["src/leapedfrog"]
 
 [tool.hatch.version]
-path = "src/kangaroo/__about__.py"
+path = "src/leapedfrog/__about__.py"
 
 [tool.ruff]
 target-version = "py313"

@@ -21,8 +21,8 @@ from pysmt.shortcuts import (
 )
 from pysmt.typing import BVType
 
-from kangaroo.bit_vector import BitVector
-from kangaroo.utils import AutoRepr
+from leapedfrog.bit_vector import BitVector
+from leapedfrog.utils import AutoRepr
 from program.expression import Expression
 
 
