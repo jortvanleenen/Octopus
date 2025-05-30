@@ -7,7 +7,6 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 from abc import ABC, abstractmethod
-from functools import partial
 from typing import TYPE_CHECKING, Callable
 
 import pysmt.shortcuts
@@ -229,7 +228,7 @@ class Reference(Expression):
 
 
 _EXPRESSION_DISPATCH: dict[
-    str, Callable[[ParserProgram, dict, int | None], Expression]
+    str, Callable[["ParserProgram", dict, int | None], Expression]
 ] = {
     "Concat": lambda program, component, size_context: Concatenate(
         program=program, obj=component
@@ -251,7 +250,7 @@ _EXPRESSION_DISPATCH: dict[
 
 
 def parse_expression(
-    program: ParserProgram, component: dict, size_context: int = None
+    program: "ParserProgram", component: dict, size_context: int = None
 ) -> Expression:
     """
     Parse a P4 expression component into an Expression object.

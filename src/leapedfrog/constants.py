@@ -6,4 +6,4 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 # TODO: change to BV when supported?
-logic_name = "BVt" # Bit-vector logic with custom types
+logic_name = "BVt"  # Bit-vector logic with custom types

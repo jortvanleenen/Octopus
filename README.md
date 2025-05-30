@@ -113,23 +113,37 @@ Print execution time (wall and CPU time):
 leapedfrog -j parser1.json parser2.json --time
 ```
 
+Customise the SMT solver portfolio and provide (global) options:
+
+```
+leapedfrog -j p1.json p2.json \
+--solvers ["z3", ("cvc5", {"incremental": False})] \
+--solvers-global-options {"generate_models": False}
+```
+
+_Note: evaluation of the options is done using `ast.literal_eval()`, so it must be a valid Python literal._
+_For `--solvers`, the following object is accepted: `list[str | tuple[str, dict[str, Any]]]`._
+_For `--solvers-global-options`, the following object is accepted: `dict[str, Any]`._
+
 ## CLI Options
 
 LeapedFrog provides a command-line interface (CLI) with the following options:
 
-| Short | Long                 | Description                                                                |
-|-------|----------------------|----------------------------------------------------------------------------|
-| `-h`  | `--help`             | Show a help message and exit                                               |
-|       | `--version`          | Show the version of LeapedFrog and exit                                      |
-| `-j`  | `--json`             | Specify that both inputs are in IR (p4c) JSON format                       |
-|       | `file1`              | Path to the first P4 program                                               |
-|       | `file2`              | Path to the second P4 program                                              |
-| `-v`  | `--verbosity`        | Increase output verbosity (`-v`, `-vv`, `-vvv`)                            |
-| `-n`  | `--naive`            | Use naive bisimulation instead of symbolic bisimulation                    |
-|       | `--disable_leaps`    | Disable leaps in symbolic bisimulation (ignored if `--naive` is set)       |
-| `-o`  | `--output`           | Write the bisimulation certificate or counterexample to the specified file |
-|       | `--fail-on-mismatch` | Exit with code 1 if the parsers are not equivalent                         |
-| `-t`  | `--time`             | Measure and print bisimulation execution time                              |
+| Short | Long                       | Description                                                                |
+|-------|----------------------------|----------------------------------------------------------------------------|
+| `-h`  | `--help`                   | Show a help message and exit                                               |
+|       | `--version`                | Show the version of LeapedFrog and exit                                    |
+| `-j`  | `--json`                   | Specify that both inputs are in IR (p4c) JSON format                       |
+|       | `file1`                    | Path to the first P4 program                                               |
+|       | `file2`                    | Path to the second P4 program                                              |
+| `-v`  | `--verbosity`              | Increase output verbosity (`-v`, `-vv`, `-vvv`)                            |
+| `-n`  | `--naive`                  | Use naive bisimulation instead of symbolic bisimulation                    |
+|       | `--disable_leaps`          | Disable leaps in symbolic bisimulation (ignored if `--naive` is set)       |
+| `-o`  | `--output`                 | Write the bisimulation certificate or counterexample to the specified file |
+|       | `--fail-on-mismatch`       | Exit with code 1 if the parsers are not equivalent                         |
+| `-t`  | `--time`                   | Measure and print bisimulation execution time                              |
+| `-s`  | `--solvers`                | Specify which SMT solvers to use along with their options                  |
+|       | `--solvers-global-options` | Specify global options for all solvers                                     |
 
 ## License
 

@@ -6,6 +6,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import argparse
+import ast
 import json
 import logging
 import shutil
@@ -90,9 +91,14 @@ def parse_arguments() -> argparse.Namespace:
         "-s",
         "--solvers",
         type=str,
-        nargs="+",
-        default=["z3", "cvc5"],
-        help="list of solvers (supported by PySMT) to use for symbolic bisimulation",
+        default="['z3', 'cvc5']",
+        help="list of solvers, possibly with options, to use for symbolic bisimulation",
+    )
+    parser.add_argument(
+        "--solvers-global-options",
+        type=str,
+        metavar="GLOBAL_OPTIONS",
+        help="global options for the provided solvers",
     )
     return parser.parse_args()
 
@@ -103,15 +109,9 @@ def setup_logging(verbosity: int) -> None:
 
     :param verbosity: the verbosity level
     """
-    if verbosity >= 3:
-        level = logging.DEBUG
-    elif verbosity == 2:
-        level = logging.INFO
-    elif verbosity == 1:
-        level = logging.WARNING
-    else:
-        level = logging.ERROR
-
+    level = [logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG][
+        min(verbosity, 3)
+    ]
     root_logger = logging.getLogger()
     if not root_logger.handlers:
         logging.basicConfig(
@@ -122,19 +122,56 @@ def setup_logging(verbosity: int) -> None:
         root_logger.setLevel(level)
 
 
-def create_portfolio(solvers: list[str], **options: Any) -> Portfolio:
+def create_portfolio(args: argparse.Namespace) -> Portfolio:
     """
     Given a list of wanted solvers, return a portfolio of available solvers.
 
-    :param solvers: a list of solver names to check for availability
+    :param args: the parsed command-line arguments
     :return: a Portfolio object containing the available solvers
     """
+    try:
+        solvers = ast.literal_eval(args.solvers)
+    except (SyntaxError, ValueError) as e:
+        raise ValueError(
+            f"Invalid solvers format: {args.solvers}. "
+            "Expected a list of solvers, e.g., ['z3', ('cvc5', {'option': 'value'})]."
+        ) from e
+
+    options = {}
+    if args.solvers_global_options:
+        try:
+            options = ast.literal_eval(args.solvers_global_options)
+        except (SyntaxError, ValueError) as e:
+            raise ValueError(
+                f"Invalid solvers global options format: {args.solvers_global_options}. "
+                "Expected a dictionary, e.g., {'option': 'value'}."
+            ) from e
+
     available_solvers: list[str] = list(
-        get_env().factory.all_solvers(logic=get_logic_by_name(constants.logic_name)).keys()
+        get_env()
+        .factory.all_solvers(logic=get_logic_by_name(constants.logic_name))
+        .keys()
     )
     logger.info(f"Available solvers: {available_solvers}")
 
-    selected_solvers = [s for s in solvers if s in available_solvers]
+    selected_solvers = []
+    for solver in solvers:
+        if isinstance(solver, str):
+            if solver in available_solvers:
+                selected_solvers.append(solver)
+            else:
+                logger.warning(f"Solver '{solver}' is not available.")
+        elif isinstance(solver, tuple) and len(solver) == 2:
+            name, opts = solver
+            if name in available_solvers:
+                selected_solvers.append((name, opts))
+            else:
+                logger.warning(f"Solver '{name}' with options {opts} is not available.")
+        else:
+            logger.error(
+                f"Invalid solver format: {solver}. "
+                "Expected a string or a tuple (name, options)."
+            )
     if not selected_solvers:
         raise ValueError(
             "None of the specified solvers are available. "
@@ -142,7 +179,9 @@ def create_portfolio(solvers: list[str], **options: Any) -> Portfolio:
         )
     logger.info(f"Selected solvers: {selected_solvers}")
 
-    portfolio = Portfolio(selected_solvers, get_logic_by_name(constants.logic_name), **options)
+    portfolio = Portfolio(
+        selected_solvers, get_logic_by_name(constants.logic_name), **options
+    )
 
     return portfolio
 
@@ -232,8 +271,11 @@ def select_bisimulation_method(
         logger.info("Using naive bisimulation")
         return naive_bisimulation, "Naive"
     else:
-        logger.info("Using symbolic bisimulation")
-        portfolio = create_portfolio(args.solvers)
+        portfolio = create_portfolio(args)
+        logger.info(
+            f"Using symbolic bisimulation (leaps: {not args.disable_leaps})"
+            f" with solvers: {portfolio.solvers}"
+        )
         return partial(
             symbolic_bisimulation,
             enable_leaps=not args.disable_leaps,
@@ -271,6 +313,8 @@ def main() -> None:
     logger.info("Starting...")
     logger.debug(f"Parsed CLI argument values: {args}")
 
+    method, method_name = select_bisimulation_method(args)
+
     logger.info("Reading P4 files...")
     ir_jsons = read_p4_files([args.file1, args.file2], args.json)
 
@@ -286,7 +330,6 @@ def main() -> None:
     logger.debug(f"Parser object 2 (repr): '{parsers[1]!r}'")
     logger.debug(f"Parser object 2 (str)\n {parsers[1]}")
 
-    method, method_name = select_bisimulation_method(args)
     if args.time:
         with timed_block(f"{method_name} bisimulation"):
             are_equal, certificate = method(parsers[0], parsers[1])
