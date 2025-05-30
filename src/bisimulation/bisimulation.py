@@ -4,13 +4,16 @@ This module defines Component, a class representing an operation in a P4 parser 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
+
 import copy
+
+from pysmt.shortcuts import Implies, Or, Portfolio
 
 from automata.dfa import DFA
 from bisimulation.symbolic.formula import GuardedFormula, PureFormula
+from leapedfrog import constants
 from program.expression import Concatenate
 from program.parser_program import ParserProgram
-from pysmt.shortcuts import Portfolio, Implies, Or
 
 
 def naive_bisimulation(
@@ -76,7 +79,7 @@ def symbolic_bisimulation(
         # TODO: Update logic to BV when possible?
         if Implies(
             current_pf.to_smt(), Or(*[pf.to_smt() for pf in relevant_pfs])
-        ).is_sat(logic="BVt", portfolio=solver_portfolio):
+        ).is_sat(logic=constants.logic_name, portfolio=solver_portfolio):
             continue
 
         # Both transition
@@ -101,7 +104,9 @@ def symbolic_bisimulation(
                     formula.state_r
                 ].transitionBlock.symbolic_transition(new_pf):
                     new_pf_copy = copy.deepcopy(new_pf)
-                    new_pf_copy = PureFormula.And(new_pf_copy, PureFormula.And(form_l, form_r))
+                    new_pf_copy = PureFormula.And(
+                        new_pf_copy, PureFormula.And(form_l, form_r)
+                    )
                     work_queue.append(
                         GuardedFormula(
                             to_state_l,
@@ -183,4 +188,3 @@ def symbolic_bisimulation(
                     new_pf,
                 )
             )
-

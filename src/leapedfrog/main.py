@@ -16,13 +16,14 @@ import time
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
-from typing import Any, Generator, Callable
+from typing import Any, Callable, Generator
 
 from pysmt.logics import get_logic_by_name
 from pysmt.shortcuts import Portfolio, get_env
 
 from automata.dfa import DFA
 from bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
+from leapedfrog import constants
 from leapedfrog.__about__ import __version__
 from program.parser_program import ParserProgram
 
@@ -128,10 +129,8 @@ def create_portfolio(solvers: list[str], **options: Any) -> Portfolio:
     :param solvers: a list of solver names to check for availability
     :return: a Portfolio object containing the available solvers
     """
-    # TODO: change to BV when supported?
-    logic_name = "BVt"  # Bit-vector logic with custom types
     available_solvers: list[str] = list(
-        get_env().factory.all_solvers(logic=get_logic_by_name(logic_name)).keys()
+        get_env().factory.all_solvers(logic=get_logic_by_name(constants.logic_name)).keys()
     )
     logger.info(f"Available solvers: {available_solvers}")
 
@@ -143,7 +142,7 @@ def create_portfolio(solvers: list[str], **options: Any) -> Portfolio:
         )
     logger.info(f"Selected solvers: {selected_solvers}")
 
-    portfolio = Portfolio(selected_solvers, get_logic_by_name(logic_name), **options)
+    portfolio = Portfolio(selected_solvers, get_logic_by_name(constants.logic_name), **options)
 
     return portfolio
 

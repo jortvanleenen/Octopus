@@ -7,21 +7,20 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 from abc import ABC, abstractmethod
-
 from typing import TYPE_CHECKING
 
 from bisimulation.symbolic.formula import PureFormula
 from program.expression import (
+    Concatenate,
     Expression,
+    Reference,
     Slice,
     parse_expression,
-    Concatenate,
-    Reference,
 )
 
 if TYPE_CHECKING:
-    from program.parser_program import ParserProgram
     from program.operation_block import OperationBlock
+    from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +67,9 @@ class Assignment(Component):
         new_var = pf.fresh_variable(len(reference_var))
         substitution = {reference_var: new_var}
         pf.substitute(substitution)
-        return PureFormula.And(reference_var, PureFormula.Equals(reference_var, self.right))
+        return PureFormula.And(
+            reference_var, PureFormula.Equals(reference_var, self.right)
+        )
 
     def __repr__(self) -> str:
         return f"Component(left={self.left!r}, right={self.right!r})"

@@ -9,6 +9,7 @@ import logging
 from abc import ABC, abstractmethod
 from functools import partial
 from typing import TYPE_CHECKING, Callable
+
 import pysmt.shortcuts
 
 if TYPE_CHECKING:

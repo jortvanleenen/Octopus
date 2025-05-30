@@ -8,16 +8,16 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 from abc import ABC, abstractmethod
 
 from pysmt.shortcuts import (
-    Symbol,
     BV,
+    TRUE,
+    And,
     BVConcat,
     BVExtract,
-    And,
-    TRUE,
+    Equals,
     Exists,
     Not,
-    Equals,
     Or,
+    Symbol,
 )
 from pysmt.typing import BVType
 
@@ -168,9 +168,7 @@ class PureFormula:
             return "TRUE"
 
     class Equals(Subformula, AutoRepr):
-        def __init__(
-            self, left: Expression, right: Expression
-        ):
+        def __init__(self, left: Expression, right: Expression):
             assert left.bits == right.bits, "Bitvector mismatch in equality"
             self.left = left
             self.right = right
@@ -188,11 +186,12 @@ class PureFormula:
         self.header_field_vars: dict[tuple[str, bool], PureFormula.Variable] = {}
         self.buf_vars: dict[bool, PureFormula.Variable] | None = None
 
-
     def get_header_field_var(self, name: str, left: bool):
         return self.header_field_vars.get((name, left), None)
 
-    def set_header_field_var(self, name: str, left: bool, variable: "PureFormula.Variable"):
+    def set_header_field_var(
+        self, name: str, left: bool, variable: "PureFormula.Variable"
+    ):
         """Set a header variable by name, ensuring it is unique."""
         self.header_field_vars[(name, left)] = variable
         self.used_vars.add(variable)
@@ -216,7 +215,9 @@ class PureFormula:
                 self.used_vars.add(name)
                 return PureFormula.Variable(name, size)
 
-    def substitute(self, mapping: dict["PureFormula.Variable", "PureFormula.Subformula"]) -> None:
+    def substitute(
+        self, mapping: dict["PureFormula.Variable", "PureFormula.Subformula"]
+    ) -> None:
         new_equalities = []
         for eq in self.equalities:
             left = self._substitute_expr(eq.left, mapping)
@@ -244,7 +245,9 @@ class PureFormula:
     def to_smt(self):
         if not self.equalities:
             return TRUE()
-        return Exists(*[v for v in self.used_vars], Or(*[eq.to_smt() for eq in self.equalities]))
+        return Exists(
+            *[v for v in self.used_vars], Or(*[eq.to_smt() for eq in self.equalities])
+        )
 
     def __str__(self):
         return " ∧ ".join(str(eq) for eq in self.equalities)
@@ -270,8 +273,8 @@ class GuardedFormula(AutoRepr):
     def equal_template(self, other: "GuardedFormula") -> bool:
         """Check if two template-guarded formulas are equal."""
         return (
-                self.state_l == other.state_l
-                and self.state_r == other.state_r
-                and self.buf_len_l == other.buf_len_l
-                and self.buf_len_r == other.buf_len_r
+            self.state_l == other.state_l
+            and self.state_r == other.state_r
+            and self.buf_len_l == other.buf_len_l
+            and self.buf_len_r == other.buf_len_r
         )

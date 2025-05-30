@@ -8,7 +8,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import logging
 from typing import TYPE_CHECKING
 
-from program.component import Component, MethodCall, Assignment, Extract
+from program.component import Assignment, Component, Extract, MethodCall
 
 if TYPE_CHECKING:
     from program.parser_program import ParserProgram

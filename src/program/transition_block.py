@@ -6,11 +6,10 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import logging
+from typing import TYPE_CHECKING
 
 from bisimulation.symbolic.formula import PureFormula
-from program.expression import Expression, DontCare, parse_expression
-
-from typing import TYPE_CHECKING
+from program.expression import DontCare, Expression, parse_expression
 
 if TYPE_CHECKING:
     from program.parser_program import ParserProgram
