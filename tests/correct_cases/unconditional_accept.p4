@@ -3,35 +3,16 @@
 // HEADER END
 
 header mpls_t {
-    bit<2> label;
-}
-
-header udp_t {
-    bit<2> data;
-}
-
-struct test_t {
-    bit<2> field;
+    bit<3> label;
 }
 
 struct headers_t {
     mpls_t mpls;
-    udp_t udp;
-    test_t test;
 }
 
 parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
         pkt.extract(hdr.mpls);
-        hdr.mpls.label = hdr.mpls.label;
-        transition select(hdr.mpls.label[0:0], hdr.mpls.label[1:1]) {
-            (0, 0): start;
-            (1, 1): q2;
-        }
-    }
-
-    state q2 {
-        pkt.extract(hdr.udp);
         transition accept;
     }
 }

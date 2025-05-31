@@ -160,18 +160,21 @@ class ParserProgram:
 
         logger.info(f"Parsed states (excluding terminals): {list(self._states.keys())}")
 
-    def get_header_fields(self, reference: str) -> dict[str, int]:
+    def get_header(self, reference: str) -> dict[str, int] | int:
         """
-        Get the names and sizes (in bits) of the fields in a header type.
+        Given a reference, get either the size of the field, or the fields
+        contained in the header.
 
-        For example, get_header_fields(hdr.mpls) = {label: 32}.
+        For example:
+        - get_header(hdr.mpls) = {label: 32}
+        - get_header(hdr.mpls.label) = 32
 
         As a P4 program is statically typed and compiled, the type of a field
         must be known at compile time and valid. This eliminates the need
         for type checking at runtime.
 
-        :param reference: a reference to the header
-        :return: a dictionary with the names and sizes of its fields
+        :param reference: a reference to a header or a field in a header
+        :return: a dictionary of fields and their sizes, or a size
         """
         type_content = self._types.get(self._output_type)
         if type_content is None:
@@ -184,9 +187,10 @@ class ParserProgram:
         for part in reference_parts:
             if part not in type_content:
                 raise KeyError(f"Reference part '{part}' not found in type content")
-            type_content = self._types.get(type_content[part])
-            if type_content is None:
-                raise KeyError(f"Type '{part}' not found in types")
+            type_content = type_content[part]
+            if type_content in self._types:
+                # If found, then it is a reference to a type and not a field
+                type_content = self._types[type_content]
 
         logger.info(f"Obtained header fields for '{reference}': {type_content}")
         return type_content

@@ -8,7 +8,14 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import logging
 from typing import TYPE_CHECKING
 
-from bisimulation.symbolic.formula import PureFormula
+from bisimulation.symbolic.formula import (
+    PureFormula,
+    FormulaManager,
+    Equals,
+    And,
+    Not,
+    FormulaNode,
+)
 from program.expression import DontCare, Expression, parse_expression
 
 if TYPE_CHECKING:
@@ -68,15 +75,15 @@ class TransitionBlock:
         for expression in select_expr["select"]["components"]["vec"]:
             self._selectors.append(parse_expression(self._program, expression))
 
-        for i, case in enumerate(select_expr["selectCases"]["vec"]):
+        for case in select_expr["selectCases"]["vec"]:
             for_values = []
             keyset = case["keyset"]
             if "value" in keyset:
                 for_values.append(
-                    parse_expression(self._program, keyset, len(self._selectors[i]))
+                    parse_expression(self._program, keyset, len(self._selectors[0]))
                 )
             else:
-                for expression in keyset["components"]["vec"]:
+                for i, expression in enumerate(keyset["components"]["vec"]):
                     for_values.append(
                         parse_expression(
                             self._program, expression, len(self._selectors[i])
@@ -88,6 +95,12 @@ class TransitionBlock:
             logger.info(f"Parsed transition to '{to_state_name}' for '{for_values}'")
 
     def eval(self, store: dict) -> str:
+        """
+        Evaluate the transition block with the given store.
+
+        :param store: the store containing the values for the selectors
+        :return: the name of the state to transition to, or "reject" if no match is found
+        """
         if len(self._selectors) == 0:
             return self._cases[tuple([DontCare()])]
 
@@ -120,21 +133,28 @@ class TransitionBlock:
             output.append(" " * n_spaces + f"({key_str}) -> {state}")
         return "\n".join(output)
 
-    def symbolic_transition(self, pf: PureFormula) -> set[tuple[PureFormula, str]]:
-        symbolic_cases: set[tuple[PureFormula, str]] = set()
-        seen: set[PureFormula] = set()
-        fresh_variables = [pf.fresh_variable(len(v)) for v in self._selectors]
+    def symbolic_transition(
+        self, manager: FormulaManager, pf: PureFormula
+    ) -> set[tuple[FormulaNode, str]]:
+        """
+        Generate symbolic transitions based on the transition block and a given pure formula.
+
+        :param manager: the formula manager to create fresh variables
+        :param pf: the pure formula, representing the current state
+        :return: a set of tuples containing the symbolic formula and the state to transition to
+        """
+        symbolic_cases: set[tuple[FormulaNode, str]] = set()
+        seen: set[FormulaNode] = set()
+        fresh_variables = [manager.fresh_variable(len(v)) for v in self._selectors]
         for for_values, to_state in self._cases.items():
             formula = None
             for i, v in enumerate(for_values):
                 if formula is None:
-                    formula = PureFormula.Equals(fresh_variables[i], v)
-                formula = PureFormula.And(
-                    formula, PureFormula.Equals(v, fresh_variables[i])
-                )
+                    formula = Equals(fresh_variables[i], v)
+                formula = And(formula, Equals(v, fresh_variables[i]))
             seen.add(formula)
             for f in seen:
-                formula = PureFormula.And(formula, PureFormula.Not(f))
+                formula = And(formula, Not(f))
             symbolic_cases.add((formula, to_state))
 
         return symbolic_cases

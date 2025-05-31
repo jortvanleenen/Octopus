@@ -7,12 +7,18 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import copy
 
-from pysmt.shortcuts import Implies, Or, Portfolio
+import pysmt.shortcuts as pysmt
 
 from automata.dfa import DFA
-from bisimulation.symbolic.formula import GuardedFormula, PureFormula
-from leapedfrog import constants
-from program.expression import Concatenate
+from bisimulation.symbolic.formula import (
+    GuardedFormula,
+    PureFormula,
+    FormulaManager,
+    And,
+    Equals,
+    TRUE,
+    Concatenate,
+)
 from program.parser_program import ParserProgram
 
 
@@ -62,129 +68,99 @@ def symbolic_bisimulation(
     parser1: ParserProgram,
     parser2: ParserProgram,
     enable_leaps: bool,
-    solver_portfolio: Portfolio,
+    solver_portfolio: pysmt.Portfolio,
 ):
     knowledge: set[GuardedFormula] = set()
+    manager = FormulaManager()
     # In P4, the initial state is always called 'start'
-    work_queue = [GuardedFormula("start", "start", 0, 0, PureFormula.TRUE())]
-    while len(work_queue) > 0:
-        formula = work_queue.pop(0)
+    work_queue = [GuardedFormula("start", "start", 0, 0, PureFormula(TRUE()))]
+    with solver_portfolio as s:
+        while len(work_queue) > 0:
+            formula = work_queue.pop(0)
 
-        relevant_pfs = set()
-        for seen_formula in knowledge:
-            if formula.equal_template(seen_formula):
-                relevant_pfs.add(seen_formula.pf)
-        current_pf = formula.pf
+            relevant_pfs = set()
+            for seen_formula in knowledge:
+                if formula.equal_guard(seen_formula):
+                    relevant_pfs.add(seen_formula.pf)
+            current_pf = formula.pf
 
-        # TODO: Update logic to BV when possible?
-        if Implies(
-            current_pf.to_smt(), Or(*[pf.to_smt() for pf in relevant_pfs])
-        ).is_sat(logic=constants.logic_name, portfolio=solver_portfolio):
-            continue
-
-        # Both transition
-        if (
-            formula.buf_len_l + 1 == parser1.states[formula.state_l].operationBlock.size
-            and formula.buf_len_r + 1
-            == parser2.states[formula.state_r].operationBlock.size
-        ):
-            new_pf = parser1.states[
-                formula.state_l
-            ].operationBlock.strongest_postcondition(
-                parser2.states[formula.state_r].operationBlock.strongest_postcondition(
-                    formula.pf, left=False
-                ),
-                left=True,
+            implication = pysmt.Implies(
+                current_pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
             )
+            if s.is_sat(implication):
+                continue
 
-            for form_l, to_state_l in parser1.states[
-                formula.state_l
-            ].transitionBlock.symbolic_transition(new_pf):
-                for form_r, to_state_r in parser2.states[
-                    formula.state_r
-                ].transitionBlock.symbolic_transition(new_pf):
-                    new_pf_copy = copy.deepcopy(new_pf)
-                    new_pf_copy = PureFormula.And(
-                        new_pf_copy, PureFormula.And(form_l, form_r)
-                    )
+            state_l = formula.state_l
+            state_r = formula.state_r
+            buf_l = formula.buf_len_l
+            buf_r = formula.buf_len_r
+            opblock_l = parser1.states[state_l].operationBlock
+            opblock_r = parser2.states[state_r].operationBlock
+            transblock_l = parser1.states[state_l].transitionBlock
+            transblock_r = parser2.states[state_r].transitionBlock
+
+            size_l = opblock_l.size
+            size_r = opblock_r.size
+
+            transition_l = buf_l + 1 == size_l
+            transition_r = buf_r + 1 == size_r
+
+            if transition_l and transition_r:
+                pf = opblock_l.strongest_postcondition(manager, formula.pf, left=True)
+                pf = opblock_r.strongest_postcondition(manager, pf, left=False)
+
+                for form_l, to_l in transblock_l.symbolic_transition(manager, pf):
+                    for form_r, to_r in transblock_r.symbolic_transition(manager, pf):
+                        pf_root = copy.deepcopy(pf.root)
+                        pf_new = PureFormula(And(pf_root, And(form_l, form_r)))
+                        work_queue.append(GuardedFormula(to_l, to_r, 0, 0, pf_new))
+
+            elif transition_l:
+                pf = opblock_l.strongest_postcondition(manager, formula.pf, left=True)
+
+                for form, to_l in transblock_l.symbolic_transition(manager, pf):
+                    pf_root = copy.deepcopy(pf.root)
+                    pf_new = PureFormula(And(pf_root, form))
                     work_queue.append(
-                        GuardedFormula(
-                            to_state_l,
-                            to_state_r,
-                            0,
-                            0,
-                            new_pf_copy,
-                        )
+                        GuardedFormula(to_l, state_r, 0, buf_r + 1, pf_new)
                     )
-        # Left transitions, right does not
-        elif (
-            formula.buf_len_l + 1 == parser1.states[formula.state_l].operationBlock.size
-            and formula.buf_len_r + 1
-            < parser2.states[formula.state_r].operationBlock.size
-        ):
-            new_pf = parser1.states[
-                formula.state_l
-            ].operationBlock.strongest_postcondition(formula.pf, left=True)
 
-            for form, to_state in parser1.states[
-                formula.state_l
-            ].transitionBlock.symbolic_transition(new_pf):
-                new_pf_copy = copy.deepcopy(new_pf)
-                new_pf_copy = PureFormula.And(new_pf_copy, form)
+            elif transition_r:
+                pf = opblock_r.strongest_postcondition(manager, formula.pf, left=False)
+
+                for form, to_r in transblock_r.symbolic_transition(manager, pf):
+                    pf_root = copy.deepcopy(pf.root)
+                    pf_new = PureFormula(And(pf_root, form))
+                    work_queue.append(
+                        GuardedFormula(state_l, to_r, buf_l + 1, 0, pf_new)
+                    )
+
+            else:
+                new_bit = manager.fresh_variable(1)
+
+                old_buf_l = formula.pf.get_buffer_var(left=True)
+                if old_buf_l is None:
+                    new_buf_l = manager.fresh_variable(1)
+                    formula.pf.set_buffer_var(left=True, var=new_buf_l)
+                    buf_eq_l = Equals(new_buf_l, new_bit)
+                else:
+                    new_buf_l = manager.fresh_variable(len(old_buf_l) + 1)
+                    buf_eq_l = Equals(new_buf_l, Concatenate(old_buf_l, new_bit))
+                    formula.pf.set_buffer_var(left=True, var=new_buf_l)
+
+                old_buf_r = formula.pf.get_buffer_var(left=False)
+                if old_buf_r is None:
+                    new_buf_r = manager.fresh_variable(1)
+                    formula.pf.set_buffer_var(left=False, var=new_buf_r)
+                    buf_eq_r = Equals(new_buf_r, new_bit)
+                else:
+                    new_buf_r = manager.fresh_variable(len(old_buf_r) + 1)
+                    buf_eq_r = Equals(new_buf_r, Concatenate(old_buf_r, new_bit))
+                    formula.pf.set_buffer_var(left=False, var=new_buf_r)
+
+                pf = PureFormula(And(formula.pf.root, And(buf_eq_l, buf_eq_r)))
                 work_queue.append(
-                    GuardedFormula(
-                        to_state,
-                        formula.state_r,
-                        0,
-                        formula.buf_len_r + 1,
-                        new_pf_copy,
-                    )
-                )
-        # Right transitions, left does not
-        elif (
-            formula.buf_len_l + 1 < parser1.states[formula.state_l].operationBlock.size
-            and formula.buf_len_r + 1
-            == parser2.states[formula.state_r].operationBlock.size
-        ):
-            new_pf = parser2.states[
-                formula.state_r
-            ].operationBlock.strongest_postcondition(formula.pf, left=False)
-
-            for form, to_state in parser2.states[
-                formula.state_r
-            ].transitionBlock.symbolic_transition(new_pf):
-                new_pf_copy = copy.deepcopy(new_pf)
-                new_pf_copy = PureFormula.And(new_pf_copy, form)
-                work_queue.append(
-                    GuardedFormula(
-                        formula.state_l,
-                        to_state,
-                        formula.buf_len_l + 1,
-                        0,
-                        new_pf_copy,
-                    )
+                    GuardedFormula(state_l, state_r, buf_l + 1, buf_r + 1, pf)
                 )
 
-        # Both do not transition
-        else:
-            new_bit = formula.pf.fresh_variable(1)
-            old_buf_l = formula.pf.get_buffer_var(left=True)
-            new_buf_l = formula.pf.fresh_variable(len(old_buf_l) + 1)
-            buf_l = PureFormula.Equals(new_buf_l, Concatenate(old_buf_l, new_bit))
-            old_buf_r = formula.pf.get_buffer_var(left=False)
-            new_buf_r = formula.pf.fresh_variable(len(old_buf_r) + 1)
-            formula.pf.set_buffer_var(left=False, var=new_buf_r)
-            buf_r = PureFormula.Equals(new_buf_r, Concatenate(old_buf_r, new_bit))
-            new_pf = PureFormula.And(
-                formula.pf,
-                PureFormula.And(buf_l, buf_r),
-            )
-            work_queue.append(
-                GuardedFormula(
-                    formula.state_l,
-                    formula.state_r,
-                    formula.buf_len_l + 1,
-                    formula.buf_len_r + 1,
-                    new_pf,
-                )
-            )
+            knowledge.add(formula)

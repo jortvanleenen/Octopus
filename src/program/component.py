@@ -7,11 +7,11 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
-from bisimulation.symbolic.formula import PureFormula
+from bisimulation import symbolic
+from bisimulation.symbolic.formula import PureFormula, FormulaManager, And, Equals
 from program.expression import (
-    Concatenate,
     Expression,
     Reference,
     Slice,
@@ -19,7 +19,6 @@ from program.expression import (
 )
 
 if TYPE_CHECKING:
-    from program.operation_block import OperationBlock
     from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
@@ -30,14 +29,35 @@ class Component(ABC):
 
     @abstractmethod
     def parse(self, component: dict) -> None:
+        """
+        Parse a component JSON into a Component object.
+
+        :param component: the component JSON object
+        """
         pass
 
     @abstractmethod
     def eval(self, store: dict[str, str], buffer: str) -> tuple[dict[str, str], str]:
+        """
+        Evaluate the component using the provided store and buffer.
+
+        :param store: the current store
+        :param buffer: the current buffer
+        :return: a tuple containing the updated store and buffer
+        """
         pass
 
     @abstractmethod
-    def strongest_postcondition(self, pf: PureFormula, left: bool):
+    def strongest_postcondition(
+        self, manager: FormulaManager, pf: PureFormula, left: bool
+    ) -> PureFormula:
+        """
+        Generate the strongest postcondition for this component.
+
+        :param manager: the FormulaManager to use for generating the postcondition
+        :param pf: the PureFormula representing what we currently know
+        :param left: whether the postcondition is for the left parser
+        """
         pass
 
 
@@ -62,60 +82,25 @@ class Assignment(Component):
 
         return store, buffer
 
-    def strongest_postcondition(self, pf: PureFormula, left: bool):
+    def strongest_postcondition(
+        self, manager: FormulaManager, pf: PureFormula, left: bool
+    ) -> PureFormula:
         reference_var = pf.get_header_field_var(self.left.reference, left)
-        new_var = pf.fresh_variable(len(reference_var))
+        new_var = manager.fresh_variable(len(reference_var))
+
         substitution = {reference_var: new_var}
         pf.substitute(substitution)
-        return PureFormula.And(
-            reference_var, PureFormula.Equals(reference_var, self.right)
-        )
+
+        return PureFormula(And(pf.root, Equals(reference_var, self.right)))
+        # PureFormula.And(
+        #     reference_var, PureFormula.Equals(reference_var, self.right)
+        # )
 
     def __repr__(self) -> str:
         return f"Component(left={self.left!r}, right={self.right!r})"
 
     def __str__(self) -> str:
         return f"{self.left} = {self.right}"
-
-
-class MethodCall(Component):
-    """A class representing a method call in a P4 parser state."""
-
-    def __init__(self, program: "ParserProgram", component: dict = None) -> None:
-        self.program: ParserProgram = program
-        self.instance: Extract | None = None
-        self.function_name: str | None = None
-        if component is not None:
-            self.parse(component)
-
-    def parse(self, component: dict) -> None:
-        """Parse a component JSON into a MethodCall object."""
-        operation_type = component["Node_Type"]
-        match operation_type:
-            case "MethodCallStatement":
-                call = component["methodCall"]
-                self.function_name = call["method"]["member"]
-                match self.function_name:
-                    case "extract":
-                        self.instance = Extract(self.program, call)
-                    case _:
-                        logger.warning(f"Ignoring method call '{self.function_name}()'")
-            case _:
-                logger.warning(f"Ignoring component of type '{operation_type}'")
-
-    def eval(self, store: dict[str, str], buffer: str):
-        """Evaluate the method call."""
-        if self.instance is None or self.function_name is None:
-            logger.warning("Method call has not yet been parsed")
-            return store, buffer
-
-        return self.instance.eval(store, buffer)
-
-    def __repr__(self) -> str:
-        return f"MethodCall(function_name={self.function_name!r}, instance={self.instance!r})"
-
-    def __str__(self) -> str:
-        return f"{self.function_name}({self.instance})"
 
 
 class Extract(Component):
@@ -132,9 +117,7 @@ class Extract(Component):
     def parse(self, call: dict) -> None:
         header_name = call["arguments"]["vec"][0]["expression"]["member"]
         self.header_reference = self.program.output_name + "." + header_name
-        self.header_content: dict = self.program.get_header_fields(
-            self.header_reference
-        )
+        self.header_content: dict = self.program.get_header(self.header_reference)
         self.size = sum(self.header_content.values())
 
     def eval(self, store: dict[str, str], buffer: str):
@@ -150,27 +133,69 @@ class Extract(Component):
 
         return store, buffer
 
-    def strongest_postcondition(self, pf: PureFormula, left: bool):
+    def strongest_postcondition(
+        self, manager: FormulaManager, pf: PureFormula, left: bool
+    ) -> PureFormula:
         substitution = {}
-        buffer_var = pf.get_buffer_var()
-        new_buffer = pf.fresh_variable(len(buffer_var) - self.size)
+        buffer_var = pf.get_buffer_var(left)
+        if buffer_var is None:
+            logger.warning("No buffer variable found in the postcondition")
+            raise ValueError("No buffer variable found in the postcondition")
+        else:
+            new_buffer = manager.fresh_variable(len(buffer_var) - self.size)
 
         for field, field_size in self.header_content.items():
-            variable = pf.fresh_variable(field_size)
+            variable = manager.fresh_variable(field_size)
 
             store_name = self.header_reference + "." + field
-            old_variable = pf.get_header_field_var(store_name)
+            old_variable = pf.get_header_field_var(store_name, left)
             if old_variable is not None:
                 substitution[old_variable] = variable
-            pf.set_header_field_var(store_name, variable)
+            pf.set_header_field_var(store_name, left, variable)
 
-            new_buffer = Concatenate(variable, new_buffer)
+            new_buffer = symbolic.formula.Concatenate(variable, new_buffer)
 
         substitution[buffer_var] = new_buffer
         pf.substitute(substitution)
+
+        return pf
 
     def __repr__(self) -> str:
         return f"Extract(header_reference={self.header_reference!r}, header_content={self.header_content!r}, size={self.size!r})"
 
     def __str__(self) -> str:
         return self.header_reference
+
+
+_METHOD_DISPATCH: dict[str, Callable[["ParserProgram", dict], Component]] = {
+    "extract": lambda program, call: Extract(program, call),
+}
+
+
+def parse_method_call(program: "ParserProgram", component: dict) -> Component | None:
+    """
+    Parse a method call component into a specific MethodCall subclass.
+
+    :param program: the ParserProgram this component belongs to
+    :param component: the full component JSON object
+    :return: a Component instance representing the method call
+    """
+    if component.get("Node_Type") != "MethodCallStatement":
+        logger.warning(
+            f"Ignoring non-method-call node type '{component.get('Node_Type')}'"
+        )
+        return None
+
+    call = component.get("methodCall")
+    if call is None:
+        logger.warning("Missing 'methodCall' field in MethodCallStatement")
+        return None
+
+    method_name = call.get("method", {}).get("member")
+    factory = _METHOD_DISPATCH.get(method_name)
+
+    if factory is None:
+        logger.warning(f"Unsupported method call: '{method_name}()'")
+        return None
+
+    return factory(program, call)

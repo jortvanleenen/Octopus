@@ -7,250 +7,225 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 from abc import ABC, abstractmethod
 
-from pysmt.shortcuts import (
-    BV,
-    TRUE,
-    And,
-    BVConcat,
-    BVExtract,
-    Equals,
-    Exists,
-    Not,
-    Or,
-    Symbol,
-)
-from pysmt.typing import BVType
+import pysmt.shortcuts as pysmt
 
-from leapedfrog.bit_vector import BitVector
 from leapedfrog.utils import AutoRepr
 from program.expression import Expression
 
 
-class PureFormula:
-    """A formula that should be template-guarded for symbolic execution."""
+class FormulaNode(ABC):
+    """An abstract base class for formula nodes in symbolic execution."""
 
-    class Subformula(ABC):
-        """A class representing a subformula in a PureFormula."""
+    @abstractmethod
+    def to_smt(self):
+        """Get the SMT representation of the formula."""
+        pass
 
-        @abstractmethod
-        def to_smt(self):
-            """Get the SMT representation of the formula."""
-            pass
+    @abstractmethod
+    def __repr__(self) -> str:
+        pass
 
-        @abstractmethod
-        def __repr__(self) -> str:
-            pass
+    @abstractmethod
+    def __str__(self) -> str:
+        pass
 
-        @abstractmethod
-        def __str__(self) -> str:
-            pass
 
-    class Variable(Subformula, AutoRepr):
-        def __init__(self, name: str, size: int):
-            self.name = name
-            self._size = size
+class Variable(AutoRepr, FormulaNode):
+    def __init__(self, name: str, size: int):
+        self.name = name
+        self._size = size
 
-        def __len__(self):
-            return self.size
+    def to_smt(self):
+        return pysmt.Symbol(self.name, pysmt.BVType(self._size))
 
-        def to_smt(self):
-            return Symbol(self.name, BVType(self.size))
+    def __len__(self):
+        return self._size
 
-        def __eq__(self, other: "PureFormula"):
-            if isinstance(other, PureFormula.Variable):
-                return self.name == other.name and self.size == other.size
-            return False
+    def __hash__(self):
+        return hash((self.name, self._size))
 
-        def __str__(self):
-            return f"{self.name}({self.size})"
+    def __eq__(self, other: FormulaNode) -> bool:
+        if isinstance(other, Variable):
+            return self.name == other.name and self._size == other._size
+        return False
 
-    class BufferLeft(Subformula, AutoRepr):
-        def __init__(self, bv: BitVector):
-            self.bv = bv
+    def __str__(self):
+        return f"{self.name}({self._size})"
 
-        @property
-        def size(self) -> int:
-            return len(self.bv)
 
-        def to_smt(self):
-            return BV(self.bv.bits, self.size)
+class Not(AutoRepr, FormulaNode):
+    def __init__(self, subformula: FormulaNode):
+        self.subformula = subformula
 
-        def __str__(self):
-            return f"buf<({self.bv})"
+    def to_smt(self):
+        return pysmt.Not(self.subformula.to_smt())
 
-        def __repr__(self):
-            return f"{self.__class__.__name__}(bv={self.bv!r})"
+    def __str__(self):
+        return f"¬{self.subformula}"
 
-    class BufferRight(Subformula, AutoRepr):
-        def __init__(self, bv: BitVector):
-            self.bv = bv
 
-        def __str__(self):
-            return f"buf>({self.bits})"
+class And(AutoRepr, FormulaNode):
+    def __init__(self, left: FormulaNode, right: FormulaNode):
+        self.left = left
+        self.right = right
 
-        @property
-        def size(self) -> int:
-            return len(self.bv)
+    def to_smt(self):
+        return pysmt.And(self.left.to_smt(), self.right.to_smt())
 
-        def to_smt(self):
-            return BV(self.bits, self.width)
+    def __str__(self):
+        return f"{self.left} & {self.right}"
 
-    class FieldLeft(Subformula, AutoRepr):
-        def __init__(self, field: str, bv: BitVector):
-            self.field = field
-            self.bv = bv
 
-        def __str__(self):
-            return f"st<.{self.field}({self.bits})"
+class TRUE(AutoRepr, FormulaNode):
+    def to_smt(self):
+        return pysmt.TRUE()
 
-        @property
-        def size(self) -> int:
-            return len(self.bv)
+    def __str__(self):
+        return "TRUE"
 
-        def to_smt(self):
-            return BV(self.bv.bits, self.size)
 
-    class FieldRight(Subformula, AutoRepr):
-        def __init__(self, field: str, bv: BitVector):
-            self.field = field
-            self.bv: BitVector = bv
+class Concatenate(AutoRepr, FormulaNode):
+    def __init__(self, left: Expression | FormulaNode, right: Expression | FormulaNode):
+        self.left = left
+        self.right = right
 
-        @property
-        def width(self) -> int:
-            return len(self.bits)
+    def to_smt(self):
+        return pysmt.BVConcat(self.left.to_smt(), self.right.to_smt())
 
-        def to_smt(self):
-            return BV(self.bits, self.width)
+    def __str__(self):
+        return f"{self.left} ++ {self.right}"
 
-        def __str__(self):
-            return f"st>.{self.field}({self.bits})"
 
-    class BitString(Subformula, AutoRepr):
-        def __init__(self, bits: str):
-            super().__init__(bits)
+class Equals(AutoRepr, FormulaNode):
+    def __init__(self, left: Expression | FormulaNode, right: Expression | FormulaNode):
+        self.left = left
+        self.right = right
 
-        def __str__(self):
-            return f"bs({self.bits})"
+    def __str__(self):
+        return f"{self.left} == {self.right}"
 
-        @property
-        def width(self) -> int:
-            return len(self.bits)
+    def to_smt(self):
+        return pysmt.Equals(self.left.to_smt(), self.right.to_smt())
 
-        def to_smt(self):
-            return BV(self.bits, self.width)
 
-    class Not(Subformula, AutoRepr):
-        def __init__(self, subformula: "PureFormula.Subformula"):
-            self.subformula = subformula
-
-        def to_smt(self):
-            return Not(self.subformula.to_smt())
-
-        def __str__(self):
-            return f"¬{self.subformula}"
-
-    class And(Subformula, AutoRepr):
-        def __init__(
-            self, left: "PureFormula.Subformula", right: "PureFormula.Subformula"
-        ):
-            pass
-
-    # class Exists(Subformula, AutoRepr):
-    #     def __init__(self, variable: "PureFormula.Variable", subformula: "PureFormula.Subformula"):
-    #         self.variable = variable
-    #         self.subformula = subformula
-
-    class TRUE(Subformula, AutoRepr):
-        def to_smt(self):
-            return TRUE()
-
-        def __str__(self):
-            return "TRUE"
-
-    class Equals(Subformula, AutoRepr):
-        def __init__(self, left: Expression, right: Expression):
-            assert left.bits == right.bits, "Bitvector mismatch in equality"
-            self.left = left
-            self.right = right
-
-        def __str__(self):
-            return f"{self.left} == {self.right}"
-
-        def to_smt(self):
-            return Equals(self.left.to_symbolic(), self.right.to_symbolic())
-
+class FormulaManager(AutoRepr):
     def __init__(self):
-        self.equalities: list[PureFormula.Equals] = []
-        self.used_vars: set[PureFormula.Variable] = set()
-        self.next_free_var_name: int = 0
-        self.header_field_vars: dict[tuple[str, bool], PureFormula.Variable] = {}
-        self.buf_vars: dict[bool, PureFormula.Variable] | None = None
+        self._next_free_var_name: int = 0
 
-    def get_header_field_var(self, name: str, left: bool):
-        return self.header_field_vars.get((name, left), None)
+    def fresh_name(self) -> str:
+        """
+        Generate a fresh variable name.
 
-    def set_header_field_var(
-        self, name: str, left: bool, variable: "PureFormula.Variable"
-    ):
-        """Set a header variable by name, ensuring it is unique."""
+        :return: a unique variable name as a string
+        """
+        name = str(self._next_free_var_name)
+        self._next_free_var_name += 1
+        return name
+
+    def fresh_variable(self, size: int) -> Variable:
+        """
+        Create a fresh variable with a unique name and specified size.
+
+        :param size: the size of the variable
+        :return: a Variable instance with a unique name and specified size
+        """
+        return Variable(self.fresh_name(), size)
+
+
+class PureFormula(AutoRepr, FormulaNode):
+    def __init__(self, root: FormulaNode = TRUE()):
+        self.root = root
+        self.used_vars: set[Variable] = self._used_vars(self.root)
+        self.header_field_vars: dict[tuple[str, bool], Variable] = {}
+        self.buf_vars: dict[bool, Variable] = {}
+
+    def get_header_field_var(self, name: str, left: bool) -> Variable | None:
+        return self.header_field_vars.get((name, left))
+
+    def set_header_field_var(self, name: str, left: bool, variable: Variable):
         self.header_field_vars[(name, left)] = variable
         self.used_vars.add(variable)
 
-    def get_buffer_var(self, left: bool) -> "PureFormula.Variable":
-        """Get the buffer variable."""
-        var = self.buf_vars.get(left, None)
-        if var is None:
-            self.buf_vars[left] = self.fresh_variable(0)
-        return self.buf_vars[left]
+    def get_buffer_var(self, left: bool) -> Variable | None:
+        return self.buf_vars.get(left)
 
-    def set_buffer_var(self, left: bool, var: "PureFormula.Variable") -> None:
+    def set_buffer_var(self, left: bool, var: Variable) -> None:
         self.buf_vars[left] = var
         self.used_vars.add(var)
 
-    def fresh_variable(self, size: int) -> "PureFormula.Variable":
-        while True:
-            name = str(self.next_free_var_name)
-            self.next_free_var_name += 1
-            if name not in self.used_vars:
-                self.used_vars.add(name)
-                return PureFormula.Variable(name, size)
+    def substitute(self, mapping: dict[Variable, FormulaNode]) -> None:
+        """
+        Substitute variables in the formula with the given mapping.
 
-    def substitute(
-        self, mapping: dict["PureFormula.Variable", "PureFormula.Subformula"]
-    ) -> None:
-        new_equalities = []
-        for eq in self.equalities:
-            left = self._substitute_expr(eq.left, mapping)
-            right = self._substitute_expr(eq.right, mapping)
-            new_equalities.append(PureFormula.Equals(left, right))
-        self.equalities = new_equalities
+        :param mapping: a dictionary mapping Variable to FormulaNode
+        """
+        self.root = self._substitute(self.root, mapping)
+        self.used_vars = {v for v in self.used_vars if v not in mapping}
 
-    def _substitute_expr(
-        self,
-        expr: "PureFormula.Subformula",
-        mapping: dict[str, "PureFormula.Subformula"],
-    ) -> "PureFormula.Subformula":
-        if isinstance(expr, PureFormula.Variable):
-            return mapping.get(expr.name, expr)
-        elif isinstance(expr, PureFormula.Slice):
-            base = self._substitute_expr(expr.base, mapping)
-            return PureFormula.Slice(base, expr.hi, expr.lo)
-        elif isinstance(expr, PureFormula.Concat):
-            left = self._substitute_expr(expr.left, mapping)
-            right = self._substitute_expr(expr.right, mapping)
-            return PureFormula.Concat(left, right)
+    def _substitute(
+        self, node: FormulaNode, mapping: dict[Variable, FormulaNode]
+    ) -> FormulaNode:
+        """
+        Recursively substitute variables in the formula nodes.
+
+        :param node: the current formula node to substitute
+        :param mapping: a dictionary mapping Variable to FormulaNode
+        :return: the substituted formula node
+        """
+        if isinstance(node, Variable):
+            return mapping.get(node, node)
+        elif isinstance(node, Not):
+            return Not(self._substitute(node.subformula, mapping))
+        elif isinstance(node, And):
+            return And(
+                self._substitute(node.left, mapping),
+                self._substitute(node.right, mapping),
+            )
+        elif isinstance(node, Equals):
+            return Equals(
+                self._substitute(node.left, mapping),
+                self._substitute(node.right, mapping),
+            )
+        elif isinstance(node, TRUE):
+            return TRUE()
+        elif isinstance(node, Concatenate):
+            return Concatenate(
+                self._substitute(node.left, mapping),
+                self._substitute(node.right, mapping),
+            )
         else:
-            return expr
+            raise TypeError(f"Unsupported formula node type: {type(node)}")
+
+    def _used_vars(self, node: FormulaNode) -> set[Variable]:
+        """
+        Recursively collect all used variables in the formula.
+
+        :param node: the current formula node to check
+        :return: a set of used Variable instances
+        """
+        if isinstance(node, Variable):
+            return {node}
+        elif isinstance(node, Not):
+            return self._used_vars(node.subformula)
+        elif isinstance(node, And):
+            return self._used_vars(node.left) | self._used_vars(node.right)
+        elif isinstance(node, Equals):
+            return self._used_vars(node.left) | self._used_vars(node.right)
+        elif isinstance(node, TRUE):
+            return set()
+        elif isinstance(node, Concatenate):
+            return self._used_vars(node.left) | self._used_vars(node.right)
+        else:
+            raise TypeError(f"Unsupported formula node type: {type(node)}")
 
     def to_smt(self):
-        if not self.equalities:
-            return TRUE()
-        return Exists(
-            *[v for v in self.used_vars], Or(*[eq.to_smt() for eq in self.equalities])
+        return pysmt.Exists(
+            variables=[v.to_smt() for v in self.used_vars],
+            formula=self.root.to_smt(),
         )
 
     def __str__(self):
-        return " ∧ ".join(str(eq) for eq in self.equalities)
+        return " E " + ", ".join(str(v) for v in self.used_vars) + f". {self.root}"
 
 
 class GuardedFormula(AutoRepr):
@@ -262,7 +237,7 @@ class GuardedFormula(AutoRepr):
         state_right: str = None,
         buffer_length_left: int = None,
         buffer_length_right: int = None,
-        pure_formula: PureFormula = None,
+        pure_formula: PureFormula = PureFormula(),
     ) -> None:
         self.state_l = state_left
         self.state_r = state_right
@@ -270,8 +245,13 @@ class GuardedFormula(AutoRepr):
         self.buf_len_r = buffer_length_right
         self.pf = pure_formula
 
-    def equal_template(self, other: "GuardedFormula") -> bool:
-        """Check if two template-guarded formulas are equal."""
+    def equal_guard(self, other: "GuardedFormula") -> bool:
+        """
+        Check if the guard of this formula is equal to another.
+
+        :param other: the GuardedFormula to compare with
+        :return: True if the guards are equal, False otherwise
+        """
         return (
             self.state_l == other.state_l
             and self.state_r == other.state_r

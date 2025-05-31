@@ -8,7 +8,8 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import logging
 from typing import TYPE_CHECKING
 
-from program.component import Assignment, Component, Extract, MethodCall
+from bisimulation.symbolic.formula import PureFormula, FormulaManager
+from program.component import Assignment, Extract, parse_method_call, Component
 
 if TYPE_CHECKING:
     from program.parser_program import ParserProgram
@@ -34,9 +35,9 @@ class OperationBlock(Component):
                 case "AssignmentStatement":
                     parsed_component = Assignment(self.program, component)
                 case "MethodCallStatement":
-                    parsed_component = MethodCall(self.program, component)
-                    if isinstance(parsed_component.instance, Extract):
-                        self.size += parsed_component.instance.size
+                    parsed_component = parse_method_call(self.program, component)
+                    if isinstance(parsed_component, Extract):
+                        self.size += parsed_component.size
                 case _:
                     logger.warning(
                         f"Ignoring unknown component type '{component['Node_Type']}'"
@@ -50,6 +51,14 @@ class OperationBlock(Component):
             store, buffer = component.eval(store, buffer)
 
         return store, buffer
+
+    def strongest_postcondition(
+        self, manager: FormulaManager, pf: PureFormula, left: bool
+    ) -> PureFormula:
+        for component in self.components:
+            pf = component.strongest_postcondition(manager, pf, left)
+
+        return pf
 
     def __repr__(self) -> str:
         return f"OperationBlock(size= {self.size!r}, components={self.components!r})"

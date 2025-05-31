@@ -7,9 +7,12 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Any
 
-import pysmt.shortcuts
+from pysmt.shortcuts import TRUE, FreshSymbol, BV, BVExtract
+from pysmt.typing import BVType
+
+from leapedfrog.utils import AutoRepr
 
 if TYPE_CHECKING:
     from program.parser_program import ParserProgram
@@ -18,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class Expression(ABC):
+    """An abstract base class representing an expression in a P4 parser state."""
+
     @abstractmethod
     def eval(self, store: dict[str, str]) -> str:
         """
@@ -29,29 +34,32 @@ class Expression(ABC):
         pass
 
     @abstractmethod
-    def to_symbolic(self):
-        pass
-
-    @abstractmethod
     def __len__(self) -> int:
         pass
 
+    @abstractmethod
     def __str__(self) -> str:
-        return repr(self)
+        pass
 
+    @abstractmethod
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}()"
+        pass
 
 
-class Concatenate(Expression):
+class Concatenate(AutoRepr, Expression):
     def __init__(self, program: "ParserProgram", obj: dict) -> None:
         self._program = program
-        self.left = None
-        self.right = None
+        self.left: Expression | None = None
+        self.right: Expression | None = None
         if obj is not None:
             self.parse(obj)
 
     def parse(self, obj: dict) -> None:
+        """
+        Parse a concatenation expression JSON into a Concatenate object.
+
+        :param obj: the concatenation expression JSON object
+        """
         self.left = parse_expression(self._program, obj["left"])
         self.right = parse_expression(self._program, obj["right"])
 
@@ -60,23 +68,14 @@ class Concatenate(Expression):
         right_value: str = self.right.eval(store)
         return left_value + right_value
 
-    def to_symbolic(self):
-        left_symbolic = self.left.to_symbolic()
-        right_symbolic = self.right.to_symbolic()
-
-        return pysmt.shortcuts.BVConcat(left_symbolic, right_symbolic)
-
     def __len__(self) -> int:
-        return self.left.size + self.right.size
-
-    def __repr__(self) -> str:
-        return f"Concatenate(left={self.left!r}, right={self.right!r})"
+        return len(self.left) + len(self.right)
 
     def __str__(self) -> str:
         return f"{self.left} ++ {self.right}"
 
 
-class Slice(Expression):
+class Slice(AutoRepr, Expression):
     def __init__(self, program: "ParserProgram", obj: dict = None) -> None:
         self._program = program
         self.reference = None
@@ -85,12 +84,17 @@ class Slice(Expression):
         if obj is not None:
             self.parse(obj)
 
-    def parse(self, slice: dict) -> None:
-        self.reference = Reference(self._program, slice["e0"])
+    def parse(self, obj: dict) -> None:
+        """
+        Parse a slice expression JSON into a Slice object.
+
+        :param obj: the slice expression JSON object
+        """
+        self.reference = Reference(self._program, obj["e0"])
         length = len(self.reference)
 
-        msb = slice["e1"]["value"]
-        lsb = slice["e2"]["value"]
+        msb = obj["e1"]["value"]
+        lsb = obj["e2"]["value"]
         self.lsb = length - msb - 1
         self.msb = length - lsb
 
@@ -98,23 +102,18 @@ class Slice(Expression):
         value = self.reference.eval(store)
         return value[self.lsb : self.msb]
 
-    def to_symbolic(self):
-        reference_symbolic = self.reference.to_symbolic()
-        return pysmt.shortcuts.BVExtract(reference_symbolic, self.lsb, self.msb)
+    def to_smt(self) -> Any:
+        reference_symbolic = self.reference.to_smt()
+        return BVExtract(reference_symbolic, self.lsb, self.msb)
 
     def __len__(self) -> int:
         return self.msb - self.lsb + 1
-
-    def __repr__(self) -> str:
-        return (
-            f"Slice(reference={self.reference!r}, msb={self.msb!r}, lsb={self.lsb!r})"
-        )
 
     def __str__(self) -> str:
         return f"{self.reference}[{self.msb}:{self.lsb}]"
 
 
-class Constant(Expression):
+class Constant(AutoRepr, Expression):
     def __init__(self, obj: dict, size_context: int) -> None:
         self.numeric_value: int | float | None = None
         self.value: str | None = None
@@ -122,17 +121,22 @@ class Constant(Expression):
         if obj is not None:
             self.parse(obj)
 
-    def parse(self, component: dict) -> None:
-        self.numeric_value = component["value"]
+    def parse(self, obj: dict) -> None:
+        """
+        Parse a constant expression JSON into a Constant object.
+
+        :param obj: the constant expression JSON object
+        """
+        self.numeric_value: int = obj["value"]
         self.value = bin(self.numeric_value)[2:]  # Convert to binary string
         if self._size is not None:
             self.value = self.value.zfill(self._size)
 
     def eval(self, store: dict[str, str]) -> str:
-        return self
+        return self.value
 
-    def to_symbolic(self):
-        return pysmt.shortcuts.BV(self.numeric_value, len(self))
+    def to_smt(self) -> Any:
+        return BV(self.numeric_value, len(self))
 
     def __len__(self) -> int:
         return self._size
@@ -148,22 +152,22 @@ class Constant(Expression):
         else:
             return NotImplemented
 
-    def __repr__(self) -> str:
-        return f"Constant(value={self.value!r})"
-
     def __str__(self) -> str:
         return str(self.value)
 
 
-class DontCare(Expression):
+class DontCare(AutoRepr, Expression):
     def __init__(self) -> None:
         pass
 
     def eval(self, store: dict[str, str]) -> "DontCare":
         return self
 
-    def to_symbolic(self):
-        return pysmt.shortcuts.TRUE()
+    def to_smt(self) -> Any:
+        return TRUE()
+
+    def __len__(self) -> int:
+        return 0
 
     def __hash__(self) -> int:
         return 0  # fixed value: all DontCares are "equal" and hash identically
@@ -171,60 +175,61 @@ class DontCare(Expression):
     def __eq__(self, other) -> bool:
         return True
 
-    def __repr__(self) -> str:
-        return "DontCare()"
-
     def __str__(self) -> str:
         return "*"
 
 
-class Reference(Expression):
+class Reference(AutoRepr, Expression):
     def __init__(self, program: "ParserProgram", obj: dict) -> None:
         self._program = program
-        self.reference: str | None = None
+        self._reference: str | None = None
         self._size: int = 0
         if obj is not None:
             self.parse(obj)
 
-    def parse(self, component: dict) -> None:
+    @property
+    def reference(self) -> str:
+        """Get the reference of the expression."""
+        return self._reference
+
+    def parse(self, obj: dict) -> None:
+        """
+        Parse a reference expression JSON into a Reference object.
+
+        :param obj: the reference expression JSON object
+        """
         reference = ""
         while True:
-            if "member" in component:
-                reference = component["member"] + ("." if reference else "") + reference
+            if "member" in obj:
+                reference = obj["member"] + ("." if reference else "") + reference
 
-            if "expr" in component:
-                component = component["expr"]
+            if "expr" in obj:
+                obj = obj["expr"]
                 continue
 
-            if "path" in component:
-                reference = (
-                    component["path"]["name"] + ("." if reference else "") + reference
-                )
+            if "path" in obj:
+                reference = obj["path"]["name"] + ("." if reference else "") + reference
             break
 
-        self.reference = reference
+        self._reference = reference
 
-        header_content: dict = self._program.get_header_fields(self.reference)
-        self._size = sum(header_content.values())
+        self._size = self._program.get_header(self._reference)
 
     def eval(self, store: dict[str, str]) -> str:
-        if self.reference in store:
-            return store[self.reference]
+        if self._reference in store:
+            return store[self._reference]
         else:
-            logger.warning(f"Reference '{self.reference}' not found in store.")
+            logger.warning(f"Reference '{self._reference}' not found in store.")
             return ""
 
-    def to_symbolic(self):
-        return pysmt.shortcuts.FreshSymbol("BVType")
+    def to_smt(self) -> Any:
+        return FreshSymbol(BVType(self._size))
 
     def __len__(self) -> int:
         return self._size
 
-    def __repr__(self) -> str:
-        return f"Reference(reference={self.reference!r})"
-
     def __str__(self) -> str:
-        return str(self.reference)
+        return str(self._reference)
 
 
 _EXPRESSION_DISPATCH: dict[
