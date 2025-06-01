@@ -5,12 +5,15 @@ Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
+import logging
 from abc import ABC, abstractmethod
 
 import pysmt.shortcuts as pysmt
 
 from leapedfrog.utils import AutoRepr
-from program.expression import Expression
+from program.expression import Expression, Constant
+
+logger = logging.getLogger(__name__)
 
 
 class FormulaNode(ABC):
@@ -32,6 +35,8 @@ class FormulaNode(ABC):
 
 class Variable(AutoRepr, FormulaNode):
     def __init__(self, name: str, size: int):
+        if size <= 0:
+            raise ValueError("Size of variable must be greater than 0")
         self.name = name
         self._size = size
 
@@ -139,6 +144,15 @@ class PureFormula(AutoRepr, FormulaNode):
         self.header_field_vars: dict[tuple[str, bool], Variable] = {}
         self.buf_vars: dict[bool, Variable] = {}
 
+    @classmethod
+    def clone_with_new_root(
+        cls, original: "PureFormula", new_root: FormulaNode
+    ) -> "PureFormula":
+        new_pf = cls(root=new_root)
+        new_pf.header_field_vars = dict(original.header_field_vars)
+        new_pf.buf_vars = dict(original.buf_vars)
+        return new_pf
+
     def get_header_field_var(self, name: str, left: bool) -> Variable | None:
         return self.header_field_vars.get((name, left))
 
@@ -149,7 +163,7 @@ class PureFormula(AutoRepr, FormulaNode):
     def get_buffer_var(self, left: bool) -> Variable | None:
         return self.buf_vars.get(left)
 
-    def set_buffer_var(self, left: bool, var: Variable) -> None:
+    def set_buffer_var(self, left: bool, var: Variable | None) -> None:
         self.buf_vars[left] = var
         self.used_vars.add(var)
 
@@ -215,8 +229,11 @@ class PureFormula(AutoRepr, FormulaNode):
             return set()
         elif isinstance(node, Concatenate):
             return self._used_vars(node.left) | self._used_vars(node.right)
+        elif isinstance(node, Constant):
+            return set()
         else:
-            raise TypeError(f"Unsupported formula node type: {type(node)}")
+            logger.warning(f"Unsupported formula node type for used_vars: {type(node)}")
+            return set()
 
     def to_smt(self):
         return pysmt.Exists(

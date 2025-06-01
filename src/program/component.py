@@ -91,10 +91,9 @@ class Assignment(Component):
         substitution = {reference_var: new_var}
         pf.substitute(substitution)
 
-        return PureFormula(And(pf.root, Equals(reference_var, self.right)))
-        # PureFormula.And(
-        #     reference_var, PureFormula.Equals(reference_var, self.right)
-        # )
+        return PureFormula.clone_with_new_root(
+            pf, And(pf.root, Equals(reference_var, self.right))
+        )
 
     def __repr__(self) -> str:
         return f"Component(left={self.left!r}, right={self.right!r})"
@@ -142,7 +141,12 @@ class Extract(Component):
             logger.warning("No buffer variable found in the postcondition")
             raise ValueError("No buffer variable found in the postcondition")
         else:
-            new_buffer = manager.fresh_variable(len(buffer_var) - self.size)
+            length = len(buffer_var) - self.size
+            if length <= 0:
+                pf.set_buffer_var(left, None)
+                new_buffer = None
+            else:
+                new_buffer = manager.fresh_variable(len(buffer_var) - self.size)
 
         for field, field_size in self.header_content.items():
             variable = manager.fresh_variable(field_size)
@@ -153,7 +157,10 @@ class Extract(Component):
                 substitution[old_variable] = variable
             pf.set_header_field_var(store_name, left, variable)
 
-            new_buffer = symbolic.formula.Concatenate(variable, new_buffer)
+            if new_buffer is None:
+                new_buffer = variable
+            else:
+                new_buffer = symbolic.formula.Concatenate(variable, new_buffer)
 
         substitution[buffer_var] = new_buffer
         pf.substitute(substitution)

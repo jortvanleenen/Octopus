@@ -3,11 +3,11 @@
 // HEADER END
 
 header mpls_t {
-    bit<2> label;
+    bit<32> label;
 }
 
 header udp_t {
-    bit<4> data;
+    bit<64> data;
 }
 
 struct headers_t {

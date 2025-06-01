@@ -13,11 +13,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
-from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Generator
+from typing import Callable
 
 from pysmt.logics import get_logic_by_name
 from pysmt.shortcuts import Portfolio, get_env
@@ -26,6 +24,7 @@ from automata.dfa import DFA
 from bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
 from leapedfrog import constants
 from leapedfrog.__about__ import __version__
+from leapedfrog.utils import timed_block, setup_logging
 from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
@@ -101,25 +100,6 @@ def parse_arguments() -> argparse.Namespace:
         help="global options for the provided solvers",
     )
     return parser.parse_args()
-
-
-def setup_logging(verbosity: int) -> None:
-    """
-    Set up the logging configuration based on the verbosity level.
-
-    :param verbosity: the verbosity level
-    """
-    level = [logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG][
-        min(verbosity, 3)
-    ]
-    root_logger = logging.getLogger()
-    if not root_logger.handlers:
-        logging.basicConfig(
-            format="[%(levelname)s - %(filename)s, line %(lineno)d]: %(message)s",
-            level=level,
-        )
-    else:
-        root_logger.setLevel(level)
 
 
 def create_portfolio(args: argparse.Namespace) -> Portfolio:
@@ -281,28 +261,6 @@ def select_bisimulation_method(
             enable_leaps=not args.disable_leaps,
             solver_portfolio=portfolio,
         ), "Symbolic"
-
-
-@contextmanager
-def timed_block(label: str) -> Generator[None, Any, None]:
-    """
-    Context manager to measure the execution time of a code block.
-
-    :param label: a label for the block of code being timed
-
-    """
-    start_wall = time.perf_counter()
-    start_cpu = time.process_time()
-    yield
-    end_wall = time.perf_counter()
-    end_cpu = time.process_time()
-    duration_msg = (
-        f"{label} completed. Timing results:\n"
-        f"  Wall time: {end_wall - start_wall:.4f} s\n"
-        f"  CPU time:  {end_cpu - start_cpu:.4f} s"
-    )
-    logger.info(duration_msg)
-    print(duration_msg)
 
 
 def main() -> None:

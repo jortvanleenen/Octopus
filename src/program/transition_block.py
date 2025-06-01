@@ -15,6 +15,7 @@ from bisimulation.symbolic.formula import (
     And,
     Not,
     FormulaNode,
+    TRUE,
 )
 from program.expression import DontCare, Expression, parse_expression
 
@@ -143,6 +144,11 @@ class TransitionBlock:
         :param pf: the pure formula, representing the current state
         :return: a set of tuples containing the symbolic formula and the state to transition to
         """
+        if len(self._selectors) == 0:
+            return {
+                (TRUE(), self._cases[tuple([DontCare()])])
+            }
+
         symbolic_cases: set[tuple[FormulaNode, str]] = set()
         seen: set[FormulaNode] = set()
         fresh_variables = [manager.fresh_variable(len(v)) for v in self._selectors]

@@ -3,11 +3,11 @@
 // HEADER END
 
 header udp_t {
-    bit<4> data;
+    bit<64> data;
 }
 
 header tmp_t {
-    bit<2> field;
+    bit<32> field;
 }
 
 struct headers_t {

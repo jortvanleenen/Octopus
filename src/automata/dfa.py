@@ -92,9 +92,12 @@ class DFA:
             config = self.step(config, bit)
         return config
 
-    def is_accepted(self, config: "DFA.Configuration", bits: str) -> bool:
-        final_config = self.multi_step(config, bits)
-        return final_config.is_accepting()
+    @staticmethod
+    def initial_config(q0: str, store: dict[str, str]) -> "DFA.Configuration":
+        """
+        Create the initial configuration of the DFA.
 
-    def initial_config(self, q0: str, store: dict[str, str]) -> "DFA.Configuration":
+        :param q0: the initial state of the DFA
+        :param store: the initial store (header fields)
+        """
         return DFA.Configuration(q0, store, "")
