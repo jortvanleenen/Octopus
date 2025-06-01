@@ -81,10 +81,9 @@ def parse_arguments() -> argparse.Namespace:
         help="exit with code 1 if the parsers are not equivalent",
     )
     parser.add_argument(
-        "-t",
-        "--time",
+        "--stat",
         action="store_true",
-        help="measure and print bisimulation execution time",
+        help="measure and print bisimulation execution time and memory usage",
     )
     parser.add_argument(
         "-s",
@@ -288,7 +287,7 @@ def main() -> None:
     logger.debug(f"Parser object 2 (repr): '{parsers[1]!r}'")
     logger.debug(f"Parser object 2 (str)\n {parsers[1]}")
 
-    if args.time:
+    if args.stat:
         with timed_block(f"{method_name} bisimulation"):
             are_equal, certificate = method(parsers[0], parsers[1])
     else:

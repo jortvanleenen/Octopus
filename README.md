@@ -31,9 +31,9 @@ Ensure `p4c-graphs` is available on your system's `PATH`.
 ## Installation
 
 To install LeapedFrog, the following steps can be followed.
-Step 6 installs the project in development mode, including development dependencies.
+Step 6 installs the project in editable mode, including development dependencies.
 Feel free to customise this step according to your needs.
-For example, one could decide to install only the runtime dependencies by skipping `[dev]`.
+For example, one could decide to install only the runtime dependencies by removing `[dev]`.
 
 ```bash
 # 1. Clone the repository
@@ -70,12 +70,12 @@ Afterwards, `pysmt-install --check` can be used to verify the installation.
 leapedfrog [OPTIONS] FILE1 FILE2
 ```
 
-`FILE1` and `FILE2` are paths to the two P4 programs to compare. These can be either `.p4` source files or IR JSON files
-produced by `p4c-graphs` (with the `-j` option).
+`FILE1` and `FILE2` are paths to the two P4 programs to compare.
+hese can be either `.p4` source files, or IR JSON files produced by `p4c-graphs` (with the `-j` option).
 
 ### Examples
 
-Check two IR JSON files:
+Check two IR JSON files (using symbolic bisimulation by default):
 
 ```
 leapedfrog -j parser1.json parser2.json
@@ -107,10 +107,10 @@ leapedfrog -j parser1.json parser2.json --fail-on-mismatch
 
 _Note: this is useful for scripting or CI/CD pipelines._
 
-Print execution time (wall and CPU time):
+Print bisimulation execution time and memory usage:
 
 ```
-leapedfrog -j parser1.json parser2.json --time
+leapedfrog -j parser1.json parser2.json --stat
 ```
 
 Customise the SMT solver portfolio and provide (global) options:
@@ -141,7 +141,7 @@ LeapedFrog provides a command-line interface (CLI) with the following options:
 |       | `--disable_leaps`          | Disable leaps in symbolic bisimulation (ignored if `--naive` is set)       |
 | `-o`  | `--output`                 | Write the bisimulation certificate or counterexample to the specified file |
 |       | `--fail-on-mismatch`       | Exit with code 1 if the parsers are not equivalent                         |
-| `-t`  | `--time`                   | Measure and print bisimulation execution time                              |
+|       | `--stat`                   | Measure and print bisimulation execution time and memory usage             |
 | `-s`  | `--solvers`                | Specify which SMT solvers to use along with their options                  |
 |       | `--solvers-global-options` | Specify global options for all solvers                                     |
 
