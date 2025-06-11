@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 
 import pysmt.shortcuts as pysmt
 
-from leapedfrog.utils import AutoRepr
+from octopus.utils import AutoRepr
 from program.expression import Expression, Constant
 
 logger = logging.getLogger(__name__)

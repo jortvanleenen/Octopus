@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Callable, Any
 from pysmt.shortcuts import TRUE, FreshSymbol, BV, BVExtract
 from pysmt.typing import BVType
 
-from leapedfrog.utils import AutoRepr
+from octopus.utils import AutoRepr
 
 if TYPE_CHECKING:
     from program.parser_program import ParserProgram

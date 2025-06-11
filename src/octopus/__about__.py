@@ -1,5 +1,5 @@
 """
-Package metadata for LeapedFrog.
+Package metadata for Octopus.
 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)

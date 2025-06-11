@@ -22,9 +22,9 @@ from pysmt.shortcuts import Portfolio, get_env
 
 from automata.dfa import DFA
 from bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
-from leapedfrog import constants
-from leapedfrog.__about__ import __version__
-from leapedfrog.utils import timed_block, setup_logging
+from octopus import constants
+from octopus.__about__ import __version__
+from octopus.utils import timed_block, setup_logging
 from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
@@ -37,11 +37,11 @@ def parse_arguments() -> argparse.Namespace:
     :return: an argparse namespace containing the parsed arguments
     """
     parser = argparse.ArgumentParser(
-        description="LeapedFrog is an equivalence checker for P4 packet parsers.",
+        description="Octopus is an equivalence checker for P4 packet parsers.",
         epilog="Developed by Jort van Leenen.",
     )
     parser.add_argument(
-        "--version", action="version", version=f"LeapedFrog v{__version__}"
+        "--version", action="version", version=f"Octopus v{__version__}"
     )
     parser.add_argument(
         "-j",

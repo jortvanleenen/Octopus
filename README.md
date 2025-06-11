@@ -1,9 +1,9 @@
-# LeapedFrog
+# Octopus
 
-LeapedFrog is an equivalence checker for P4 packet parsers, implemented in Python.  
+Octopus is an equivalence checker for P4 packet parsers, implemented in Python.  
 It supports both naive and optimised symbolic bisimulation techniques for comparing parser behaviour.
 
-LeapedFrog is accompanied by the paper *"Practical Equivalence Checking of P4 Parsers"* by Jort van Leenen.  
+Octopus is accompanied by the paper *"Practical Equivalence Checking of P4 Parsers"* by Jort van Leenen.  
 The implementation builds on earlier work from [Leapfrog](https://doi.org/10.48550/arXiv.2205.08762), a Rocq-based
 formal verifier for P4 parsers.
 
@@ -21,7 +21,7 @@ formal verifier for P4 parsers.
 
 ## Dependencies and Compatibility
 
-LeapedFrog depends on the `p4c-graphs` tool to generate the IR JSON representation of P4 programs.
+Octopus depends on the `p4c-graphs` tool to generate the IR JSON representation of P4 programs.
 
 - Tested with: `p4c-graphs` version 1.2.4.2
 - Requires: Python 3.10 or later (tested up to 3.13)
@@ -30,15 +30,15 @@ Ensure `p4c-graphs` is available on your system's `PATH`.
 
 ## Installation
 
-To install LeapedFrog, the following steps can be followed.
+To install Octopus, the following steps can be followed.
 Step 6 installs the project in editable mode, including development dependencies.
 Feel free to customise this step according to your needs.
 For example, one could decide to install only the runtime dependencies by removing `[dev]`.
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/jortvanleenen/LeapedFrog.git
-cd LeapedFrog
+git clone https://github.com/jortvanleenen/Octopus.git
+cd Octopus
 
 # 2. Create a virtual environment
 python3 -m venv .venv
@@ -56,7 +56,7 @@ pip install hatch
 pip install -e .[dev]
 ```
 
-This makes the `leapedfrog` command available in your environment.
+This makes the `octopus` command available in your environment.
 
 To use symbolic bisimulation, at least one SMT solver has to be installed locally.
 PySMT provides the `pysmt-install` command to make doing this simple.
@@ -67,7 +67,7 @@ Afterwards, `pysmt-install --check` can be used to verify the installation.
 ## Usage
 
 ```
-leapedfrog [OPTIONS] FILE1 FILE2
+octopus [OPTIONS] FILE1 FILE2
 ```
 
 `FILE1` and `FILE2` are paths to the two P4 programs to compare.
@@ -78,31 +78,31 @@ hese can be either `.p4` source files, or IR JSON files produced by `p4c-graphs`
 Check two IR JSON files (using symbolic bisimulation by default):
 
 ```
-leapedfrog -j parser1.json parser2.json
+octopus -j parser1.json parser2.json
 ```
 
-Check two P4 source files (LeapedFrog invokes `p4c-graphs` internally):
+Check two P4 source files (Octopus invokes `p4c-graphs` internally):
 
 ```
-leapedfrog program1.p4 program2.p4
+octopus program1.p4 program2.p4
 ```
 
 Use symbolic bisimulation with leaps disabled:
 
 ```
-leapedfrog program1.p4 program2.p4 --disable_leaps
+octopus program1.p4 program2.p4 --disable_leaps
 ```
 
 Write output (certificate or counterexample) to a file:
 
 ```
-leapedfrog -j parser1.json parser2.json --output result.txt
+octopus -j parser1.json parser2.json --output result.txt
 ```
 
 Exit with status code 1 if the parsers are not equivalent:
 
 ```
-leapedfrog -j parser1.json parser2.json --fail-on-mismatch
+octopus -j parser1.json parser2.json --fail-on-mismatch
 ```
 
 _Note: this is useful for scripting or CI/CD pipelines._
@@ -110,13 +110,13 @@ _Note: this is useful for scripting or CI/CD pipelines._
 Print bisimulation execution time and memory usage:
 
 ```
-leapedfrog -j parser1.json parser2.json --stat
+octopus -j parser1.json parser2.json --stat
 ```
 
 Customise the SMT solver portfolio and provide (global) options:
 
 ```
-leapedfrog -j p1.json p2.json \
+octopus -j p1.json p2.json \
 --solvers ["z3", ("cvc5", {"incremental": False})] \
 --solvers-global-options {"generate_models": False}
 ```
@@ -127,12 +127,12 @@ _For `--solvers-global-options`, the following object is accepted: `dict[str, An
 
 ## CLI Options
 
-LeapedFrog provides a command-line interface (CLI) with the following options:
+Octopus provides a command-line interface (CLI) with the following options:
 
 | Short | Long                       | Description                                                                |
 |-------|----------------------------|----------------------------------------------------------------------------|
 | `-h`  | `--help`                   | Show a help message and exit                                               |
-|       | `--version`                | Show the version of LeapedFrog and exit                                    |
+|       | `--version`                | Show the version of Octopus and exit                                    |
 | `-j`  | `--json`                   | Specify that both inputs are in IR (p4c) JSON format                       |
 |       | `file1`                    | Path to the first P4 program                                               |
 |       | `file2`                    | Path to the second P4 program                                              |
