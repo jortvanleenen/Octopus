@@ -3,7 +3,7 @@
 Octopus is an equivalence checker for P4 packet parsers, implemented in Python.  
 It supports both naive and optimised symbolic bisimulation techniques for comparing parser behaviour.
 
-Octopus is accompanied by the paper *"Practical Equivalence Checking of P4 Parsers"* by Jort van Leenen.  
+Octopus is accompanied by the paper *"Practical Equivalence Checking of P4 Packet Parsers"* by Jort van Leenen.  
 The implementation builds on earlier work from [Leapfrog](https://doi.org/10.48550/arXiv.2205.08762), a Rocq-based
 formal verifier for P4 parsers.
 
