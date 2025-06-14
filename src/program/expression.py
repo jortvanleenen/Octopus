@@ -104,10 +104,10 @@ class Slice(AutoRepr, Expression):
 
     def to_smt(self) -> Any:
         reference_symbolic = self.reference.to_smt()
-        return BVExtract(reference_symbolic, self.lsb, self.msb)
+        return BVExtract(reference_symbolic, self.lsb, self.msb - 1)  # BVExtract has inclusive msb
 
     def __len__(self) -> int:
-        return self.msb - self.lsb + 1
+        return self.msb - self.lsb
 
     def __str__(self) -> str:
         return f"{self.reference}[{self.msb}:{self.lsb}]"
