@@ -1,0 +1,8 @@
+.git
+.idea
+.ruff_cache
+.venv
+__pycache__/
+*.pyo
+*.pyd
+*.log

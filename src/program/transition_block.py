@@ -139,7 +139,7 @@ class TransitionBlock:
         if len(self._selectors) == 0:
             return {(TRUE(), self._cases[tuple([DontCare()])])}
 
-        symbolic_cases: set[tuple[FormulaNode, str]] = set()
+        symbolic_transitions: set[tuple[FormulaNode, str]] = set()
         seen: set[FormulaNode] = set()
         for for_exprs, to_state in self._cases.items():
             formula = TRUE()
@@ -151,6 +151,6 @@ class TransitionBlock:
                 appended_formula = And(appended_formula, Not(f))
 
             seen.add(formula)
-            symbolic_cases.add((appended_formula, to_state))
+            symbolic_transitions.add((appended_formula, to_state))
 
-        return symbolic_cases
+        return symbolic_transitions
