@@ -12,12 +12,12 @@ formal verifier for P4 parsers.
 - Equivalence checking for P4 parsers using either naive or (optimised) symbolic bisimulation;
 - Support for IR (JSON) format from `p4c-graphs`;
 - CLI interface with structured output;
-- Lightweight and dependency-free (except for SMT solving).
+- Lightweight and dependency-free, excluding SMT solvers required for symbolic bisimulation.
 
 ## Limitations
 
 - Only supports P4-16 parsers;
-- Only supports a subset of P4-16 constructs and features;
+- Only supports a subset of P4-16 constructs and features.
 
 ## Dependencies and Compatibility
 
@@ -28,7 +28,45 @@ Octopus depends on the `p4c-graphs` tool to generate the IR JSON representation 
 
 Ensure `p4c-graphs` is available on your system's `PATH`.
 
-## Installation
+## Docker
+
+Octopus is available as a prebuilt Docker image, [hosted on Docker Hub](https://hub.docker.
+com/repository/docker/jortvanleenen/octopus).
+
+To download the image:
+
+```bash
+docker pull jortvanleenen/octopus:latest
+```
+
+You can verify the installation by performing a self-check on a simple P4 program:
+
+```bash
+docker run --rm jortvanleenen/octopus:latest \
+  tests/correct_cases/hello-octopus.p4 tests/correct_cases/hello-octopus.p4
+```
+
+This should confirm that Octopus is functioning correctly.
+
+To check your own P4 programs, mount a local directory (e.g., the current working directory) into the container.
+The example below mounts the current working directory to `/workspace` and sets that as the working directory:
+
+```bash
+docker run --rm -v "$PWD:/workspace" -w /workspace jortvanleenen/octopus:latest \
+  [OPTIONS] FILE1 FILE2
+```
+
+The image includes the Z3 and cvc5 SMT solvers preinstalled.
+To install additional solvers, or to run custom PySMT configurations, use an interactive shell:
+
+```bash
+docker run -it --rm jortvanleenen/octopus:latest /bin/bash
+```
+
+You can then, for example, use `pysmt-install`.
+For more information, see the manual installation instructions below.
+
+## Manual Installation
 
 To install Octopus, the following steps can be followed.
 Step 6 installs the project in editable mode, including development dependencies.
