@@ -130,28 +130,22 @@ class TransitionBlock:
             output.append(" " * n_spaces + f"({key_str}) -> {state}")
         return "\n".join(output)
 
-    def symbolic_transition(
-        self, manager: FormulaManager, pf: PureFormula
-    ) -> set[tuple[FormulaNode, str]]:
+    def symbolic_transition(self) -> set[tuple[FormulaNode, str]]:
         """
-        Generate symbolic transitions based on the transition block and a given pure formula.
+        Generate symbolic transitions based on the transition block.
 
-        :param manager: the formula manager to create fresh variables
-        :param pf: the pure formula, representing the current state
-        :return: a set of tuples containing the symbolic formula and the state to transition to
+        :return: a set of tuples containing the symbolic condition and the state to transition to
         """
         if len(self._selectors) == 0:
             return {(TRUE(), self._cases[tuple([DontCare()])])}
 
-        # TODO: check var usage
         symbolic_cases: set[tuple[FormulaNode, str]] = set()
         seen: set[FormulaNode] = set()
-        fresh_variables = [manager.fresh_variable(len(e)) for e in self._selectors]
         for for_exprs, to_state in self._cases.items():
             formula = TRUE()
             for i, expr in enumerate(for_exprs):
                 if not isinstance(expr, DontCare):
-                    formula = And(formula, Equals(expr, fresh_variables[i]))
+                    formula = And(formula, Equals(expr, self._selectors[i]))
             appended_formula = formula
             for f in seen:
                 appended_formula = And(appended_formula, Not(f))

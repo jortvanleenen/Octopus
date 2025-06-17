@@ -177,8 +177,8 @@ def symbolic_bisimulation(
                 pf = op_block_l.strongest_postcondition(manager, pf, left=True)
                 pf = op_block_r.strongest_postcondition(manager, pf, left=False)
 
-                for form_l, to_l in trans_block_l.symbolic_transition(manager, pf):
-                    for form_r, to_r in trans_block_r.symbolic_transition(manager, pf):
+                for form_l, to_l in trans_block_l.symbolic_transition():
+                    for form_r, to_r in trans_block_r.symbolic_transition():
                         pf_root = copy.deepcopy(pf.root)
                         pf_new = PureFormula.clone_with_new_root(
                             guarded_form.pf, And(pf_root, And(form_l, form_r))
@@ -188,7 +188,7 @@ def symbolic_bisimulation(
             elif transition_l:
                 pf = op_block_l.strongest_postcondition(manager, guarded_form.pf, left=True)
 
-                for form, to_l in trans_block_l.symbolic_transition(manager, pf):
+                for form, to_l in trans_block_l.symbolic_transition():
                     pf_root = copy.deepcopy(pf.root)
                     pf_new = PureFormula.clone_with_new_root(
                         guarded_form.pf, And(pf_root, form)
@@ -200,7 +200,7 @@ def symbolic_bisimulation(
             elif transition_r:
                 pf = op_block_r.strongest_postcondition(manager, guarded_form.pf, left=False)
 
-                for form, to_r in trans_block_r.symbolic_transition(manager, pf):
+                for form, to_r in trans_block_r.symbolic_transition():
                     pf_root = copy.deepcopy(pf.root)
                     pf_new = PureFormula.clone_with_new_root(
                         guarded_form.pf, And(pf_root, form)

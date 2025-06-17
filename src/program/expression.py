@@ -57,7 +57,7 @@ class Expression(ABC):
         pass
 
 
-class Concatenate(AutoRepr, Expression, FormulaNode):
+class Concatenate(AutoRepr, Expression):
     def __init__(self, program: "ParserProgram", obj: dict) -> None:
         self._program = program
         self.left: Expression | None = None
