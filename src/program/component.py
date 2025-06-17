@@ -83,9 +83,20 @@ class Assignment(Component):
         return store, buffer
 
     def strongest_postcondition(
-        self, manager: FormulaManager, pf: PureFormula, left: bool
+        self, manager: FormulaManager, pf: PureFormula, for_left: bool
     ) -> PureFormula:
-        reference_var = pf.get_header_field_var(self.left.reference, left)
+        if isinstance(self.left, Slice):
+            logger.warning("Assignment with left-hand slice is not supported")
+            raise NotImplementedError("Assignment with left-hand slice is not supported")
+            # reference = self.left.reference.reference
+        elif isinstance(self.left, Reference):
+            reference = self.left.reference
+        else:
+            logger.warning("Assignment left-hand side is not a Slice or Reference, but "
+                            f"{type(self.left).__name__}")
+            raise ValueError("Assignment left-hand side must be a Slice or Reference, "
+                             f"but got {type(self.left).__name__}")
+        reference_var = pf.get_header_field_var(reference, for_left)
         new_var = manager.fresh_variable(len(reference_var))
 
         substitution = {reference_var: new_var}
@@ -171,7 +182,7 @@ class Extract(Component):
         return f"Extract(header_reference={self.header_reference!r}, header_content={self.header_content!r}, size={self.size!r})"
 
     def __str__(self) -> str:
-        return self.header_reference
+        return f"extract({self.header_reference})"
 
 
 _METHOD_DISPATCH: dict[str, Callable[["ParserProgram", dict], Component]] = {

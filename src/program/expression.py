@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Callable, Any
 from pysmt.shortcuts import TRUE, FreshSymbol, BV, BVExtract
 from pysmt.typing import BVType
 
+from bisimulation import symbolic
+from bisimulation.symbolic.formula import Concatenate, FormulaNode, Variable
 from octopus.utils import AutoRepr
 
 if TYPE_CHECKING:
@@ -34,6 +36,15 @@ class Expression(ABC):
         pass
 
     @abstractmethod
+    def to_smt(self) -> Any:
+        """
+        Convert the expression to its SMT representation.
+
+        :return: the SMT representation of the expression
+        """
+        pass
+
+    @abstractmethod
     def __len__(self) -> int:
         pass
 
@@ -46,7 +57,7 @@ class Expression(ABC):
         pass
 
 
-class Concatenate(AutoRepr, Expression):
+class Concatenate(AutoRepr, Expression, FormulaNode):
     def __init__(self, program: "ParserProgram", obj: dict) -> None:
         self._program = program
         self.left: Expression | None = None
@@ -68,6 +79,15 @@ class Concatenate(AutoRepr, Expression):
         right_value: str = self.right.eval(store)
         return left_value + right_value
 
+    def to_smt(self) -> Any:
+        return symbolic.formula.Concatenate(self.left, self.right).to_smt()
+
+    def used_vars(self) -> set[Variable]:
+        return symbolic.formula.Concatenate(self.left, self.right).used_vars()
+
+    def substitute(self, mapping: dict[Variable, FormulaNode]) -> FormulaNode:
+        return symbolic.formula.Concatenate(self.left, self.right).substitute(mapping)
+
     def __len__(self) -> int:
         return len(self.left) + len(self.right)
 
@@ -75,7 +95,7 @@ class Concatenate(AutoRepr, Expression):
         return f"{self.left} ++ {self.right}"
 
 
-class Slice(AutoRepr, Expression):
+class Slice(AutoRepr, Expression, FormulaNode):
     def __init__(self, program: "ParserProgram", obj: dict = None) -> None:
         self._program = program
         self.reference = None
@@ -106,14 +126,21 @@ class Slice(AutoRepr, Expression):
         reference_symbolic = self.reference.to_smt()
         return BVExtract(reference_symbolic, self.lsb, self.msb - 1)  # BVExtract has inclusive msb
 
+    def used_vars(self) -> set[Variable]:
+        return self.reference.used_vars()
+
+    def substitute(self, mapping: dict[Variable, FormulaNode]) -> FormulaNode:
+        self.reference = self.reference.substitute(mapping)
+        return self
+
     def __len__(self) -> int:
         return self.msb - self.lsb
 
     def __str__(self) -> str:
-        return f"{self.reference}[{self.msb}:{self.lsb}]"
+        return f"{self.reference}[{self.lsb}:{self.msb}]"
 
 
-class Constant(AutoRepr, Expression):
+class Constant(AutoRepr, Expression, FormulaNode):
     def __init__(self, obj: dict, size_context: int) -> None:
         self.numeric_value: int | float | None = None
         self.value: str | None = None
@@ -137,6 +164,12 @@ class Constant(AutoRepr, Expression):
 
     def to_smt(self) -> Any:
         return BV(self.numeric_value, len(self))
+
+    def used_vars(self) -> set[Variable]:
+        return set()
+
+    def substitute(self, mapping: dict[Variable, FormulaNode]) -> FormulaNode:
+        return self
 
     def __len__(self) -> int:
         return self._size
@@ -179,7 +212,7 @@ class DontCare(AutoRepr, Expression):
         return "*"
 
 
-class Reference(AutoRepr, Expression):
+class Reference(AutoRepr, Expression, FormulaNode):
     def __init__(self, program: "ParserProgram", obj: dict) -> None:
         self._program = program
         self._reference: str | None = None
@@ -224,6 +257,12 @@ class Reference(AutoRepr, Expression):
 
     def to_smt(self) -> Any:
         return FreshSymbol(BVType(self._size))
+
+    def used_vars(self) -> set[Variable]:
+        return {Variable(self._reference, self._size)}
+
+    def substitute(self, mapping: dict[Variable, FormulaNode]) -> FormulaNode:
+        return Variable(self._reference, self._size).substitute(mapping)
 
     def __len__(self) -> int:
         return self._size

@@ -276,16 +276,16 @@ def main() -> None:
     ir_jsons = read_p4_files([args.file1, args.file2], args.json)
 
     logger.info("Converted both P4 files to IR JSON format")
-    logger.debug(f"IR JSON of file 1: '{ir_jsons[0]}'")
-    logger.debug(f"IR JSON of file 2: '{ir_jsons[1]}'")
+    logger.debug(f"IR JSON of file 1:\n{ir_jsons[0]}")
+    logger.debug(f"IR JSON of file 2:\n{ir_jsons[1]}")
 
     logger.info("Creating Parser objects...")
     parsers = [ParserProgram(j) for j in ir_jsons]
     logger.info("Created Parser objects")
-    logger.debug(f"Parser object 1 (repr): '{parsers[0]!r}'")
-    logger.debug(f"Parser object 1 (str):\n {parsers[0]}")
-    logger.debug(f"Parser object 2 (repr): '{parsers[1]!r}'")
-    logger.debug(f"Parser object 2 (str)\n {parsers[1]}")
+    logger.debug(f"Parser object 1 (repr):\n{parsers[0]!r}")
+    logger.debug(f"Parser object 1 (str):\n{parsers[0]}")
+    logger.debug(f"Parser object 2 (repr):\n{parsers[1]!r}")
+    logger.debug(f"Parser object 2 (str)\n{parsers[1]}")
 
     if args.stat:
         with timed_block(f"{method_name} bisimulation"):
@@ -300,9 +300,6 @@ def main() -> None:
         message = "The two parsers are NOT equivalent."
         header = "--- Counterexample ---"
 
-    logger.info(f"{message}\n{header}\n{certificate}")
-    print(message + "\n" + header + "\n" + str(certificate))
-
     if args.output:
         try:
             with open(args.output, "w", encoding="utf-8") as f:
@@ -312,6 +309,9 @@ def main() -> None:
                 f"Could not write to output file '{args.output}': {e.strerror}"
             )
             sys.exit(1)
+    else:
+        print(message + "\n" + header + "\n" + str(certificate))
+
 
     if args.fail_on_mismatch and not are_equal:
         sys.exit(1)

@@ -41,12 +41,12 @@ class ParserState:
             self.parse(components, select_expr)
 
     @property
-    def operationBlock(self) -> OperationBlock | None:
+    def operation_block(self) -> OperationBlock | None:
         """Get the operation block of this parser state."""
         return self._operationBlock
 
     @property
-    def transitionBlock(self) -> TransitionBlock | None:
+    def transition_block(self) -> TransitionBlock | None:
         """Get the transition block of this parser state."""
         return self._transitionBlock
 

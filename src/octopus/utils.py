@@ -66,5 +66,4 @@ def timed_block(label: str) -> Generator[None, Any, None]:
         f"  CPU time:  {end_cpu - start_cpu:.4f} s\n"
         f"  Peak memory: {peak / 1024:.2f} KiB"
     )
-    logger.info(duration_msg)
     print(duration_msg)

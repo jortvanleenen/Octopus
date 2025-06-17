@@ -6,6 +6,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import copy
+import logging
 
 import pysmt.shortcuts as pysmt
 
@@ -20,6 +21,8 @@ from bisimulation.symbolic.formula import (
     Concatenate,
 )
 from program.parser_program import ParserProgram
+
+logger = logging.getLogger(__name__)
 
 
 def naive_bisimulation(
@@ -89,19 +92,28 @@ def symbolic_bisimulation(
     :param solver_portfolio: the solver portfolio to use for symbolic execution
     :return: a boolean indicating bisimilarity and seen formulas or counterexample
     """
+    def is_terminal(state_name : str) -> bool:
+        """
+        Check if a state is terminal.
+
+        :param state_name: the state to check
+        :return: True if the state is terminal, False otherwise
+        """
+        return state_name in ["accept", "reject"]
+
     knowledge: set[GuardedFormula] = set()
     manager = FormulaManager()
     # In P4, the initial state is always called 'start'
     work_queue = [GuardedFormula("start", "start", 0, 0, PureFormula(TRUE()))]
     with solver_portfolio as s:
         while len(work_queue) > 0:
-            formula = work_queue.pop(0)
+            guarded_form = work_queue.pop(0)
 
             relevant_pfs = set()
-            for seen_formula in knowledge:
-                if formula.equal_guard(seen_formula):
-                    relevant_pfs.add(seen_formula.pf)
-            current_pf = formula.pf
+            for seen_guarded_form in knowledge:
+                if guarded_form.has_equal_guard(seen_guarded_form):
+                    relevant_pfs.add(seen_guarded_form.pf)
+            current_pf = guarded_form.pf
 
             implication = pysmt.Implies(
                 current_pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
@@ -109,91 +121,94 @@ def symbolic_bisimulation(
             if s.is_sat(implication):
                 continue
 
-            state_l = formula.state_l
-            state_r = formula.state_r
+            state_l = guarded_form.state_l
+            state_r = guarded_form.state_r
             if (state_l == "accept") != (state_r == "accept"):
-                return False, {formula}
+                # TODO: extend using pointers to get a full counterexample
+                return False, {guarded_form}
 
-            buf_l = formula.buf_len_l
-            buf_r = formula.buf_len_r
-            opblock_l = parser1.states[state_l].operationBlock
-            opblock_r = parser2.states[state_r].operationBlock
-            transblock_l = parser1.states[state_l].transitionBlock
-            transblock_r = parser2.states[state_r].transitionBlock
 
-            size_l = opblock_l.size
-            size_r = opblock_r.size
+            if is_terminal(state_l) and is_terminal(state_r):
+                continue
 
-            transition_l = buf_l + 1 == size_l
-            transition_r = buf_r + 1 == size_r
+            buf_l = guarded_form.buf_len_l
+            buf_r = guarded_form.buf_len_r
+            op_block_l = parser1.states[state_l].operation_block
+            op_block_r = parser2.states[state_r].operation_block
+            trans_block_l = parser1.states[state_l].transition_block
+            trans_block_r = parser2.states[state_r].transition_block
 
-            new_bit = manager.fresh_variable(1)
+            op_size_l = op_block_l.size
+            op_size_r = op_block_r.size
 
-            old_buf_l = formula.pf.get_buffer_var(left=True)
+            leap = min(op_size_l - buf_l, op_size_r - buf_r) if enable_leaps else 1
+
+            transition_l = buf_l + leap == op_size_l
+            transition_r = buf_r + leap == op_size_r
+
+            new_bits_var = manager.fresh_variable(leap)
+
+            old_buf_l = current_pf.get_buffer_var(left=True)
             if old_buf_l is None:
-                new_buf_l = manager.fresh_variable(1)
-                formula.pf.set_buffer_var(left=True, var=new_buf_l)
-                buf_eq_l = Equals(new_buf_l, new_bit)
+                new_buf_l = manager.fresh_variable(leap)
+                current_pf.set_buffer_var(left=True, var=new_buf_l)
+                buf_eq_l = Equals(new_buf_l, new_bits_var)
             else:
-                new_buf_l = manager.fresh_variable(len(old_buf_l) + 1)
-                formula.pf.set_buffer_var(left=True, var=new_buf_l)
-                buf_eq_l = Equals(new_buf_l, Concatenate(old_buf_l, new_bit))
+                new_buf_l = manager.fresh_variable(len(old_buf_l) + leap)
+                current_pf.set_buffer_var(left=True, var=new_buf_l)
+                buf_eq_l = Equals(new_buf_l, Concatenate(old_buf_l, new_bits_var))
 
-            old_buf_r = formula.pf.get_buffer_var(left=False)
+            old_buf_r = current_pf.get_buffer_var(left=False)
             if old_buf_r is None:
-                new_buf_r = manager.fresh_variable(1)
-                formula.pf.set_buffer_var(left=False, var=new_buf_r)
-                buf_eq_r = Equals(new_buf_r, new_bit)
+                new_buf_r = manager.fresh_variable(leap)
+                current_pf.set_buffer_var(left=False, var=new_buf_r)
+                buf_eq_r = Equals(new_buf_r, new_bits_var)
             else:
-                new_buf_r = manager.fresh_variable(len(old_buf_r) + 1)
-                formula.pf.set_buffer_var(left=False, var=new_buf_r)
-                buf_eq_r = Equals(new_buf_r, Concatenate(old_buf_r, new_bit))
+                new_buf_r = manager.fresh_variable(len(old_buf_r) + leap)
+                current_pf.set_buffer_var(left=False, var=new_buf_r)
+                buf_eq_r = Equals(new_buf_r, Concatenate(old_buf_r, new_bits_var))
 
+            # TODO rem equals above and check
             pf = PureFormula.clone_with_new_root(
-                formula.pf, And(formula.pf.root, And(buf_eq_l, buf_eq_r))
+                current_pf, And(current_pf.root, And(buf_eq_l, buf_eq_r))
             )
 
             if transition_l and transition_r:
-                pf = opblock_l.strongest_postcondition(manager, formula.pf, left=True)
-                pf = opblock_r.strongest_postcondition(manager, pf, left=False)
+                pf = op_block_l.strongest_postcondition(manager, pf, left=True)
+                pf = op_block_r.strongest_postcondition(manager, pf, left=False)
 
-                for form_l, to_l in transblock_l.symbolic_transition(manager, pf):
-                    for form_r, to_r in transblock_r.symbolic_transition(manager, pf):
+                for form_l, to_l in trans_block_l.symbolic_transition(manager, pf):
+                    for form_r, to_r in trans_block_r.symbolic_transition(manager, pf):
                         pf_root = copy.deepcopy(pf.root)
                         pf_new = PureFormula.clone_with_new_root(
-                            formula.pf, And(pf_root, And(form_l, form_r))
+                            guarded_form.pf, And(pf_root, And(form_l, form_r))
                         )
                         work_queue.append(GuardedFormula(to_l, to_r, 0, 0, pf_new))
 
             elif transition_l:
-                pf = opblock_l.strongest_postcondition(manager, formula.pf, left=True)
+                pf = op_block_l.strongest_postcondition(manager, guarded_form.pf, left=True)
 
-                for form, to_l in transblock_l.symbolic_transition(manager, pf):
+                for form, to_l in trans_block_l.symbolic_transition(manager, pf):
                     pf_root = copy.deepcopy(pf.root)
                     pf_new = PureFormula.clone_with_new_root(
-                        formula.pf, And(pf_root, form)
+                        guarded_form.pf, And(pf_root, form)
                     )
                     work_queue.append(
-                        GuardedFormula(to_l, state_r, 0, buf_r + 1, pf_new)
+                        GuardedFormula(to_l, state_r, 0, buf_r + leap, pf_new)
                     )
 
             elif transition_r:
-                pf = opblock_r.strongest_postcondition(manager, formula.pf, left=False)
+                pf = op_block_r.strongest_postcondition(manager, guarded_form.pf, left=False)
 
-                for form, to_r in transblock_r.symbolic_transition(manager, pf):
+                for form, to_r in trans_block_r.symbolic_transition(manager, pf):
                     pf_root = copy.deepcopy(pf.root)
                     pf_new = PureFormula.clone_with_new_root(
-                        formula.pf, And(pf_root, form)
+                        guarded_form.pf, And(pf_root, form)
                     )
                     work_queue.append(
-                        GuardedFormula(state_l, to_r, buf_l + 1, 0, pf_new)
+                        GuardedFormula(state_l, to_r, buf_l + leap, 0, pf_new)
                     )
 
-            else:
-                work_queue.append(
-                    GuardedFormula(state_l, state_r, buf_l + 1, buf_r + 1, pf)
-                )
-
-            knowledge.add(formula)
+            knowledge.add(guarded_form)
 
     return True, knowledge

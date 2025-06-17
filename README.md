@@ -132,7 +132,7 @@ Octopus provides a command-line interface (CLI) with the following options:
 | Short | Long                       | Description                                                                |
 |-------|----------------------------|----------------------------------------------------------------------------|
 | `-h`  | `--help`                   | Show a help message and exit                                               |
-|       | `--version`                | Show the version of Octopus and exit                                    |
+|       | `--version`                | Show the version of Octopus and exit                                       |
 | `-j`  | `--json`                   | Specify that both inputs are in IR (p4c) JSON format                       |
 |       | `file1`                    | Path to the first P4 program                                               |
 |       | `file2`                    | Path to the second P4 program                                              |

@@ -77,23 +77,23 @@ class TransitionBlock:
             self._selectors.append(parse_expression(self._program, expression))
 
         for case in select_expr["selectCases"]["vec"]:
-            for_values = []
+            for_exprs = []
             keyset = case["keyset"]
-            if "value" in keyset:
-                for_values.append(
-                    parse_expression(self._program, keyset, len(self._selectors[0]))
-                )
-            else:
+            if "components" in keyset and "vec" in keyset["components"]:
                 for i, expression in enumerate(keyset["components"]["vec"]):
-                    for_values.append(
+                    for_exprs.append(
                         parse_expression(
                             self._program, expression, len(self._selectors[i])
                         )
                     )
+            else:
+                for_exprs.append(
+                    parse_expression(self._program, keyset, len(self._selectors[0]))
+                )
             to_state_name = case["state"]["path"]["name"]
-            self._cases[tuple(for_values)] = to_state_name
+            self._cases[tuple(for_exprs)] = to_state_name
 
-            logger.info(f"Parsed transition to '{to_state_name}' for '{for_values}'")
+            logger.info(f"Parsed transition to '{to_state_name}' for '{for_exprs}'")
 
     def eval(self, store: dict) -> str:
         """
@@ -107,14 +107,10 @@ class TransitionBlock:
 
         evaluated_selectors = [expression.eval(store) for expression in self._selectors]
         for key, state in self._cases.items():
-            if len(key) != len(evaluated_selectors):
-                logger.warning(
-                    f"Key length {len(key)} does not match evaluated values length {len(evaluated_selectors)}"
-                )
-                continue
-
-            evaluated_for_values = [expression.eval(store) for expression in key]
-            if evaluated_for_values == evaluated_selectors:
+            for_values = [expression.eval(store) for expression in key]
+            if (
+                len(for_values) == 1 and isinstance(for_values[0], DontCare)
+            ) or for_values == evaluated_selectors:
                 return state
 
         return "reject"
@@ -145,22 +141,22 @@ class TransitionBlock:
         :return: a set of tuples containing the symbolic formula and the state to transition to
         """
         if len(self._selectors) == 0:
-            return {
-                (TRUE(), self._cases[tuple([DontCare()])])
-            }
+            return {(TRUE(), self._cases[tuple([DontCare()])])}
 
+        # TODO: check var usage
         symbolic_cases: set[tuple[FormulaNode, str]] = set()
         seen: set[FormulaNode] = set()
-        fresh_variables = [manager.fresh_variable(len(v)) for v in self._selectors]
-        for for_values, to_state in self._cases.items():
-            formula = None
-            for i, v in enumerate(for_values):
-                if formula is None:
-                    formula = Equals(fresh_variables[i], v)
-                formula = And(formula, Equals(v, fresh_variables[i]))
-            seen.add(formula)
+        fresh_variables = [manager.fresh_variable(len(e)) for e in self._selectors]
+        for for_exprs, to_state in self._cases.items():
+            formula = TRUE()
+            for i, expr in enumerate(for_exprs):
+                if not isinstance(expr, DontCare):
+                    formula = And(formula, Equals(expr, fresh_variables[i]))
+            appended_formula = formula
             for f in seen:
-                formula = And(formula, Not(f))
-            symbolic_cases.add((formula, to_state))
+                appended_formula = And(appended_formula, Not(f))
+
+            seen.add(formula)
+            symbolic_cases.add((appended_formula, to_state))
 
         return symbolic_cases

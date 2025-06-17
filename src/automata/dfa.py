@@ -71,11 +71,11 @@ class DFA:
         if q in self.program.states:  # Does not include accept and reject states
             state = self.program.states[q]
             wb = w + bit
-            if len(wb) < state.operationBlock.size:
+            if len(wb) < state.operation_block.size:
                 return DFA.Configuration(q, s, wb)
 
-            s_prime, w_prime = state.operationBlock.eval(s, wb)
-            next_q = state.transitionBlock.eval(s_prime)
+            s_prime, w_prime = state.operation_block.eval(s, wb)
+            next_q = state.transition_block.eval(s_prime)
             return DFA.Configuration(next_q, s_prime, w_prime)
 
         return DFA.Configuration("reject", s, "")
