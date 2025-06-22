@@ -2,13 +2,13 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get install -y curl gpg apt-transport-https ca-certificates && \
+RUN apt-get update && apt-get install -y \
+    curl gpg apt-transport-https ca-certificates python3.10 python3-pip && \
     echo 'deb https://download.opensuse.org/repositories/home:/p4lang/xUbuntu_22.04/ /' > /etc/apt/sources.list.d/home_p4lang.list && \
     curl -fsSL https://download.opensuse.org/repositories/home:/p4lang/xUbuntu_22.04/Release.key | gpg --dearmor > /etc/apt/trusted.gpg.d/home_p4lang.gpg && \
     apt-get update && \
-    apt-get install -y p4lang-p4c
-
-RUN apt-get update && apt-get install -y python3.10 python3-pip
+    apt-get install -y p4lang-p4c && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY . /octopus
 WORKDIR /octopus
