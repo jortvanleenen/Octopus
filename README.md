@@ -63,7 +63,7 @@ To install additional solvers, or to run custom PySMT configurations, use an int
 docker run -it --rm jortvanleenen/octopus:latest /bin/bash
 ```
 
-You can then, for example, use `pysmt-install`.
+You can then, for example, use `pysmt-install` to install SMT solvers.
 For more information, see the manual installation instructions below.
 
 ## Manual Installation
