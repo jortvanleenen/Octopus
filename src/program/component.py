@@ -4,7 +4,7 @@ This module defines Component, a class representing an operation in a P4 parser 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
-
+import copy
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable
@@ -49,14 +49,13 @@ class Component(ABC):
 
     @abstractmethod
     def strongest_postcondition(
-        self, manager: FormulaManager, pf: PureFormula, left: bool
+        self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
         """
         Generate the strongest postcondition for this component.
 
         :param manager: the FormulaManager to use for generating the postcondition
         :param pf: the PureFormula representing what we currently know
-        :param left: whether the postcondition is for the left parser
         """
         pass
 
@@ -83,31 +82,38 @@ class Assignment(Component):
         return store, buffer
 
     def strongest_postcondition(
-        self, manager: FormulaManager, pf: PureFormula, for_left: bool
+        self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
         if isinstance(self.left, Slice):
-            logger.warning("Assignment with left-hand slice is not supported")
-            raise NotImplementedError("Assignment with left-hand slice is not supported")
+            raise NotImplementedError(
+                "Assignment with left-hand slice is not supported"
+            )
             # reference = self.left.reference.reference
         elif isinstance(self.left, Reference):
-            reference = self.left.reference
+            reference = self.left
         else:
-            logger.warning("Assignment left-hand side is not a Slice or Reference, but "
-                            f"{type(self.left).__name__}")
-            raise ValueError("Assignment left-hand side must be a Slice or Reference, "
-                             f"but got {type(self.left).__name__}")
-        reference_var = pf.get_header_field_var(reference, for_left)
-        new_var = manager.fresh_variable(len(reference_var))
+            raise ValueError(
+                "Assignment left-hand side must be a Slice or Reference, "
+                f"but got {type(self.left).__name__}"
+            )
+        # reference_var = pf.get_header_field_var(reference, for_left)
+        new_var = manager.fresh_variable(len(reference))
+        # if reference_var is not None:
+        #     substitution = {reference_var: new_var}
+        #     pf.substitute(substitution)
 
-        substitution = {reference_var: new_var}
-        pf.substitute(substitution)
+        pf.set_header_field_var(reference.reference, self._program.left, new_var)
 
-        return PureFormula.clone_with_new_root(
-            pf, And(pf.root, Equals(reference_var, self.right))
+        right_copy = copy.deepcopy(self.right)
+        right_copy.to_formula(pf)
+        return PureFormula(
+            And(pf.root, Equals(new_var, right_copy)),
+            pf.header_field_vars,
+            pf.buf_vars,
         )
 
     def __repr__(self) -> str:
-        return f"Component(left={self.left!r}, right={self.right!r})"
+        return f"Assignment(left={self.left!r}, right={self.right!r})"
 
     def __str__(self) -> str:
         return f"{self.left} = {self.right}"
@@ -144,28 +150,36 @@ class Extract(Component):
         return store, buffer
 
     def strongest_postcondition(
-        self, manager: FormulaManager, pf: PureFormula, left: bool
+        self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
         substitution = {}
+        left = self.program.left
         buffer_var = pf.get_buffer_var(left)
+        print(self)
+        print(left)
+        print("buf vars at start ", pf.buf_vars)
         if buffer_var is None:
-            logger.warning("No buffer variable found in the postcondition")
-            raise ValueError("No buffer variable found in the postcondition")
+            raise ValueError("No buffer variable found for the pure formula")
+
+        length = len(buffer_var) - self.size
+        if length < 0:
+            raise ValueError("Invalid buffer length")
+        elif length == 0:
+            pf.set_buffer_var(left, None)
+            new_buffer = None
         else:
-            length = len(buffer_var) - self.size
-            if length <= 0:
-                pf.set_buffer_var(left, None)
-                new_buffer = None
-            else:
-                new_buffer = manager.fresh_variable(len(buffer_var) - self.size)
+            print(f"extracting: {len(buffer_var)} - {self.size}")
+            new_buffer = manager.fresh_variable(len(buffer_var) - self.size)
+            pf.set_buffer_var(left, new_buffer)
+            print("new buf vars = ", pf.buf_vars)
 
         for field, field_size in self.header_content.items():
             variable = manager.fresh_variable(field_size)
 
             store_name = self.header_reference + "." + field
-            old_variable = pf.get_header_field_var(store_name, left)
-            if old_variable is not None:
-                substitution[old_variable] = variable
+            # old_variable = pf.get_header_field_var(store_name, left)
+            # if old_variable is not None:
+            #     substitution[old_variable] = variable
             pf.set_header_field_var(store_name, left, variable)
 
             if new_buffer is None:
@@ -173,10 +187,18 @@ class Extract(Component):
             else:
                 new_buffer = symbolic.formula.Concatenate(variable, new_buffer)
 
-        substitution[buffer_var] = new_buffer
-        pf.substitute(substitution)
+        # substitution[buffer_var] = new_buffer
+        # pf.substitute(substitution)
 
-        return pf
+        new_pf = PureFormula(
+            And(pf.root, Equals(buffer_var, new_buffer)),
+                pf.header_field_vars,
+                pf.buf_vars,
+        )
+
+        print("new pf buf vars/end at: ", new_pf.buf_vars)
+
+        return new_pf
 
     def __repr__(self) -> str:
         return f"Extract(header_reference={self.header_reference!r}, header_content={self.header_content!r}, size={self.size!r})"

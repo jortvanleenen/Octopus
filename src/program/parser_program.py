@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class ParserProgram:
     """A class representing a P4 parser program with its input and output types."""
 
-    def __init__(self, json: dict | None = None) -> None:
+    def __init__(self, json: dict | None = None, left: bool = False) -> None:
         """
         Initialise a ParserProgram object.
 
@@ -29,6 +29,8 @@ class ParserProgram:
         self._output_type: str | None = None
 
         self._states: dict[str, ParserState] = {}
+
+        self._left = left
 
         if json is not None:
             self.parse(json)
@@ -57,6 +59,11 @@ class ParserProgram:
     def states(self) -> dict[str, ParserState]:
         """Get the states of the parser program."""
         return self._states
+
+    @property
+    def left(self) -> bool:
+        """Get whether the parser program is the left one or not."""
+        return self._left
 
     def parse(self, data: dict) -> None:
         """

@@ -21,19 +21,19 @@ parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
         pkt.extract(hdr.old);
         pkt.extract(hdr.new);
-        transition select(hdr.old.field[1:1], hdr.new.field[1:1]) {
+        transition select(hdr.old.field[23:23], hdr.new.field[23:23]) {
             (0, 0): start;
-            (0, 1): q4;
-            (1, _): q5;
+            (0, 1): parse_udp;
+            (1, _): cleanup;
         }
     }
 
-    state q4 {
+    state parse_udp {
         pkt.extract(hdr.udp);
         transition accept;
     }
 
-    state q5 {
+    state cleanup {
         pkt.extract(hdr.tmp);
         hdr.udp.data = hdr.new.field ++ hdr.tmp.field;
         transition accept;

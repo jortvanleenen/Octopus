@@ -35,6 +35,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff ~= 0.11.9",
+    "tqdm ~= 4.67.1",
 ]
 
 [project.urls]

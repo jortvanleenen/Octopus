@@ -15,7 +15,7 @@ import sys
 import tempfile
 from functools import partial
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Any
 
 from pysmt.logics import get_logic_by_name
 from pysmt.shortcuts import Portfolio, get_env
@@ -262,13 +262,16 @@ def select_bisimulation_method(
         ), "Symbolic"
 
 
-def main() -> None:
+def main(args: Any = None) -> None:
     """Entry point of the program."""
-    args = parse_arguments()
-    setup_logging(args.verbosity)
-
     logger.info("Starting...")
-    logger.debug(f"Parsed CLI argument values: {args}")
+
+    if args is None:
+        args = parse_arguments()
+        setup_logging(args.verbosity)
+        logger.debug(f"Parsed CLI argument values: {args}")
+    else:
+        logger.debug(f"Received the following arguments: {args}")
 
     method, method_name = select_bisimulation_method(args)
 
@@ -280,7 +283,7 @@ def main() -> None:
     logger.debug(f"IR JSON of file 2:\n{ir_jsons[1]}")
 
     logger.info("Creating Parser objects...")
-    parsers = [ParserProgram(j) for j in ir_jsons]
+    parsers = [ParserProgram(j, i == 0) for i, j in enumerate(ir_jsons)]
     logger.info("Created Parser objects")
     logger.debug(f"Parser object 1 (repr):\n{parsers[0]!r}")
     logger.debug(f"Parser object 1 (str):\n{parsers[0]}")
@@ -303,7 +306,9 @@ def main() -> None:
     if args.output:
         try:
             with open(args.output, "w", encoding="utf-8") as f:
-                f.write(f"{message}\n{header}\n{certificate}\n")
+                f.write(f"{message}\n{header}\n")
+                for item in certificate:
+                    f.write(f"{item}\n")
         except OSError as e:
             logger.error(
                 f"Could not write to output file '{args.output}': {e.strerror}"
@@ -311,7 +316,6 @@ def main() -> None:
             sys.exit(1)
     else:
         print(message + "\n" + header + "\n" + str(certificate))
-
 
     if args.fail_on_mismatch and not are_equal:
         sys.exit(1)

@@ -53,10 +53,10 @@ class OperationBlock(Component):
         return store, buffer
 
     def strongest_postcondition(
-        self, manager: FormulaManager, pf: PureFormula, left: bool
+        self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
         for component in self.components:
-            pf = component.strongest_postcondition(manager, pf, left)
+            pf = component.strongest_postcondition(manager, pf)
 
         return pf
 

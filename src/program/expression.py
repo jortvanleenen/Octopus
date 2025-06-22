@@ -9,11 +9,15 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable, Any
 
-from pysmt.shortcuts import TRUE, FreshSymbol, BV, BVExtract
-from pysmt.typing import BVType
+from pysmt.shortcuts import TRUE, BV, BVExtract
 
 from bisimulation import symbolic
-from bisimulation.symbolic.formula import Concatenate, FormulaNode, Variable
+from bisimulation.symbolic.formula import (
+    Concatenate,
+    FormulaNode,
+    Variable,
+    PureFormula,
+)
 from octopus.utils import AutoRepr
 
 if TYPE_CHECKING:
@@ -36,12 +40,17 @@ class Expression(ABC):
         pass
 
     @abstractmethod
-    def to_smt(self) -> Any:
+    def to_smt(self, pf: PureFormula) -> Any:
         """
         Convert the expression to its SMT representation.
 
+        :param pf: the PureFormula in which the expression occurs
         :return: the SMT representation of the expression
         """
+        pass
+
+    @abstractmethod
+    def to_formula(self, pf):
         pass
 
     @abstractmethod
@@ -57,7 +66,7 @@ class Expression(ABC):
         pass
 
 
-class Concatenate(AutoRepr, Expression):
+class Concatenate(AutoRepr, Expression, FormulaNode):
     def __init__(self, program: "ParserProgram", obj: dict) -> None:
         self._program = program
         self.left: Expression | None = None
@@ -79,14 +88,22 @@ class Concatenate(AutoRepr, Expression):
         right_value: str = self.right.eval(store)
         return left_value + right_value
 
-    def to_smt(self) -> Any:
-        return symbolic.formula.Concatenate(self.left, self.right).to_smt()
+    def to_smt(self, pf: PureFormula) -> Any:
+        return symbolic.formula.Concatenate(self.left, self.right).to_smt(pf)
 
-    def used_vars(self) -> set[Variable]:
-        return symbolic.formula.Concatenate(self.left, self.right).used_vars()
+    def to_formula(self, pf):
+        self.left.to_formula(pf)
+        self.right.to_formula(pf)
 
-    def substitute(self, mapping: dict[Variable, FormulaNode]) -> FormulaNode:
-        return symbolic.formula.Concatenate(self.left, self.right).substitute(mapping)
+    def used_vars(self, pf: PureFormula) -> set[Variable]:
+        return symbolic.formula.Concatenate(self.left, self.right).used_vars(pf)
+
+    def substitute(
+        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+    ) -> FormulaNode:
+        return symbolic.formula.Concatenate(self.left, self.right).substitute(
+            pf, mapping
+        )
 
     def __len__(self) -> int:
         return len(self.left) + len(self.right)
@@ -122,15 +139,21 @@ class Slice(AutoRepr, Expression, FormulaNode):
         value = self.reference.eval(store)
         return value[self.lsb : self.msb]
 
-    def to_smt(self) -> Any:
-        reference_symbolic = self.reference.to_smt()
-        return BVExtract(reference_symbolic, self.lsb, self.msb - 1)  # BVExtract has inclusive msb
+    def to_smt(self, pf: PureFormula) -> Any:
+        return BVExtract(
+            self.reference.to_smt(pf), self.lsb, self.msb - 1
+        )  # BVExtract has inclusive msb
 
-    def used_vars(self) -> set[Variable]:
-        return self.reference.used_vars()
+    def to_formula(self, pf):
+        self.reference.to_formula(pf)
 
-    def substitute(self, mapping: dict[Variable, FormulaNode]) -> FormulaNode:
-        self.reference = self.reference.substitute(mapping)
+    def used_vars(self, pf: PureFormula) -> set[Variable]:
+        return self.reference.used_vars(pf)
+
+    def substitute(
+        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+    ) -> FormulaNode:
+        self.reference = self.reference.substitute(pf, mapping)
         return self
 
     def __len__(self) -> int:
@@ -162,13 +185,18 @@ class Constant(AutoRepr, Expression, FormulaNode):
     def eval(self, store: dict[str, str]) -> str:
         return self.value
 
-    def to_smt(self) -> Any:
+    def to_formula(self, pf):
+        pass
+
+    def to_smt(self, pf: PureFormula) -> Any:
         return BV(self.numeric_value, len(self))
 
-    def used_vars(self) -> set[Variable]:
+    def used_vars(self, pf: PureFormula) -> set[Variable]:
         return set()
 
-    def substitute(self, mapping: dict[Variable, FormulaNode]) -> FormulaNode:
+    def substitute(
+        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+    ) -> FormulaNode:
         return self
 
     def __len__(self) -> int:
@@ -196,8 +224,11 @@ class DontCare(AutoRepr, Expression):
     def eval(self, store: dict[str, str]) -> "DontCare":
         return self
 
-    def to_smt(self) -> Any:
+    def to_smt(self, pf: PureFormula) -> Any:
         return TRUE()
+
+    def to_formula(self, pf):
+        pass
 
     def __len__(self) -> int:
         return 0
@@ -217,6 +248,7 @@ class Reference(AutoRepr, Expression, FormulaNode):
         self._program = program
         self._reference: str | None = None
         self._size: int = 0
+        self.variable = None
         if obj is not None:
             self.parse(obj)
 
@@ -255,14 +287,24 @@ class Reference(AutoRepr, Expression, FormulaNode):
             logger.warning(f"Reference '{self._reference}' not found in store.")
             return ""
 
-    def to_smt(self) -> Any:
-        return FreshSymbol(BVType(self._size))
+    def to_formula(self, pf):
+        self.variable = pf.get_header_field_var(self._reference, self._program.left)
 
-    def used_vars(self) -> set[Variable]:
-        return {Variable(self._reference, self._size)}
+    def to_smt(self, pf: PureFormula) -> Any:
+        return self.variable.to_smt(pf)
 
-    def substitute(self, mapping: dict[Variable, FormulaNode]) -> FormulaNode:
-        return Variable(self._reference, self._size).substitute(mapping)
+    def used_vars(self, pf: PureFormula) -> set[Variable]:
+        if self.variable is None:
+            print("Tried to access variable from reference but None.")
+            print(f"Reference '{self._reference}'.")
+        return {self.variable}
+
+    def substitute(
+        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+    ) -> FormulaNode:
+        return self.variable.substitute(
+            pf, mapping
+        )
 
     def __len__(self) -> int:
         return self._size

@@ -4,7 +4,7 @@ This module defines TransitionBlock, a class representing the transition block o
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
-
+import copy
 import logging
 from typing import TYPE_CHECKING
 
@@ -130,7 +130,7 @@ class TransitionBlock:
             output.append(" " * n_spaces + f"({key_str}) -> {state}")
         return "\n".join(output)
 
-    def symbolic_transition(self) -> set[tuple[FormulaNode, str]]:
+    def symbolic_transition(self, pf) -> set[tuple[FormulaNode, str]]:
         """
         Generate symbolic transitions based on the transition block.
 
@@ -145,7 +145,11 @@ class TransitionBlock:
             formula = TRUE()
             for i, expr in enumerate(for_exprs):
                 if not isinstance(expr, DontCare):
-                    formula = And(formula, Equals(expr, self._selectors[i]))
+                    expr_copy = copy.deepcopy(expr)
+                    expr_copy.to_formula(pf)
+                    selector_copy = copy.deepcopy(self._selectors[i])
+                    selector_copy.to_formula(pf)
+                    formula = And(formula, Equals(expr_copy, selector_copy))
             appended_formula = formula
             for f in seen:
                 appended_formula = And(appended_formula, Not(f))
