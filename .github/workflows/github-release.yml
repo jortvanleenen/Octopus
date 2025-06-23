@@ -1,0 +1,33 @@
+name: Create GitHub Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  tag_release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract Changelog for Release
+        run: |
+          awk "/## \[${{ github.ref_name }}\] / {flag=1; print; next} /^## \[/ && flag {flag=0} flag" CHANGELOG.md > release_notes.md
+          echo "Extracted changelog for ${{ github.ref_name }}:"
+          cat release_notes.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Bullseye ${{ github.ref_name }} Release"
+          body_path: "release_notes.md"
+          draft: false
+          prerelease: false

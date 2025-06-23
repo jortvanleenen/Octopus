@@ -5,13 +5,11 @@ Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
+import logging
 import time
 import tracemalloc
-
 from contextlib import contextmanager
-from typing import Generator, Any
-
-import logging
+from typing import Any, Generator
 
 logger = logging.getLogger(__name__)
 

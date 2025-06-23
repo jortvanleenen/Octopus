@@ -1,15 +1,14 @@
-FROM python:3.10-slim
+# syntax=docker/dockerfile:1
+FROM python:3.10-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
-WORKDIR /build
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    make cmake g++ gcc git curl gpg pkg-config \
-    libboost-all-dev libgc-dev bison flex graphviz \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    cmake g++ curl gcc gpg git pkg-config \
+    libboost-all-dev libgc-dev bison flex graphviz
 
-RUN git clone --depth=1 --recurse-submodules https://github.com/p4lang/p4c.git && \
-    cd p4c && \
+RUN git clone --depth=1 --recursive https://github.com/p4lang/p4c.git /p4c && \
+    cd /p4c && \
     mkdir build && cd build && \
     cmake .. \
       -DENABLE_BMV2=OFF \
@@ -20,11 +19,19 @@ RUN git clone --depth=1 --recurse-submodules https://github.com/p4lang/p4c.git &
       -DENABLE_P4FMT=OFF \
       -DENABLE_P4TEST=OFF \
       -DENABLE_GTESTS=OFF \
-    && make -j$(nproc) && make install && \
-    cd / && rm -rf /build
+    && make -j4 && make install
+
+FROM python:3.10-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /octopus
+
+COPY --from=builder /usr/local /usr/local
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libboost_* /usr/lib/x86_64-linux-gnu/
+
+RUN apt-get update && apt-get install -y --no-install-recommends cpp
 
 COPY . /octopus
-WORKDIR /octopus
 
 RUN pip install --upgrade pip --no-cache-dir && \
     pip install --no-cache-dir hatch && \

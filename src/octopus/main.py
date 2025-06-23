@@ -15,7 +15,7 @@ import sys
 import tempfile
 from functools import partial
 from pathlib import Path
-from typing import Callable, Any
+from typing import Any, Callable
 
 from pysmt.logics import get_logic_by_name
 from pysmt.shortcuts import Portfolio, get_env
@@ -24,7 +24,7 @@ from automata.dfa import DFA
 from bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
 from octopus import constants
 from octopus.__about__ import __version__
-from octopus.utils import timed_block, setup_logging
+from octopus.utils import setup_logging, timed_block
 from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)

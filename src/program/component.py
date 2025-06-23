@@ -4,13 +4,14 @@ This module defines Component, a class representing an operation in a P4 parser 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
+
 import copy
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable
 
 from bisimulation import symbolic
-from bisimulation.symbolic.formula import PureFormula, FormulaManager, And, Equals
+from bisimulation.symbolic.formula import And, Equals, FormulaManager, PureFormula
 from program.expression import (
     Expression,
     Reference,
@@ -192,8 +193,8 @@ class Extract(Component):
 
         new_pf = PureFormula(
             And(pf.root, Equals(buffer_var, new_buffer)),
-                pf.header_field_vars,
-                pf.buf_vars,
+            pf.header_field_vars,
+            pf.buf_vars,
         )
 
         print("new pf buf vars/end at: ", new_pf.buf_vars)
