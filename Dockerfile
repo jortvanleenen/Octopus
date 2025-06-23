@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    cmake g++ gcc git curl gpg pkg-config \
+    make cmake g++ gcc git curl gpg pkg-config \
     libboost-all-dev libgc-dev bison flex graphviz \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
