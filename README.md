@@ -12,26 +12,24 @@ formal verifier for P4 parsers.
 - Equivalence checking for P4 parsers using either naive or (optimised) symbolic bisimulation;
 - Support for IR (JSON) format from `p4c-graphs`;
 - CLI interface with structured output;
-- Lightweight and dependency-free, excluding SMT solvers required for symbolic bisimulation.
 
 ## Limitations
 
-- Only supports P4-16 parsers;
-- Only supports a subset of P4-16 constructs and features.
+- Only a subset of P4-16 constructs and features are supported.
 
 ## Dependencies and Compatibility
 
 Octopus depends on the `p4c-graphs` tool to generate the IR JSON representation of P4 programs.
 
-- Tested with: `p4c-graphs` version 1.2.4.2
-- Requires: Python 3.10 or later (tested up to 3.13)
+- Tested with: `p4c-graphs` version 1.2.x.x
+- Requires: Python 3.10 or later; tested up to 3.13
 
-Ensure `p4c-graphs` is available on your system's `PATH`.
+Ensure `p4c-graphs` is available on your system's `PATH` if you provide P4 programs as input.
 
 ## Docker
 
-Octopus is available as a prebuilt Docker image, [hosted on Docker Hub](https://hub.docker.
-com/repository/docker/jortvanleenen/octopus).
+Octopus is available as a prebuilt Docker image,
+[hosted on Docker Hub](https://hub.docker.com/repository/docker/jortvanleenen/octopus).
 
 To download the image:
 
@@ -94,7 +92,7 @@ pip install hatch
 pip install -e .[dev]
 ```
 
-This makes the `octopus` command available in your environment.
+Following the above instructions, should make the `octopus` command available in your environment.
 
 To use symbolic bisimulation, at least one SMT solver has to be installed locally.
 PySMT provides the `pysmt-install` command to make doing this simple.
@@ -109,7 +107,7 @@ octopus [OPTIONS] FILE1 FILE2
 ```
 
 `FILE1` and `FILE2` are paths to the two P4 programs to compare.
-hese can be either `.p4` source files, or IR JSON files produced by `p4c-graphs` (with the `-j` option).
+These can be either `.p4` source files, or IR JSON files produced by `p4c-graphs` (with the `-j` option).
 
 ### Examples
 
