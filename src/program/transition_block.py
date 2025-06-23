@@ -4,18 +4,19 @@ This module defines TransitionBlock, a class representing the transition block o
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
+
 import copy
 import logging
 from typing import TYPE_CHECKING
 
 from bisimulation.symbolic.formula import (
-    PureFormula,
-    FormulaManager,
-    Equals,
-    And,
-    Not,
-    FormulaNode,
     TRUE,
+    And,
+    Equals,
+    FormulaManager,
+    FormulaNode,
+    Not,
+    PureFormula,
 )
 from program.expression import DontCare, Expression, parse_expression
 

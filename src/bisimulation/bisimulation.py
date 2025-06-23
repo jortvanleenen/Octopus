@@ -11,13 +11,13 @@ import pysmt.shortcuts as pysmt
 
 from automata.dfa import DFA
 from bisimulation.symbolic.formula import (
+    TRUE,
+    And,
+    Concatenate,
+    Equals,
+    FormulaManager,
     GuardedFormula,
     PureFormula,
-    FormulaManager,
-    And,
-    Equals,
-    TRUE,
-    Concatenate,
 )
 from program.parser_program import ParserProgram
 
@@ -156,8 +156,6 @@ def symbolic_bisimulation(
                 # TODO: correct?
                 continue
 
-
-
             buf_len_l = guarded_form.buf_len_l
             print("buf_len_l", buf_len_l)
             buf_len_r = guarded_form.buf_len_r
@@ -261,7 +259,9 @@ def symbolic_bisimulation(
                     )
                     if s.is_sat(pf_new.to_smt()):
                         work_queue.append(
-                            GuardedFormula(state_l, to_r, buf_len_l + leap, 0, pf_new, guarded_form)
+                            GuardedFormula(
+                                state_l, to_r, buf_len_l + leap, 0, pf_new, guarded_form
+                            )
                         )
 
             knowledge.add(guarded_form)

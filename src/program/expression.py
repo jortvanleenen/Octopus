@@ -7,16 +7,16 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, Any
+from typing import TYPE_CHECKING, Any, Callable
 
-from pysmt.shortcuts import TRUE, BV, BVExtract
+from pysmt.shortcuts import BV, TRUE, BVExtract
 
 from bisimulation import symbolic
 from bisimulation.symbolic.formula import (
     Concatenate,
     FormulaNode,
-    Variable,
     PureFormula,
+    Variable,
 )
 from octopus.utils import AutoRepr
 
@@ -302,9 +302,7 @@ class Reference(AutoRepr, Expression, FormulaNode):
     def substitute(
         self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        return self.variable.substitute(
-            pf, mapping
-        )
+        return self.variable.substitute(pf, mapping)
 
     def __len__(self) -> int:
         return self._size

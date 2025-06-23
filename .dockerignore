@@ -2,7 +2,13 @@
 .idea
 .ruff_cache
 .venv
+.github
 __pycache__/
 *.pyo
 *.pyd
 *.log
+.pre-commit-config.yaml
+CHANGELOG.md
+CODING_STANDARDS.md
+CONTRIBUTING.md
+RELEASE.md

@@ -8,8 +8,8 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 import logging
 from typing import TYPE_CHECKING
 
-from bisimulation.symbolic.formula import PureFormula, FormulaManager
-from program.component import Assignment, Extract, parse_method_call, Component
+from bisimulation.symbolic.formula import FormulaManager, PureFormula
+from program.component import Assignment, Component, Extract, parse_method_call
 
 if TYPE_CHECKING:
     from program.parser_program import ParserProgram

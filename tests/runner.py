@@ -7,15 +7,15 @@ Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
-import subprocess
-import statistics
 import argparse
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List, Any
+import re
+import statistics
+import subprocess
 import sys
 import tempfile
-import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, List
 
 from tqdm import tqdm
 
@@ -226,6 +226,7 @@ def main() -> None:
     else:
         for res in result:
             print(res)
+
 
 if __name__ == "__main__":
     main()
