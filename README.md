@@ -58,7 +58,7 @@ The image includes the Z3 and cvc5 SMT solvers preinstalled.
 To install additional solvers, or to run custom PySMT configurations, use an interactive shell:
 
 ```bash
-docker run -it --rm jortvanleenen/octopus:latest /bin/bash
+docker run -it --rm --entrypoint /bin/bash jortvanleenen/octopus:latest
 ```
 
 You can then, for example, use `pysmt-install` to install SMT solvers.
