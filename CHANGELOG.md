@@ -16,11 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v1.0.0] - 2025-07-01
 
 This is the first stable release of Octopus.
-Additionally, it presents the version of the codebase that was published alongside its accompanying paper.
+Additionally, it represents the version of the codebase that was published alongside its accompanying paper (see the
+README.md file).
 
 ## [v0.2.0] - 2025-06-23
 
 ### Added
+
 - A near final version of the codebase;
 - Documentation, including a README, changelog, and contribution guidelines.
 

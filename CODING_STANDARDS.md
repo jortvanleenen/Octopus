@@ -3,7 +3,8 @@
 Our contribution workflow requires you to format and lint your code before committing it.
 This can be done automatically for you by tooling and is checked as part of our CI pipeline.
 As this can be automated, we will not go into detail about the formatting and linting rules.
-Feel free to check out the `CONTIBUTING.md` file for more information on how to set up and work with the tools locally.
+Feel free to check out the [CONTRIBUTING.md](CONTRIBUTING.md) file for more information on how to set up and work with
+the tools locally.
 This document will instead focus on the content of the code and its aspects that are not covered by the tooling.
 
 The content of this document is directly based on [PEP 8](https://peps.python.org/pep-0008/)

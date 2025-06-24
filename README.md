@@ -4,14 +4,14 @@ Octopus is an equivalence checker for P4 packet parsers, implemented in Python.
 It supports both naive and optimised symbolic bisimulation techniques for comparing parser behaviour.
 
 Octopus is accompanied by the paper *"Practical Equivalence Checking of P4 Packet Parsers"* by Jort van Leenen.  
-The implementation builds on earlier work from [Leapfrog](https://doi.org/10.48550/arXiv.2205.08762), a Rocq-based
-formal verifier for P4 parsers.
+The implementation builds on theoretical work from [Leapfrog](https://doi.org/10.48550/arXiv.2205.08762), a Rocq-based
+formal verifier for P4 packet parsers.
 
 ## Features
 
-- Equivalence checking for P4 parsers using either naive or (optimised) symbolic bisimulation;
+- Equivalence checking for P4 packet parsers using either naive or (optimised) symbolic bisimulation;
 - Support for IR (JSON) format from `p4c-graphs`;
-- CLI interface with structured output;
+- CLI interface with structured output.
 
 ## Limitations
 
@@ -92,7 +92,7 @@ pip install hatch
 pip install -e .[dev]
 ```
 
-Following the above instructions, should make the `octopus` command available in your environment.
+Following the above instructions should make the `octopus` command available in your environment.
 
 To use symbolic bisimulation, at least one SMT solver has to be installed locally.
 PySMT provides the `pysmt-install` command to make doing this simple.
@@ -107,7 +107,8 @@ octopus [OPTIONS] FILE1 FILE2
 ```
 
 `FILE1` and `FILE2` are paths to the two P4 programs to compare.
-These can be either `.p4` source files, or IR JSON files produced by `p4c-graphs` (with the `-j` option).
+These can be either `.p4` source files, or IR JSON files produced by `p4c-graphs`.
+One has to provide the `-j` option to Octopus in the latter case.
 
 ### Examples
 
@@ -153,8 +154,8 @@ Customise the SMT solver portfolio and provide (global) options:
 
 ```
 octopus -j p1.json p2.json \
---solvers ["z3", ("cvc5", {"incremental": False})] \
---solvers-global-options {"generate_models": False}
+--solvers '["z3",("cvc5",{"incremental":False})]' \
+--solvers-global-options '{"generate_models":False}'
 ```
 
 _Note: evaluation of the options is done using `ast.literal_eval()`, so it must be a valid Python literal._
@@ -174,10 +175,10 @@ Octopus provides a command-line interface (CLI) with the following options:
 |       | `file2`                    | Path to the second P4 program                                              |
 | `-v`  | `--verbosity`              | Increase output verbosity (`-v`, `-vv`, `-vvv`)                            |
 | `-n`  | `--naive`                  | Use naive bisimulation instead of symbolic bisimulation                    |
-|       | `--disable_leaps`          | Disable leaps in symbolic bisimulation (ignored if `--naive` is set)       |
+| `-L`  | `--disable_leaps`          | Disable leaps in symbolic bisimulation (ignored if `--naive` is set)       |
 | `-o`  | `--output`                 | Write the bisimulation certificate or counterexample to the specified file |
-|       | `--fail-on-mismatch`       | Exit with code 1 if the parsers are not equivalent                         |
-|       | `--stat`                   | Measure and print bisimulation execution time and memory usage             |
+| `-f`  | `--fail-on-mismatch`       | Exit with code 1 if the parsers are not equivalent                         |
+| `-S`  | `--stat`                   | Measure and print bisimulation execution time and memory usage             |
 | `-s`  | `--solvers`                | Specify which SMT solvers to use along with their options                  |
 |       | `--solvers-global-options` | Specify global options for all solvers                                     |
 

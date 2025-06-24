@@ -65,6 +65,7 @@ def parse_arguments() -> argparse.Namespace:
         help="use naive bisimulation instead of symbolic bisimulation",
     )
     parser.add_argument(
+        "-L",
         "--disable_leaps",
         action="store_true",
         help="disable leaps in symbolic bisimulation (ignored if --naive is set)",
@@ -76,11 +77,13 @@ def parse_arguments() -> argparse.Namespace:
         help="write the bisimulation certificate or counterexample to this file",
     )
     parser.add_argument(
+        "-f",
         "--fail-on-mismatch",
         action="store_true",
         help="exit with code 1 if the parsers are not equivalent",
     )
     parser.add_argument(
+        "-S",
         "--stat",
         action="store_true",
         help="measure and print bisimulation execution time and memory usage",
