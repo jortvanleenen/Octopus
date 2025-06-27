@@ -32,10 +32,10 @@ parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
         pkt.extract(hdr.b112);
         transition select(hdr.b112.data[111:96]) {
-            (0x8020): state_3;
-            (0x886d): state_0_suff_1;
-            (0x8857): state_0_suff_2;
-            (0x8868): state_0_suff_3;
+            (0x800): state_3;
+            (0x86dd): state_0_suff_1;
+            (0x8847): state_0_suff_2;
+            (0x8848): state_0_suff_3;
             default: accept;
         }
     }

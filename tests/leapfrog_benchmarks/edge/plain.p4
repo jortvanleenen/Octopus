@@ -30,10 +30,10 @@ parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
         pkt.extract(hdr.eth0);
         transition select(hdr.eth0.data[111:96]) {
-            (0x8857): parse_mpls0;
-            (0x8868): parse_mpls0;
-            (0x8020): ignore_ipver4;
-            (0x886d): ignore_ipver6;
+            (0x8847): parse_mpls0;
+            (0x8848): parse_mpls0;
+            (0x800): ignore_ipver4;
+            (0x86dd): ignore_ipver6;
             default: accept;
         }
     }
