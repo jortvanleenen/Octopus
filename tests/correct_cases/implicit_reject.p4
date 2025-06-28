@@ -2,17 +2,17 @@
 #include <core.p4>
 // HEADER END
 
-header mpls_t {
+header h_t {
     bit<3> label;
 }
 
 struct headers_t {
-    mpls_t mpls;
+    h_t h;
 }
 
 parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
-        pkt.extract(hdr.mpls);
+        pkt.extract(hdr.h);
     }
 }
 

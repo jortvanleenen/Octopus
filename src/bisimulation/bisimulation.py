@@ -13,12 +13,12 @@ from automata.dfa import DFA
 from bisimulation.symbolic.formula import (
     TRUE,
     And,
-    Concatenate,
     Equals,
     FormulaManager,
     GuardedFormula,
     PureFormula,
 )
+from program.expression import Concatenate
 from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
@@ -70,12 +70,43 @@ def naive_bisimulation(
     return True, seen
 
 
+def get_trace(guarded_form):
+    trace = []
+    current = guarded_form
+    while current is not None:
+        trace.append(current)
+        current = current.prev_guarded_formula
+    trace.reverse()
+
+    lines = []
+    for step, g in enumerate(trace):
+        lines.append(f"Step {step}:")
+        lines.append(f"  Left state: {g.state_l}, Right state: {g.state_r}")
+        lines.append(f"  Buffer lengths: left={g.buf_len_l}, right={g.buf_len_r}")
+        lines.append(f"  Header fields: {g.pf.header_field_vars}")
+        lines.append(f"  Buffer vars: {g.pf.buf_vars}")
+        lines.append(f"  Formula root: {g.pf.root}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def is_terminal(state_name: str) -> bool:
+    """
+    Check if a state is terminal.
+
+    :param state_name: the state to check
+    :return: True if the state is terminal, False otherwise
+    """
+    return state_name in ["accept", "reject"]
+
+
 def symbolic_bisimulation(
     parser1: ParserProgram,
     parser2: ParserProgram,
     enable_leaps: bool,
     solver_portfolio: pysmt.Portfolio,
-) -> tuple[bool, set[GuardedFormula]]:
+) -> tuple[bool, str]:
     """
     Check whether two P4 parser programs are bisimilar using symbolic execution.
 
@@ -92,15 +123,6 @@ def symbolic_bisimulation(
     :return: a boolean indicating bisimilarity and seen formulas or counterexample
     """
 
-    def is_terminal(state_name: str) -> bool:
-        """
-        Check if a state is terminal.
-
-        :param state_name: the state to check
-        :return: True if the state is terminal, False otherwise
-        """
-        return state_name in ["accept", "reject"]
-
     knowledge: set[GuardedFormula] = set()
     manager = FormulaManager()
     # In P4, the initial state is always called 'start'
@@ -115,66 +137,98 @@ def symbolic_bisimulation(
                     relevant_pfs.add(seen_guarded_form.pf)
             current_pf = guarded_form.pf
 
-            implication = pysmt.Implies(
-                current_pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
-            )
-            if not s.is_sat(current_pf.to_smt()):
-                print("current is unsat, continiueing")
+            # current_vars = set(v.to_smt(current_pf) for v in current_pf.used_vars)
+            # relevant_vars = set(
+            #     v.to_smt(pf) for pf in relevant_pfs for v in pf.used_vars
+            # )
+            # used_vars = current_vars.union(relevant_vars)
+            # condition = pysmt.Exists(
+            #     variables=used_vars,
+            #     formula=pysmt.Implies(
+            #         current_pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
+            #     ),
+            # )
+
+            # print("current is:", current_pf.to_smt())
+            # if s.is_sat(current_pf.to_smt()):
+            #     print("current is sat")
+            # else:
+            #     print("current is not sat")
+            #
+            # print("relevant is:", [pf.to_smt() for pf in relevant_pfs])
+            # if s.is_sat(pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])):
+            #     print("relevant is sat")
+            # else:
+            #     print("relevant is not sat")
+            #
+            # print(
+            #     "Implies is:",
+            #     pysmt.Implies(
+            #         current_pf.to_smt(),
+            #         pysmt.Or(*[pf.to_smt() for pf in relevant_pfs]),
+            #     ),
+            # )
+            # if s.is_valid(
+            #     pysmt.Implies(
+            #         current_pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
+            #     )
+            # ):
+            #     print("Implies is valid")
+            # else:
+            #     print("Implies is not valid")
+
+            if s.is_valid(
+                pysmt.Implies(
+                    current_pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
+                )
+            ):
+                logger.debug("Guarded formula information already known, skipping.")
                 continue
             else:
-                print("current is sat")
-            if s.is_sat(implication):
-                continue
+                logger.debug("Guarded formula information is new, processing.")
 
             state_l = guarded_form.state_l
             state_r = guarded_form.state_r
             if (state_l == "accept") != (state_r == "accept"):
-                trace = []
-                current = guarded_form
-                while current is not None:
-                    trace.append(current)
-                    current = current.prev_guarded_formula
-                trace.reverse()
-
-                lines = []
-                for step, g in enumerate(trace):
-                    lines.append(f"Step {step}:")
-                    lines.append(f"  Left state: {g.state_l}, Right state: {g.state_r}")
-                    lines.append(
-                        f"  Buffer lengths: left={g.buf_len_l}, right={g.buf_len_r}"
-                    )
-                    lines.append(f"  Header fields: {g.pf.header_field_vars}")
-                    lines.append(f"  Buffer vars: {g.pf.buf_vars}")
-                    lines.append(f"  Formula root: {g.pf.root}")
-                    lines.append("")
-
-                trace_output = "\n".join(lines)
-
-                return False, {trace_output}
+                return False, get_trace(guarded_form)
 
             if is_terminal(state_l) and is_terminal(state_r):
                 # TODO: correct?
+                logger.debug("Both states are terminal, skipping further processing.")
+                knowledge.add(guarded_form)
                 continue
 
             buf_len_l = guarded_form.buf_len_l
-            print("buf_len_l", buf_len_l)
             buf_len_r = guarded_form.buf_len_r
-            print("buf len r", buf_len_r)
-            op_block_l = parser1.states[state_l].operation_block
-            op_block_r = parser2.states[state_r].operation_block
-            trans_block_l = parser1.states[state_l].transition_block
-            trans_block_r = parser2.states[state_r].transition_block
 
-            op_size_l = op_block_l.size
-            op_size_r = op_block_r.size
+            if state_l != "reject":
+                op_block_l = parser1.states[state_l].operation_block
+                trans_block_l = parser1.states[state_l].transition_block
+                op_size_l = op_block_l.size
+                leap = op_size_l - buf_len_l if enable_leaps else 1
 
-            leap = (
-                min(op_size_l - buf_len_l, op_size_r - buf_len_r) if enable_leaps else 1
-            )
-            print("leap", leap)
+            if state_r != "reject":
+                op_block_r = parser2.states[state_r].operation_block
+                trans_block_r = parser2.states[state_r].transition_block
+                op_size_r = op_block_r.size
+                leap = op_size_r - buf_len_r if enable_leaps else 1
 
-            transition_l = buf_len_l + leap == op_size_l
-            transition_r = buf_len_r + leap == op_size_r
+            if state_l != "reject" and state_r != "reject":
+                leap = (
+                    min(op_size_l - buf_len_l, op_size_r - buf_len_r)
+                    if enable_leaps
+                    else 1
+                )
+
+            if state_l == "reject":
+                transition_l = False
+            else:
+                transition_l = buf_len_l + leap == op_size_l
+
+            if state_r == "reject":
+                transition_r = False
+            else:
+                transition_r = buf_len_r + leap == op_size_r
 
             new_bits_var = manager.fresh_variable(leap)
             new_root = current_pf.root
@@ -185,18 +239,16 @@ def symbolic_bisimulation(
             else:
                 new_buf_l = manager.fresh_variable(len(old_buf_l) + leap)
                 current_pf.set_buffer_var(left=True, var=new_buf_l)
-                buf_eq_l = Equals(new_buf_l, Concatenate(old_buf_l, new_bits_var))
+                buf_eq_l = Equals(new_buf_l, Concatenate(parser1, left=old_buf_l, right=new_bits_var))
                 new_root = And(new_root, buf_eq_l)
 
             old_buf_r = current_pf.get_buffer_var(left=False)
             if old_buf_r is None:
-                print("setting length buf to: ", leap)
                 current_pf.set_buffer_var(left=False, var=new_bits_var)
             else:
                 new_buf_r = manager.fresh_variable(len(old_buf_r) + leap)
-                print("setting length buf to: ", len(old_buf_r), leap)
                 current_pf.set_buffer_var(left=False, var=new_buf_r)
-                buf_eq_r = Equals(new_buf_r, Concatenate(old_buf_r, new_bits_var))
+                buf_eq_r = Equals(new_buf_r, Concatenate(parser2, left=old_buf_r, right=new_bits_var))
                 new_root = And(new_root, buf_eq_r)
 
             pf = PureFormula(
@@ -205,15 +257,14 @@ def symbolic_bisimulation(
                 current_pf.buf_vars,
             )
 
-            logger.debug(
-                f"Parser status\n"
-                f"Left: state {state_l} - op. size {op_size_l} {'transitioning' if transition_l else ''}\n"
-                f"Right: state {state_r} - op. size {op_size_r} {'transitioning' if transition_r else ''}\n"
-                f"Buffers: {pf.buf_vars}"
+            logger.info(
+                f"Equivalence checking loop status\n"
+                f"Left - state: {state_l}, op. size: {op_size_l}, transitioning: {transition_l}\n"
+                f"Right - state: {state_r}, op. size: {op_size_r}, transitioning: {transition_r}\n"
             )
+            logger.debug(f"Buffers: {pf.buf_vars}")
 
             if transition_l and transition_r:
-                logger.info("Both parsers transition.")
                 pf = op_block_l.strongest_postcondition(manager, pf)
                 pf = op_block_r.strongest_postcondition(manager, pf)
 
@@ -225,13 +276,16 @@ def symbolic_bisimulation(
                             pf.buf_vars,
                         )
 
-                        if s.is_sat(pf_new.to_smt()):
+                        if s.is_sat(pf_new.to_smt_with_exists()):
                             work_queue.append(
                                 GuardedFormula(to_l, to_r, 0, 0, pf_new, guarded_form)
                             )
+                            logger.debug(
+                                "Found satisfiable:"
+                                f"({to_l}, {to_r}) with formula {pf_new}"
+                            )
 
             elif transition_l:
-                logger.info("Only the left-hand parser transitions.")
                 pf = op_block_l.strongest_postcondition(manager, pf)
 
                 for form, to_l in trans_block_l.symbolic_transition(pf):
@@ -240,15 +294,18 @@ def symbolic_bisimulation(
                         pf.header_field_vars,
                         pf.buf_vars,
                     )
-                    if s.is_sat(pf_new.to_smt()):
+                    if s.is_sat(pf_new.to_smt_with_exists()):
                         work_queue.append(
                             GuardedFormula(
                                 to_l, state_r, 0, buf_len_r + leap, pf_new, guarded_form
                             )
                         )
+                        logger.debug(
+                            "Found satisfiable:"
+                            f"({to_l}, {state_r}) with formula {pf_new}"
+                        )
 
             elif transition_r:
-                logger.info("Only the right-hand parser transitions.")
                 pf = op_block_r.strongest_postcondition(manager, pf)
 
                 for form, to_r in trans_block_r.symbolic_transition(pf):
@@ -257,13 +314,17 @@ def symbolic_bisimulation(
                         pf.header_field_vars,
                         pf.buf_vars,
                     )
-                    if s.is_sat(pf_new.to_smt()):
+                    if s.is_sat(pf_new.to_smt_with_exists()):
                         work_queue.append(
                             GuardedFormula(
                                 state_l, to_r, buf_len_l + leap, 0, pf_new, guarded_form
                             )
                         )
+                        logger.debug(
+                            "Found satisfiable:"
+                            f"({state_l}, {to_r}) with formula {pf_new}"
+                        )
 
             knowledge.add(guarded_form)
 
-    return True, knowledge
+    return True, "\n".join(str(f) for f in knowledge)

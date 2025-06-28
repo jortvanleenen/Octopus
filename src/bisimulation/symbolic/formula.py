@@ -116,7 +116,7 @@ class Not(AutoRepr, FormulaNode):
         return Not(self.subformula.substitute(pf, mapping))
 
     def __str__(self):
-        return f"¬{self.subformula}"
+        return f"~({self.subformula})"
 
 
 class And(AutoRepr, FormulaNode):
@@ -139,7 +139,7 @@ class And(AutoRepr, FormulaNode):
         )
 
     def __str__(self):
-        return f"{self.left} & {self.right}"
+        return f"({self.left}) & ({self.right})"
 
 
 class TRUE(AutoRepr, FormulaNode):
@@ -158,31 +158,30 @@ class TRUE(AutoRepr, FormulaNode):
         return "TRUE"
 
 
-class Concatenate(AutoRepr, FormulaNode):
-    def __init__(self, left: Expression | FormulaNode, right: Expression | FormulaNode):
-        self.left = left
-        self.right = right
-
-    def to_smt(self, pf: PureFormula) -> Any:
-        # TODO: check order
-        return pysmt.BVConcat(self.left.to_smt(pf), self.right.to_smt(pf))
-
-    def used_vars(self, pf: PureFormula) -> set["Variable"]:
-        return self.left.used_vars(pf) | self.right.used_vars(pf)
-
-    def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
-    ) -> FormulaNode:
-        return Concatenate(
-            self.left.substitute(pf, mapping),
-            self.right.substitute(pf, mapping),
-        )
-
-    def __len__(self):
-        return len(self.left) + len(self.right)
-
-    def __str__(self):
-        return f"{self.left} ++ {self.right}"
+# class Concatenate(AutoRepr, FormulaNode):
+#     def __init__(self, left: Expression | FormulaNode, right: Expression | FormulaNode):
+#         self.left = left
+#         self.right = right
+#
+#     def to_smt(self, pf: PureFormula) -> Any:
+#         return pysmt.BVConcat(self.left.to_smt(pf), self.right.to_smt(pf))
+#
+#     def used_vars(self, pf: PureFormula) -> set["Variable"]:
+#         return self.left.used_vars(pf) | self.right.used_vars(pf)
+#
+#     def substitute(
+#         self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+#     ) -> FormulaNode:
+#         return Concatenate(
+#             self.left.substitute(pf, mapping),
+#             self.right.substitute(pf, mapping),
+#         )
+#
+#     def __len__(self):
+#         return len(self.left) + len(self.right)
+#
+#     def __str__(self):
+#         return f"({self.left}) ++ ({self.right})"
 
 
 class Equals(AutoRepr, FormulaNode):
@@ -191,7 +190,7 @@ class Equals(AutoRepr, FormulaNode):
         self.right = right
 
     def __str__(self):
-        return f"{self.left} == {self.right}"
+        return f"({self.left}) == ({self.right})"
 
     def to_smt(self, pf: PureFormula) -> Any:
         return pysmt.Equals(self.left.to_smt(pf), self.right.to_smt(pf))
@@ -295,7 +294,9 @@ class PureFormula(AutoRepr):
         """
         self.header_field_vars[(name, left)] = variable
         if variable is None:
-            print("gattie wel lekke?")
+            logger.warning(
+                "Setting header field variable to None, this may cause issues."
+            )
         self.used_vars.add(variable)
 
     def get_buffer_var(self, left: bool) -> Variable | None:
@@ -332,12 +333,24 @@ class PureFormula(AutoRepr):
         self.root = self.root.substitute(self, mapping)
         self._used_vars = {v for v in self.used_vars if v not in mapping}
 
-    def to_smt(self):
-        print("TOSMT", self.used_vars)
+    def to_smt_with_exists(self) -> pysmt.Exists:
+        """
+        Convert the formula to an SMT representation with existential quantification.
+
+        :return: an SMT Exists object representing the formula
+        """
         return pysmt.Exists(
             variables=[v.to_smt(self) for v in self.used_vars],
             formula=self.root.to_smt(self),
         )
+
+    def to_smt(self):
+        """
+        Convert the formula to an SMT representation without quantification.
+
+        :return: an SMT Exists object representing the formula
+        """
+        return self.root.to_smt(self)
 
     def __str__(self):
         return "E " + ", ".join(str(v) for v in self.used_vars) + f". {self.root}"

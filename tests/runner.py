@@ -40,136 +40,151 @@ def get_all_benchmarks() -> List[Benchmark]:
     return [
         Benchmark(
             "datacenter",
-            Path("leapfrog_benchmarks/datacenter/switch.p4"),
-            Path("leapfrog_benchmarks/datacenter/switch.p4"),
+            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
+            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
         ),
         Benchmark(
             "edge_self",
-            Path("leapfrog_benchmarks/edge/plain.p4"),
-            Path("leapfrog_benchmarks/edge/plain.p4"),
+            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
         ),
         Benchmark(
             "edge_optimised",
-            Path("leapfrog_benchmarks/edge/plain.p4"),
-            Path("leapfrog_benchmarks/edge/optimised.p4"),
-        ),
-        Benchmark(
-            "edge_compiled",
-            Path("leapfrog_benchmarks/edge/plain.p4"),
-            Path("leapfrog_benchmarks/edge/compiled.p4"),
+            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+            Path("tests/leapfrog_benchmarks/edge/optimised.p4"),
         ),
         Benchmark(
             "enterprise",
-            Path("leapfrog_benchmarks/enterprise/router.p4"),
-            Path("leapfrog_benchmarks/enterprise/router.p4"),
+            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
+            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
         ),
         Benchmark(
             "external_filtering",
-            Path("leapfrog_benchmarks/external_filtering/sloppy.p4"),
-            Path("leapfrog_benchmarks/external_filtering/strict.p4"),
+            Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
+            Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
         ),
+        # Benchmark(
+        #     "header_initialisation",
+        #     Path("tests/leapfrog_benchmarks/header_initialisation/read_initialised.p4"),
+        #     Path(
+        #         "tests/leapfrog_benchmarks/header_initialisation/read_uninitialised.p4"
+        #     ),
+        # ),
         Benchmark(
-            "header_initialisation",
-            Path("leapfrog_benchmarks/header_initialisation/read_initialised.p4"),
-            Path("leapfrog_benchmarks/header_initialisation/read_uninitialised.p4"),
-        ),
-        Benchmark(
-            "service_provider_self",
-            Path("leapfrog_benchmarks/service_provider/plain.p4"),
-            Path("leapfrog_benchmarks/service_provider/plain.p4"),
-        ),
-        Benchmark(
-            "service_provider_compiled",
-            Path("leapfrog_benchmarks/service_provider/plain.p4"),
-            Path("leapfrog_benchmarks/service_provider/compiled.p4"),
+            "service_provider",
+            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
+            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
         ),
         Benchmark(
             "speculative_extraction",
-            Path("leapfrog_benchmarks/speculative_extraction/mpls.p4"),
-            Path("leapfrog_benchmarks/speculative_extraction/mpls_vectorised.p4"),
+            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls.p4"),
+            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls_vectorised.p4"),
         ),
         Benchmark(
             "state_rearrangement",
-            Path("leapfrog_benchmarks/state_rearrangement/combined_states.p4"),
-            Path("leapfrog_benchmarks/state_rearrangement/seperate_states.p4"),
+            Path("tests/leapfrog_benchmarks/state_rearrangement/combined_states.p4"),
+            Path("tests/leapfrog_benchmarks/state_rearrangement/separate_states.p4"),
         ),
         Benchmark(
             "variable_length_formats",
-            Path("leapfrog_benchmarks/variable_length_formats/ipoptions.p4"),
-            Path("leapfrog_benchmarks/variable_length_formats/timestamp.p4"),
+            Path("tests/leapfrog_benchmarks/variable_length_formats/ipoptions.p4"),
+            Path("tests/leapfrog_benchmarks/variable_length_formats/timestamp.p4"),
         ),
     ]
 
 
 def get_all_run_variants() -> List[BenchmarkRun]:
     return [
-        BenchmarkRun("leapfrog_comparison", {"solvers": ["Z3", "cvc4"]}),
         BenchmarkRun("octopus_default", {}),
         BenchmarkRun("octopus_no_leaps", {"disable_leaps": True}),
-        BenchmarkRun("octopus_z3", {"solvers": ["Z3"]}),
+        BenchmarkRun("octopus_z3", {"solvers": ["z3"]}),
         BenchmarkRun("octopus_cvc5", {"solvers": ["cvc5"]}),
     ]
 
 
-def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun) -> float:
-    times = []
-    for i in tqdm(
-        range(RUNS_PER_BENCHMARK + 1), desc=f"{benchmark.name} runs", leave=False
-    ):
-        args = {
-            "file1": str(benchmark.file1),
-            "file2": str(benchmark.file2),
-            "json": True,
-            "verbosity": 0,
-            "naive": False,
-            "disable_leaps": variant.arguments.get("disable_leaps", False),
-            "solvers": str(variant.arguments.get("solvers", ["z3", "cvc5"])),
-            "solvers_global_options": None,
-            "output": None,
-            "fail_on_mismatch": False,
-            "stat": False,
-        }
-        with tempfile.NamedTemporaryFile() as temp_out:
-            cmd = (
-                TIME_CMD
-                + ["python3", "-m", "octopus.main"]
-                + [
-                    f"--{k}" if isinstance(v, bool) and v else f"--{k}={v}"
-                    for k, v in args.items()
-                    if v is not False and v is not None
-                ]
-            )
-            result = subprocess.run(
-                cmd,
-                stderr=subprocess.PIPE,
-                stdout=temp_out,
-                text=True,
-                shell=False,
-            )
-            match = re.search(
-                r"Elapsed \(wall clock\) time.*?:\s*(\d+):(\d+(?:\.\d+)?)",
-                result.stderr,
-            )
-            if match:
-                minutes = int(match.group(1))
-                seconds = float(match.group(2))
-                if i > 3:
-                    times.append(minutes * 60 + seconds)
-    return statistics.mean(times)
-
-
 def run_benchmarks(
-    benchmarks: List[Benchmark], variants: List[BenchmarkRun]
+    benchmarks: List[Benchmark],
+    variants: List[BenchmarkRun],
+    output_file: str | None = None,
 ) -> List[str]:
     result = []
-    for variant in tqdm(variants, desc="Variants"):
-        result.append(f"Running variant: {variant.name}")
-        for benchmark in tqdm(
-            benchmarks, desc=f"Benchmarks ({variant.name})", leave=False
-        ):
-            avg_time = run_benchmark(benchmark, variant)
-            result.append(f"{benchmark.name} ({variant.name}): {avg_time:.3f} seconds")
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=True) as tmp_output:
+        output_path = tmp_output.name
+
+        output_stream = None
+        if output_file:
+            try:
+                output_stream = open(output_file, "w", encoding="utf-8")
+            except OSError:
+                sys.exit(1)
+
+        def emit(line: str):
+            result.append(line)
+            if output_stream:
+                output_stream.write(f"{line}\n")
+                output_stream.flush()
+            else:
+                print(line, flush=True)
+
+        for variant in tqdm(variants, desc="Variants"):
+            emit(f"Running variant: {variant.name}")
+            for benchmark in tqdm(
+                benchmarks, desc=f"Benchmarks ({variant.name})", leave=False
+            ):
+                avg_time = run_benchmark(benchmark, variant, output_path)
+                emit(f"{benchmark.name} ({variant.name}): {avg_time:.3f} seconds")
+
+        if output_stream:
+            output_stream.close()
+
     return result
+
+
+def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun, output_path) -> float:
+    times = []
+    for i in range(RUNS_PER_BENCHMARK):
+        cmd = TIME_CMD + [
+            "python3",
+            "-m",
+            "octopus.main",
+            "--output",
+            output_path,
+        ]
+
+        if variant.arguments.get("disable_leaps"):
+            cmd.append("--disable_leaps")
+
+        solvers = variant.arguments.get("solvers")
+        if solvers:
+            cmd.extend(["--solvers", str(solvers)])
+
+        cmd.extend(
+            [
+                str(benchmark.file1),
+                str(benchmark.file2),
+            ]
+        )
+
+        result = subprocess.run(
+            cmd,
+            stderr=subprocess.PIPE,
+            stdout=sys.stdout,
+            text=True,
+            shell=False,
+        )
+
+        match = re.search(
+            r"Elapsed \(wall clock\) time.*?:\s*(\d+):(\d+(?:\.\d+)?)",
+            result.stderr,
+        )
+        print(result.stderr)
+        if match:
+            minutes = int(match.group(1))
+            seconds = float(match.group(2))
+            if i > 3:
+                times.append(minutes * 60 + seconds)
+    return statistics.mean(times)
 
 
 def main() -> None:
@@ -214,19 +229,11 @@ def main() -> None:
         else all_variants
     )
 
-    result = run_benchmarks(selected_benchmarks, selected_variants)
+    if len(selected_benchmarks) == 0 or len(selected_variants) == 0:
+        print("No benchmarks or variants selected. Exiting.")
+        sys.exit(1)
 
-    if args.output:
-        try:
-            with open(args.output, "w", encoding="utf-8") as f:
-                for res in result:
-                    f.write(f"{res}\n")
-        except OSError:
-            sys.exit(1)
-    else:
-        for res in result:
-            print(res)
-
+    run_benchmarks(selected_benchmarks, selected_variants, args.output)
 
 if __name__ == "__main__":
     main()

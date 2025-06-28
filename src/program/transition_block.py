@@ -76,6 +76,7 @@ class TransitionBlock:
 
         for expression in select_expr["select"]["components"]["vec"]:
             self._selectors.append(parse_expression(self._program, expression))
+            logger.info(f"Parsed selector: {self._selectors[-1]}")
 
         for case in select_expr["selectCases"]["vec"]:
             for_exprs = []
@@ -152,10 +153,13 @@ class TransitionBlock:
                     selector_copy.to_formula(pf)
                     formula = And(formula, Equals(expr_copy, selector_copy))
             appended_formula = formula
-            for f in seen:
-                appended_formula = And(appended_formula, Not(f))
+            for seen_formula in seen:
+                appended_formula = And(appended_formula, Not(seen_formula))
 
             seen.add(formula)
             symbolic_transitions.add((appended_formula, to_state))
 
+        logger.debug(f"Symbolic transitions (left: {self._program.left}):")
+        for condition, state in symbolic_transitions:
+            logger.debug(f"  {condition} -> {state}")
         return symbolic_transitions

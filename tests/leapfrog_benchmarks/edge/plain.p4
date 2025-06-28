@@ -2,55 +2,55 @@
 #include <core.p4>
 // HEADER END
 
-header eth_t { bit<112> data; }
-header mpls_t { bit<32> data; }
-header eompls_t { bit<28> data; }
-header ipver_t { bit<4> data; }
-header ipv4_5_t { bit<152> data; }
-header ipv4_6_t { bit<184> data; }
-header ipv4_7_t { bit<216> data; }
-header ipv4_8_t { bit<248> data; }
-header ipv6_t { bit<316> data; }
+header eth_t     { bit<112> data; }
+header mpls_t    { bit<32> data; }
+header eompls_t  { bit<28> data; }
+header ipver_t   { bit<4> data; }
+header ipv4_5_t  { bit<152> data; }
+header ipv4_6_t  { bit<184> data; }
+header ipv4_7_t  { bit<216> data; }
+header ipv4_8_t  { bit<248> data; }
+header ipv6_t    { bit<316> data; }
 
 struct headers_t {
-    eth_t eth0;
-    eth_t eth1;
-    mpls_t mpls0;
-    mpls_t mpls1;
-    eompls_t eompls;
-    ipver_t ipver;
-    ipv4_5_t ipv4_5;
-    ipv4_6_t ipv4_6;
-    ipv4_7_t ipv4_7;
-    ipv4_8_t ipv4_8;
-    ipv6_t ipv6;
+    eth_t     eth0;
+    eth_t     eth1;
+    mpls_t    mpls0;
+    mpls_t    mpls1;
+    eompls_t  eompls;
+    ipver_t   ipver;
+    ipv4_5_t  ipv4_5;
+    ipv4_6_t  ipv4_6;
+    ipv4_7_t  ipv4_7;
+    ipv4_8_t  ipv4_8;
+    ipv6_t    ipv6;
 }
 
 parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
         pkt.extract(hdr.eth0);
-        transition select(hdr.eth0.data[111:96]) {
-            (0x8847): parse_mpls0;
-            (0x8848): parse_mpls0;
-            (0x800): ignore_ipver4;
-            (0x86dd): ignore_ipver6;
+        transition select(hdr.eth0.data[15:0]) {
+            0x8847: parse_mpls0;
+            0x8848: parse_mpls0;
+            0x0800: ignore_ipver4;
+            0x86dd: ignore_ipver6;
             default: accept;
         }
     }
 
     state parse_mpls0 {
         pkt.extract(hdr.mpls0);
-        transition select(hdr.mpls0.data[23:23]) {
-            (0b0): parse_mpls1;
-            (0b1): parse_ipver;
+        transition select(hdr.mpls0.data[8:8]) {
+            0: parse_mpls1;
+            1: parse_ipver;
             default: reject;
         }
     }
 
     state parse_mpls1 {
         pkt.extract(hdr.mpls1);
-        transition select(hdr.mpls1.data[23:23]) {
-            (0b1): parse_ipver;
+        transition select(hdr.mpls1.data[8:8]) {
+            1: parse_ipver;
             default: reject;
         }
     }
@@ -58,9 +58,9 @@ parser Parser(packet_in pkt, out headers_t hdr) {
     state parse_ipver {
         pkt.extract(hdr.ipver);
         transition select(hdr.ipver.data) {
-            (0x0): parse_eompls;
-            (0x4): parse_ipv4;
-            (0x6): parse_ipv6;
+            0: parse_eompls;
+            4: parse_ipv4;
+            6: parse_ipv6;
             default: reject;
         }
     }
@@ -88,10 +88,10 @@ parser Parser(packet_in pkt, out headers_t hdr) {
     state parse_ipv4 {
         pkt.extract(hdr.ipver);
         transition select(hdr.ipver.data) {
-            (0x5): parse_ipv4_5;
-            (0x6): parse_ipv4_6;
-            (0x7): parse_ipv4_7;
-            (0x8): parse_ipv4_8;
+            5: parse_ipv4_5;
+            6: parse_ipv4_6;
+            7: parse_ipv4_7;
+            8: parse_ipv4_8;
             default: reject;
         }
     }

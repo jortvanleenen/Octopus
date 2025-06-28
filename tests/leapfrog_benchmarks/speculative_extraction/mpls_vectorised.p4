@@ -2,26 +2,21 @@
 #include <core.p4>
 // HEADER END
 
-header udp_t {
-    bit<64> data;
-}
-
-header tmp_t {
-    bit<32> field;
-}
+header udp_t  { bit<64> data; }
+header tmp_t  { bit<32> field; }
 
 struct headers_t {
-    udp_t udp;
-    tmp_t tmp;
-    tmp_t old;
-    tmp_t new;
+    udp_t  udp;
+    tmp_t  tmp;
+    tmp_t  old;
+    tmp_t  new;
 }
 
 parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
         pkt.extract(hdr.old);
         pkt.extract(hdr.new);
-        transition select(hdr.old.field[23:23], hdr.new.field[23:23]) {
+        transition select(hdr.old.field[8:8], hdr.new.field[8:8]) {
             (0, 0): start;
             (0, 1): parse_udp;
             (1, _): cleanup;

@@ -306,19 +306,19 @@ def main(args: Any = None) -> None:
         message = "The two parsers are NOT equivalent."
         header = "--- Counterexample ---"
 
+    print (f"{message}")
+
     if args.output:
         try:
             with open(args.output, "w", encoding="utf-8") as f:
-                f.write(f"{message}\n{header}\n")
-                for item in certificate:
-                    f.write(f"{item}\n")
+                f.write(f"{message}\n{header}\n{certificate}")
         except OSError as e:
             logger.error(
                 f"Could not write to output file '{args.output}': {e.strerror}"
             )
             sys.exit(1)
     else:
-        print(message + "\n" + header + "\n" + str(certificate))
+        print(f"{header}\n{certificate}")
 
     if args.fail_on_mismatch and not are_equal:
         sys.exit(1)

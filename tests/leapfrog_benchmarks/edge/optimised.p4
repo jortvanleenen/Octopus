@@ -31,11 +31,11 @@ struct headers_t {
 parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
         pkt.extract(hdr.b112);
-        transition select(hdr.b112.data[111:96]) {
-            (0x800): state_3;
-            (0x86dd): state_0_suff_1;
-            (0x8847): state_0_suff_2;
-            (0x8848): state_0_suff_3;
+        transition select(hdr.b112.data[15:0]) {
+            0x0800: state_3;
+            0x86dd: state_0_suff_1;
+            0x8847: state_0_suff_2;
+            0x8848: state_0_suff_3;
             default: accept;
         }
     }
@@ -77,11 +77,11 @@ parser Parser(packet_in pkt, out headers_t hdr) {
 
     state state_3 {
         pkt.extract(hdr.b16);
-        transition select(hdr.b16.data[7:4]) {
-            (0x5): state_3_suff_0;
-            (0x6): state_3_suff_1;
-            (0x7): state_3_suff_2;
-            (0x8): state_3_suff_3;
+        transition select(hdr.b16.data[11:8]) {
+            5: state_3_suff_0;
+            6: state_3_suff_1;
+            7: state_3_suff_2;
+            8: state_3_suff_3;
             default: reject;
         }
     }
@@ -108,30 +108,30 @@ parser Parser(packet_in pkt, out headers_t hdr) {
 
     state state_4 {
         pkt.extract(hdr.b16);
-        transition select(hdr.b16.data[7:7]) {
-            (0b0): state_4_skip;
-            (0b1): state_4_trailer;
+        transition select(hdr.b16.data[8:8]) {
+            0: state_4_skip;
+            1: state_4_trailer;
             default: reject;
         }
     }
 
     state state_4_skip {
         pkt.extract(hdr.b32);
-        transition select(hdr.b32.data[23:23]) {
-            (0b1): state_4_trailer;
+        transition select(hdr.b32.data[8:8]) {
+            1: state_4_trailer;
             default: reject;
         }
     }
 
     state state_4_trailer {
         pkt.extract(hdr.b16);
-        transition select(hdr.b16.data[3:0], hdr.b16.data[7:4]) {
-            (0x0,  _):     state_1_suff_0;
-            (0x6,  _):     state_2_suff_0;
-            (0x4, 0x5):    state_3_suff_0;
-            (0x4, 0x6):    state_3_suff_1;
-            (0x4, 0x7):    state_3_suff_2;
-            (0x4, 0x8):    state_3_suff_3;
+        transition select(hdr.b16.data[15:12], hdr.b16.data[11:8]) {
+            (0, _):     state_1_suff_0;
+            (6, _):     state_2_suff_0;
+            (4, 5):    state_3_suff_0;
+            (4, 6):    state_3_suff_1;
+            (4, 7):    state_3_suff_2;
+            (4, 8):    state_3_suff_3;
             default:       reject;
         }
     }
