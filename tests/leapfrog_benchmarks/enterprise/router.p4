@@ -2,126 +2,125 @@
 #include <core.p4>
 // HEADER END
 
-header HdrEth_t    { bit<112> data; }
-header HdrVLAN0_t  { bit<160> data; }
-header HdrVLAN1_t  { bit<160> data; }
-header HdrIPv4_t   { bit<128>  data; }
-header HdrIPv6_t   { bit<64>  data; }
-header HdrTCP_t    { bit<160> data; }
-header HdrUDP_t    { bit<160> data; }
-header HdrICMP_t   { bit<32>  data; }
-header HdrICMPv6_t { bit<32>  data; }
-header HdrARP_t    { bit<64>  data; }
-header HdrARPIP_t  { bit<64>  data; }
+header eth_t      { bit<112> data; }
+header vlan_t     { bit<160> data; }
+header ipv4_t     { bit<128>  data; }
+header ipv6_t     { bit<64>  data; }
+header tcp_t      { bit<160> data; }
+header udp_t      { bit<160> data; }
+header icmp_t     { bit<32>  data; }
+header icmp_v6_t  { bit<32>  data; }
+header arp_t      { bit<64>  data; }
+header arp_ip_t   { bit<64>  data; }
 
 struct headers_t {
-  HdrEth_t     eth;
-  HdrVLAN0_t   vlan0;
-  HdrVLAN1_t   vlan1;
-  HdrIPv4_t    ipv4;
-  HdrIPv6_t    ipv6;
-  HdrTCP_t     tcp;
-  HdrUDP_t     udp;
-  HdrICMP_t    icmp;
-  HdrICMPv6_t  icmpv6;
-  HdrARP_t     arp;
-  HdrARPIP_t   arpip;
+    eth_t      eth;
+    vlan_t     vlan0;
+    vlan_t     vlan1;
+    ipv4_t     ipv4;
+    ipv6_t     ipv6;
+    tcp_t      tcp;
+    udp_t      udp;
+    icmp_t     icmp;
+    icmp_v6_t  icmp_v6;
+    arp_t      arp;
+    arp_ip_t   arp_ip;
 }
 
 parser Parser(packet_in pkt, out headers_t hdr) {
-  state start {
-    pkt.extract(hdr.eth);
-    transition select(hdr.eth.data[111:96]) {
-      0x8100: ParseVLAN0;
-      0x9100: ParseVLAN0;
-      0x9200: ParseVLAN0;
-      0x9300: ParseVLAN0;
-      0x0800: ParseIPv4;
-      0x86dd: ParseIPv6;
-      0x0806: ParseARP;
-      0x8035: ParseARP;
-      default: reject;
+    state start {
+        pkt.extract(hdr.eth);
+        transition select(hdr.eth.data[111:96]) {
+            0x8100: parse_vlan0;
+            0x9100: parse_vlan0;
+            0x9200: parse_vlan0;
+            0x9300: parse_vlan0;
+            0x0800: parse_ipv4;
+            0x86dd: parse_ipv6;
+            0x0806: parse_arp;
+            0x8035: parse_arp;
+            default: reject;
+        }
     }
-  }
 
-  state ParseVLAN0 {
+  state parse_vlan0 {
     pkt.extract(hdr.vlan0);
     transition select(hdr.vlan0.data[159:144]) {
-      0x8100: ParseVLAN1;
-      0x9100: ParseVLAN1;
-      0x9200: ParseVLAN1;
-      0x9300: ParseVLAN1;
-      0x0800: ParseIPv4;
-      0x86dd: ParseIPv6;
-      0x0806: ParseARP;
-      0x8035: ParseARP;
+      0x8100: parse_vlan1;
+      0x9100: parse_vlan1;
+      0x9200: parse_vlan1;
+      0x9300: parse_vlan1;
+      0x0800: parse_ipv4;
+      0x86dd: parse_ipv6;
+      0x0806: parse_arp;
+      0x8035: parse_arp;
       default: reject;
     }
   }
 
-  state ParseVLAN1 {
+  state parse_vlan1 {
     pkt.extract(hdr.vlan1);
     transition select(hdr.vlan1.data[159:144]) {
-      0x0800: ParseIPv4;
-      0x86dd: ParseIPv6;
-      0x0806: ParseARP;
-      0x8035: ParseARP;
+      0x0800: parse_ipv4;
+      0x86dd: parse_ipv6;
+      0x0806: parse_arp;
+      0x8035: parse_arp;
       default: reject;
     }
   }
 
-  state ParseIPv4 {
+  state parse_ipv4 {
     pkt.extract(hdr.ipv4);
     transition select(hdr.ipv4.data[79:72]) {
-      0x01: ParseICMP;
-      0x06: ParseTCP;
-      0x11: ParseUDP;
+      1: parse_icmp;
+      6: parse_tcp;
+      11: parse_udp;
       default: accept;
     }
   }
 
-  state ParseIPv6 {
-    pkt.extract(hdr.ipv6);
-    transition select(hdr.ipv6.data[55:48]) {
-      0x01: ParseICMPv6;
-      0x06: ParseTCP;
-      0x11: ParseUDP;
-      default: accept;
+    state parse_ipv6 {
+        pkt.extract(hdr.ipv6);
+        transition select(hdr.ipv6.data[55:48]) {
+            1: parse_icmp_v6;
+            6: parse_tcp;
+            11: parse_udp;
+            default: accept;
+        }
     }
-  }
 
-  state ParseTCP {
-    pkt.extract(hdr.tcp);
-    transition accept;
-  }
-
-  state ParseUDP {
-    pkt.extract(hdr.udp);
-    transition accept;
-  }
-
-  state ParseICMP {
-    pkt.extract(hdr.icmp);
-    transition accept;
-  }
-
-  state ParseICMPv6 {
-    pkt.extract(hdr.icmpv6);
-    transition accept;
-  }
-
-  state ParseARP {
-    pkt.extract(hdr.arp);
-    transition select(hdr.arp.data[31:16]) {
-      0x0800: ParseARPIP;
-      default: accept;
+    state parse_tcp {
+        pkt.extract(hdr.tcp);
+        transition accept;
     }
-  }
 
-  state ParseARPIP {
-    pkt.extract(hdr.arpip);
-    transition accept;
-  }
+    state parse_udp {
+        pkt.extract(hdr.udp);
+        transition accept;
+    }
+
+    state parse_icmp {
+        pkt.extract(hdr.icmp);
+        transition accept;
+    }
+
+    state parse_icmp_v6 {
+        pkt.extract(hdr.icmp_v6);
+        transition accept;
+    }
+
+    state parse_arp {
+        pkt.extract(hdr.arp);
+        transition select(hdr.arp.data[31:16]) {
+            0x0800: parse_arp_ip;
+            default: accept;
+        }
+    }
+
+    state parse_arp_ip {
+        pkt.extract(hdr.arp_ip);
+        transition accept;
+    }
 }
 
 // FOOTER START

@@ -2,11 +2,11 @@
 #include <core.p4>
 // HEADER END
 
-// TO FILL IN: Header and struct definitions
+// TO FILL IN: header and struct definitions
 
 parser Parser(packet_in pkt, out headers_t hdr) {
 
-    // TO FILL IN: Parser states
+    // TO FILL IN: parser states
 
 }
 

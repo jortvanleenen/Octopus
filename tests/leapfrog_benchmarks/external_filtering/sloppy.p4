@@ -2,29 +2,21 @@
 #include <core.p4>
 // HEADER END
 
-header ethernet_t {
-    bit<112> data;
-}
-
-header ipv4_t {
-    bit<128> data;
-}
-
-header ipv6_t {
-    bit<288> data;
-}
+header eth_t   { bit<112> data; }
+header ipv4_t  { bit<128> data; }
+header ipv6_t  { bit<288> data; }
 
 struct headers_t {
-    ethernet_t eth;
-    ipv4_t ipv4;
-    ipv6_t ipv6;
+    eth_t   eth;
+    ipv4_t  ipv4;
+    ipv6_t  ipv6;
 }
 
 parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
         pkt.extract(hdr.eth);
-        transition select(hdr.eth.data[111:96]) {
-            (0x86dd): parse_ipv6;
+        transition select(hdr.eth.data[15:0]) {
+            0x86dd: parse_ipv6;
             default: parse_ipv4;
         }
     }

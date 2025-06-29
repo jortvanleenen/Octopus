@@ -1,6 +1,6 @@
 """
-This module defines ParserProgram, a class that represents the parser block of
-a P4 program and types used in the parser.
+This module defines ParserProgram, a class that represents the parser block in
+a P4 program, including the types and parameters that it uses.
 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
@@ -8,19 +8,21 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 
+from octopus.utils import ReprMixin
 from program.parser_state import ParserState
 
 logger = logging.getLogger(__name__)
 
 
-class ParserProgram:
+class ParserProgram(ReprMixin):
     """A class representing a P4 parser program with its input and output types."""
 
-    def __init__(self, json: dict | None = None, left: bool = False) -> None:
+    def __init__(self, json: dict | None = None, is_left: bool = False):
         """
         Initialise a ParserProgram object.
 
         :param json: the IR JSON data to parse
+        :param is_left: whether this is the left parser program (True) or the right one (False)
         """
         self._types: dict[str, dict | int] = {}
 
@@ -30,40 +32,64 @@ class ParserProgram:
 
         self._states: dict[str, ParserState] = {}
 
-        self._left = left
+        self._is_left = is_left
 
         if json is not None:
             self.parse(json)
 
     @property
     def types(self) -> dict[str, dict | int] | None:
-        """Get the types of the parser program."""
+        """
+        Get the types of the parser program.
+
+        :return: a dictionary of type names to their fields or sizes, or None if no types are defined
+        """
         return self._types
 
     @property
     def input_name(self) -> str | None:
-        """Get the name of the input parameter."""
+        """
+        Get the name of the input parameter.
+
+        :return: the name of the input parameter, or None if not set
+        """
         return self._input_name
 
     @property
     def output_name(self) -> str | None:
-        """Get the name of the output parameter."""
+        """
+        Get the name of the output parameter.
+
+        :return: the name of the output parameter, or None if not set
+        """
         return self._output_name
 
     @property
     def output_type(self) -> str | None:
-        """Get the type of the output parameter."""
+        """
+        Get the type of the output parameter.
+
+        :return: the type of the output parameter, or None if not set
+        """
         return self._output_type
 
     @property
     def states(self) -> dict[str, ParserState]:
-        """Get the states of the parser program."""
+        """
+        Get the states of the parser program.
+
+        :return: a dictionary of state names to ParserState objects
+        """
         return self._states
 
     @property
-    def left(self) -> bool:
-        """Get whether the parser program is the left one or not."""
-        return self._left
+    def is_left(self) -> bool:
+        """
+        Get whether the parser program is the left one or not.
+
+        :return: True if this is the left parser program, False otherwise
+        """
+        return self._is_left
 
     def parse(self, data: dict) -> None:
         """
@@ -129,7 +155,7 @@ class ParserProgram:
         Parse a parser block object of a P4 program.
 
         At the moment, a parser is expected to have exactly two parameters:
-          - a packet_in parameter (the 'input to parse')
+          - a packet_in parameter (the packet stream to parse)
           - a parameter with as direction 'out' (the parsed packet/'store')
 
         :param obj: the parser object to parse
@@ -178,7 +204,7 @@ class ParserProgram:
 
         As a P4 program is statically typed and compiled, the type of a field
         must be known at compile time and valid. This eliminates the need
-        for type checking at runtime.
+        for strict type checking here.
 
         :param reference: a reference to a header or a field in a header
         :return: a dictionary of fields and their sizes, or a size
@@ -202,15 +228,7 @@ class ParserProgram:
         logger.info(f"Obtained header fields for '{reference}': {type_content}")
         return type_content
 
-    def __repr__(self) -> str:
-        return (
-            f"Parser(input={self._input_name!r}, "
-            f"output=({self._output_type!r} {self._output_name!r}), "
-            f"types={list(self._types.keys())!r}, "
-            f"states={list(self._states.keys())!r})"
-        )
-
-    def __str__(self) -> str:
+    def __str__(self):
         n_spaces = 2
         output = [
             "Parser",

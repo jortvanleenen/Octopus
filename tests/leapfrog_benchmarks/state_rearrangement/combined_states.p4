@@ -2,27 +2,22 @@
 #include <core.p4>
 // HEADER END
 
-header ip_t {
-    bit<64> data;
-}
-
-header data_t {
-    bit<32> data;
-}
+header ip_t    { bit<64> data; }
+header data_t  { bit<32> data; }
 
 struct headers_t {
-    ip_t ip;
-    data_t pref;
-    data_t suff;
+    ip_t    ip;
+    data_t  pref;
+    data_t  suff;
 }
 
 parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
         pkt.extract(hdr.ip);
         pkt.extract(hdr.pref);
-        transition select(hdr.ip.data[43:40]) {
-            (0001): accept;
-            (0000): parse_suff;
+        transition select(hdr.ip.data[23:20]) {
+            0: parse_suff;
+            1: accept;
         }
     }
 

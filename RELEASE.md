@@ -26,8 +26,9 @@ We would like to maintain an Agile development workflow, which means that we wil
 
 1. If code changes are made, the maintainers of Octopus will decide if the changes are significant enough to warrant a new release;
 2. If a release is warranted, the maintainers will increment the version number according to the semantic versioning rules;
-3. If a release is warranted, the maintainers will create a Git tag and push it to the repository;
-4. The maintainers will create a PR to merge the changes into the `main` branch.
+3. If a release is warranted, the maintained will update the version in the `__about__.py` file;
+4. If a release is warranted, the maintainers will create a Git tag and push it to the repository;
+5. The maintainers will create a PR to merge the changes into the `main` branch.
 
 When the PR is merged with the `main` branch, the release is considered complete.
 If a release is warranted, automation will take care of creating a GitHub Release.

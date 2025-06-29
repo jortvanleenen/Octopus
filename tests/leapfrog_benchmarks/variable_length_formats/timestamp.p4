@@ -20,9 +20,9 @@ header t2_t { bit<8> data; }
 header l2_t { bit<8> data; }
 header v2_t { bit<48> data; }
 
-header pointer_t  { bit<8> data; }
-header overflow_t { bit<4> data; }
-header flag_t     { bit<4> data; }
+header pointer_t   { bit<8> data; }
+header overflow_t  { bit<4> data; }
+header flag_t      { bit<4> data; }
 header timestamp_t { bit<32> data; }
 
 struct headers_t {
@@ -53,15 +53,15 @@ parser Parser(packet_in pkt, out headers_t hdr) {
         pkt.extract(hdr.t0);
         pkt.extract(hdr.l0);
         transition select(hdr.t0.data, hdr.l0.data) {
-            (0x44, 0x06): parse_0s;
-            (0x00, 0x00): accept;
-            (0x01, 0x00): accept;
-            (_, 0x01): parse_01;
-            (_, 0x02): parse_02;
-            (_, 0x03): parse_03;
-            (_, 0x04): parse_04;
-            (_, 0x05): parse_05;
-            (_, 0x06): parse_06;
+            (0x44, 6): parse_0s;
+            (0, 0): accept;
+            (1, 0): accept;
+            (_, 1): parse_01;
+            (_, 2): parse_02;
+            (_, 3): parse_03;
+            (_, 4): parse_04;
+            (_, 5): parse_05;
+            (_, 6): parse_06;
             default: reject;
         }
     }
@@ -113,15 +113,15 @@ parser Parser(packet_in pkt, out headers_t hdr) {
         pkt.extract(hdr.t1);
         pkt.extract(hdr.l1);
         transition select(hdr.t1.data, hdr.l1.data) {
-            (0x44, 0x06): parse_1s;
-            (0x00, 0x00): accept;
-            (0x01, 0x00): accept;
-            (_, 0x01): parse_11;
-            (_, 0x02): parse_12;
-            (_, 0x03): parse_13;
-            (_, 0x04): parse_14;
-            (_, 0x05): parse_15;
-            (_, 0x06): parse_16;
+            (0x44, 6): parse_1s;
+            (0, 0): accept;
+            (1, 0): accept;
+            (_, 1): parse_11;
+            (_, 2): parse_12;
+            (_, 3): parse_13;
+            (_, 4): parse_14;
+            (_, 5): parse_15;
+            (_, 6): parse_16;
             default: reject;
         }
     }
@@ -173,15 +173,15 @@ parser Parser(packet_in pkt, out headers_t hdr) {
         pkt.extract(hdr.t2);
         pkt.extract(hdr.l2);
         transition select(hdr.t2.data, hdr.l2.data) {
-            (0x44, 0x06): parse_2s;
-            (0x00, 0x00): accept;
-            (0x01, 0x00): accept;
-            (_, 0x01): parse_21;
-            (_, 0x02): parse_22;
-            (_, 0x03): parse_23;
-            (_, 0x04): parse_24;
-            (_, 0x05): parse_25;
-            (_, 0x06): parse_26;
+            (0x44, 6): parse_2s;
+            (0, 0): accept;
+            (1, 0): accept;
+            (_, 1): parse_21;
+            (_, 2): parse_22;
+            (_, 3): parse_23;
+            (_, 4): parse_24;
+            (_, 5): parse_25;
+            (_, 6): parse_26;
             default: reject;
         }
     }

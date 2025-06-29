@@ -27,7 +27,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: "Bullseye ${{ github.ref_name }} Release"
+          name: "Octopus ${{ github.ref_name }} Release"
           body_path: "release_notes.md"
           draft: false
           prerelease: false
