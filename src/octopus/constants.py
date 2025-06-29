@@ -5,6 +5,5 @@ Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
-# TODO: change to BV when supported?
-# Opened: https://github.com/pysmt/pysmt/issues/811
+# TODO: possibly modify to 'BV', see issue #2
 logic_name = "BVt"  # Bit-vector logic with custom types

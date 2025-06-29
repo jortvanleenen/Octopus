@@ -1,22 +1,24 @@
 """
-This module defines Expression, a class hierarchy representing an expression in a P4 parser state.
+This module defines Expression, a class hierarchy representing a subset of expressions in P4.
 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Callable
 
-from pysmt.shortcuts import BV, TRUE, BVExtract, BVAnd, BVLShr, BVConcat
+import pysmt.shortcuts as pysmt
+from pysmt.shortcuts import BV, TRUE, BVConcat, BVExtract
 
 from bisimulation.symbolic.formula import (
     FormulaNode,
     PureFormula,
     Variable,
 )
-from octopus.utils import AutoRepr
 
 if TYPE_CHECKING:
     from program.parser_program import ParserProgram
@@ -24,7 +26,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Expression(ABC):
+class Expression(FormulaNode):
     """An abstract base class representing an expression in a P4 parser state."""
 
     @abstractmethod
@@ -37,17 +39,6 @@ class Expression(ABC):
         """
         pass
 
-    @abstractmethod
-    def to_smt(self, pf: PureFormula) -> Any:
-        """
-        Convert the expression to its SMT representation.
-
-        :param pf: the PureFormula in which the expression occurs
-        :return: the SMT representation of the expression
-        """
-        pass
-
-    @abstractmethod
     def to_formula(self, pf) -> None:
         """
         Convert the expression to a representation that can be used in a formula.
@@ -59,45 +50,32 @@ class Expression(ABC):
         """
         pass
 
-    @abstractmethod
     def used_vars(self, pf: PureFormula) -> set[Variable]:
-        """
-        Get the set of variables used in this expression.
-
-        :param pf: the PureFormula in which the expression occurs
-        :return: a set of Variable objects used in this expression
-        """
-        pass
-
-    @abstractmethod
-    def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
-    ) -> FormulaNode:
-        """
-        Substitute variables in the formula with the given mapping.
-
-        :param pf: the PureFormula in which the expression occurs
-        :param mapping: a dictionary mapping Variable to FormulaNode
-        :return: a formula node obtained after substitution
-        """
-        pass
+        return set()
 
     @abstractmethod
     def __len__(self) -> int:
         pass
 
-    @abstractmethod
-    def __str__(self) -> str:
-        pass
 
-    @abstractmethod
-    def __repr__(self) -> str:
-        pass
+class BinaryExpression(Expression, ABC):
+    """A mixin for binary expressions that have a left and right operand."""
 
-class Concatenate(AutoRepr, Expression, FormulaNode):
+    left: Expression
+    right: Expression
+
+    def to_formula(self, pf):
+        self.left.to_formula(pf)
+        self.right.to_formula(pf)
+
+    def used_vars(self, pf: PureFormula) -> set[Variable]:
+        return self.left.used_vars(pf) | self.right.used_vars(pf)
+
+
+class Concatenate(BinaryExpression):
     def __init__(
         self,
-        program: "ParserProgram",
+        program: ParserProgram,
         obj: dict | None = None,
         *,
         left: Expression | FormulaNode | None = None,
@@ -107,10 +85,10 @@ class Concatenate(AutoRepr, Expression, FormulaNode):
         if obj is not None:
             self.parse(obj)
         else:
+            if left is None or right is None:
+                raise ValueError("Both left and right operands are required")
             self.left = left
             self.right = right
-            if self.left is None or self.right is None:
-                raise ValueError("Both left and right operands are required")
 
     def parse(self, obj: dict) -> None:
         """
@@ -118,7 +96,7 @@ class Concatenate(AutoRepr, Expression, FormulaNode):
 
         :param obj: the concatenation expression JSON object
         """
-        self.left  = parse_expression(self._program, obj["left"])
+        self.left = parse_expression(self._program, obj["left"])
         self.right = parse_expression(self._program, obj["right"])
 
     def eval(self, store: dict[str, str]) -> str:
@@ -127,21 +105,12 @@ class Concatenate(AutoRepr, Expression, FormulaNode):
     def to_smt(self, pf: PureFormula):
         return BVConcat(self.left.to_smt(pf), self.right.to_smt(pf))
 
-    def to_formula(self, pf):
-        self.left.to_formula(pf)
-        self.right.to_formula(pf)
-
-    def used_vars(self, pf: PureFormula) -> set["Variable"]:
-        return self.left.used_vars(pf) | self.right.used_vars(pf)
-
     def substitute(
         self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
-    ) -> "Concatenate":
-        return Concatenate(
-            self._program,
-            left=self.left.substitute(pf, mapping),
-            right=self.right.substitute(pf, mapping),
-        )
+    ) -> Concatenate:
+        self.left = self.left.substitute(pf, mapping)
+        self.right = self.right.substitute(pf, mapping)
+        return self
 
     def __len__(self) -> int:
         return len(self.left) + len(self.right)
@@ -150,54 +119,8 @@ class Concatenate(AutoRepr, Expression, FormulaNode):
         return f"({self.left}) ++ ({self.right})"
 
 
-# class Concatenate(AutoRepr, Expression, FormulaNode):
-#     def __init__(self, program: "ParserProgram", obj: dict) -> None:
-#         self._program = program
-#         self.left: Expression | None = None
-#         self.right: Expression | None = None
-#         if obj is not None:
-#             self.parse(obj)
-#
-#     def parse(self, obj: dict) -> None:
-#         """
-#         Parse a concatenation expression JSON into a Concatenate object.
-#
-#         :param obj: the concatenation expression JSON object
-#         """
-#         self.left = parse_expression(self._program, obj["left"])
-#         self.right = parse_expression(self._program, obj["right"])
-#
-#     def eval(self, store: dict[str, str]) -> str:
-#         left_value: str = self.left.eval(store)
-#         right_value: str = self.right.eval(store)
-#         return left_value + right_value
-#
-#     def to_smt(self, pf: PureFormula) -> Any:
-#         return symbolic.formula.Concatenate(self.left, self.right).to_smt(pf)
-#
-#     def to_formula(self, pf):
-#         self.left.to_formula(pf)
-#         self.right.to_formula(pf)
-#
-#     def used_vars(self, pf: PureFormula) -> set[Variable]:
-#         return symbolic.formula.Concatenate(self.left, self.right).used_vars(pf)
-#
-#     def substitute(
-#         self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
-#     ) -> FormulaNode:
-#         return symbolic.formula.Concatenate(self.left, self.right).substitute(
-#             pf, mapping
-#         )
-#
-#     def __len__(self) -> int:
-#         return len(self.left) + len(self.right)
-#
-#     def __str__(self) -> str:
-#         return f"{self.left} ++ {self.right}"
-
-
-class Slice(AutoRepr, Expression, FormulaNode):
-    def __init__(self, program: "ParserProgram", obj: dict = None) -> None:
+class Slice(Expression):
+    def __init__(self, program: ParserProgram, obj: dict = None) -> None:
         self._program = program
         self.reference = None
         self.msb = None
@@ -225,7 +148,7 @@ class Slice(AutoRepr, Expression, FormulaNode):
     def to_smt(self, pf: PureFormula) -> Any:
         return BVExtract(
             self.reference.to_smt(pf), self.lsb, self.msb
-        )  # BVExtract has inclusive msb; start=msb, end=lsb
+        )  # BVExtract has both ends inclusive; start=msb, end=lsb
 
     def to_formula(self, pf):
         self.reference.to_formula(pf)
@@ -246,7 +169,7 @@ class Slice(AutoRepr, Expression, FormulaNode):
         return f"{self.reference}[{self.msb}:{self.lsb}]({self.reference.variable})"
 
 
-class Constant(AutoRepr, Expression, FormulaNode):
+class Constant(Expression):
     def __init__(self, obj: dict, size_context: int) -> None:
         self.numeric_value: int | float | None = None
         self.value: str | None = None
@@ -268,16 +191,10 @@ class Constant(AutoRepr, Expression, FormulaNode):
     def eval(self, store: dict[str, str]) -> str:
         return self.value
 
-    def to_formula(self, pf):
-        pass
-
     def to_smt(self, pf: PureFormula) -> Any:
         if self._size is None:
             logger.warning("No size for constant of value %s", self.numeric_value)
         return BV(self.numeric_value, len(self))
-
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return set()
 
     def substitute(
         self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
@@ -302,21 +219,15 @@ class Constant(AutoRepr, Expression, FormulaNode):
         return str(self.value)
 
 
-class DontCare(AutoRepr, Expression, FormulaNode):
+class DontCare(Expression):
     def __init__(self) -> None:
         pass
 
-    def eval(self, store: dict[str, str]) -> "DontCare":
+    def eval(self, store: dict[str, str]) -> DontCare:
         return self
 
     def to_smt(self, pf: PureFormula) -> Any:
         return TRUE()
-
-    def to_formula(self, pf):
-        pass
-
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return set()
 
     def substitute(
         self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
@@ -336,8 +247,8 @@ class DontCare(AutoRepr, Expression, FormulaNode):
         return "*"
 
 
-class Reference(AutoRepr, Expression, FormulaNode):
-    def __init__(self, program: "ParserProgram", obj: dict) -> None:
+class Reference(Expression):
+    def __init__(self, program: ParserProgram, obj: dict) -> None:
         self._program = program
         self._reference: str | None = None
         self._size: int = 0
@@ -381,14 +292,14 @@ class Reference(AutoRepr, Expression, FormulaNode):
             return ""
 
     def to_formula(self, pf):
-        self.variable = pf.get_header_field_var(self._reference, self._program.left)
+        self.variable = pf.get_header_field_var(self._reference, self._program.is_left)
 
     def to_smt(self, pf: PureFormula) -> Any:
         return self.variable.to_smt(pf)
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
         if self.variable is None:
-            raise ValueError(f"Reference {self._reference} has not been initialised.")
+            raise ValueError(f"Reference {self._reference} has not been initialised")
         return {self.variable}
 
     def substitute(
@@ -403,10 +314,10 @@ class Reference(AutoRepr, Expression, FormulaNode):
         return str(self._reference)
 
 
-class BitwiseAnd(AutoRepr, Expression, FormulaNode):
+class BVAnd(BinaryExpression):
     def __init__(
         self,
-        program: "ParserProgram",
+        program: ParserProgram,
         obj: dict | None = None,
         *,
         left: Expression | None = None,
@@ -422,7 +333,7 @@ class BitwiseAnd(AutoRepr, Expression, FormulaNode):
             self.left = left
             self.right = right
         else:
-            raise ValueError("Must provide either 'obj' or both 'left' and 'right'.")
+            raise ValueError("Must provide either 'obj' or both 'left' and 'right'")
 
     def parse(self, obj: dict) -> None:
         """
@@ -439,21 +350,14 @@ class BitwiseAnd(AutoRepr, Expression, FormulaNode):
         return bin(int(left_value, 2) & int(right_value, 2))[2:]
 
     def to_smt(self, pf: PureFormula) -> Any:
-        return BVAnd(self.left.to_smt(pf), self.right.to_smt(pf))
-
-    def to_formula(self, pf):
-        self.left.to_formula(pf)
-        self.right.to_formula(pf)
-
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return self.left.used_vars(pf) | self.right.used_vars(pf)
+        return pysmt.BVAnd(self.left.to_smt(pf), self.right.to_smt(pf))
 
     def substitute(
         self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        left = self.left.substitute(pf, mapping)
-        right = self.right.substitute(pf, mapping)
-        return BitwiseAnd(self._program, left=left, right=right)
+        self.left = self.left.substitute(pf, mapping)
+        self.right = self.right.substitute(pf, mapping)
+        return self
 
     def __len__(self) -> int:
         return max(len(self.left), len(self.right))
@@ -462,10 +366,10 @@ class BitwiseAnd(AutoRepr, Expression, FormulaNode):
         return f"({self.left} & {self.right})"
 
 
-class BitwiseShiftRight(AutoRepr, Expression, FormulaNode):
+class BVLShr(BinaryExpression):
     def __init__(
         self,
-        program: "ParserProgram",
+        program: ParserProgram,
         obj: dict | None = None,
         *,
         left: Expression | None = None,
@@ -481,7 +385,7 @@ class BitwiseShiftRight(AutoRepr, Expression, FormulaNode):
             self.left = left
             self.right = right
         else:
-            raise ValueError("Must provide either 'obj' or both 'left' and 'right'.")
+            raise ValueError("Must provide either 'obj' or both 'left' and 'right'")
 
     def parse(self, obj: dict) -> None:
         """
@@ -493,26 +397,19 @@ class BitwiseShiftRight(AutoRepr, Expression, FormulaNode):
         self.right = parse_expression(self._program, obj["right"], len(self.left))
 
     def eval(self, store: dict[str, str]) -> str:
-        left_value: str = self.left.eval(store)
+        left_value: int = int(self.left.eval(store), 2)
         right_value: int = int(self.right.eval(store), 2)
-        return bin(int(left_value, 2) >> right_value)[2:]
+        return bin(left_value >> right_value)[2:]
 
     def to_smt(self, pf: PureFormula) -> Any:
-        return BVLShr(self.left.to_smt(pf), self.right.to_smt(pf))
-
-    def to_formula(self, pf):
-        self.left.to_formula(pf)
-        self.right.to_formula(pf)
-
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return self.left.used_vars(pf) | self.right.used_vars(pf)
+        return pysmt.BVLShr(self.left.to_smt(pf), self.right.to_smt(pf))
 
     def substitute(
         self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        left = self.left.substitute(pf, mapping)
-        right = self.right.substitute(pf, mapping)
-        return BitwiseShiftRight(self._program, left=left, right=right)
+        self.left = self.left.substitute(pf, mapping)
+        self.right = self.right.substitute(pf, mapping)
+        return self
 
     def __len__(self) -> int:
         return len(self.left)
@@ -522,7 +419,7 @@ class BitwiseShiftRight(AutoRepr, Expression, FormulaNode):
 
 
 _EXPRESSION_DISPATCH: dict[
-    str, Callable[["ParserProgram", dict, int | None], Expression]
+    str, Callable[[ParserProgram, dict, int | None], Expression]
 ] = {
     "Concat": lambda program, component, size_context: Concatenate(
         program=program, obj=component
@@ -540,17 +437,17 @@ _EXPRESSION_DISPATCH: dict[
         program=program, obj=component
     ),
     "DefaultExpression": lambda program, component, size_context: DontCare(),
-    "BAnd": lambda program, component, size_context: BitwiseAnd(
+    "BAnd": lambda program, component, size_context: BVAnd(
         program=program, obj=component
     ),
-    "Shr": lambda program, component, size_context: BitwiseShiftRight(
+    "Shr": lambda program, component, size_context: BVLShr(
         program=program, obj=component
     ),
 }
 
 
 def parse_expression(
-    program: "ParserProgram", component: dict, size_context: int = None
+    program: ParserProgram, component: dict, size_context: int = None
 ) -> Expression:
     """
     Parse a P4 expression component into an Expression object.

@@ -5,6 +5,8 @@ Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING
 
@@ -14,7 +16,6 @@ from program.transition_block import TransitionBlock
 if TYPE_CHECKING:
     from program.parser_program import ParserProgram
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -23,11 +24,11 @@ class ParserState:
 
     def __init__(
         self,
-        program: "ParserProgram",
+        program: ParserProgram,
         components: dict | None = None,
         select_expr: dict | None = None,
-    ) -> None:
-        """ "
+    ):
+        """
         Initialise a ParserState object.
 
         :param program: the ParserProgram object this state belongs to
@@ -41,19 +42,31 @@ class ParserState:
             self.parse(components, select_expr)
 
     @property
+    def program(self) -> ParserProgram:
+        """
+        Get the ParserProgram this state belongs to.
+
+        :return: the ParserProgram object of this parser state
+        """
+        return self._program
+
+    @property
     def operation_block(self) -> OperationBlock | None:
-        """Get the operation block of this parser state."""
+        """
+        Get the operation block of this parser state.
+
+        :return: the operation block of this parser state, or None if not set
+        """
         return self._operationBlock
 
     @property
     def transition_block(self) -> TransitionBlock | None:
-        """Get the transition block of this parser state."""
-        return self._transitionBlock
+        """
+        Get the transition block of this parser state.
 
-    @property
-    def program(self) -> "ParserProgram":
-        """Get the ParserProgram this state belongs to."""
-        return self._program
+        :return: the transition block of this parser state, or None if not set
+        """
+        return self._transitionBlock
 
     def parse(self, components: dict, select_expr: dict) -> None:
         """
@@ -65,13 +78,13 @@ class ParserState:
         self._operationBlock = OperationBlock(self._program, components)
         self._transitionBlock = TransitionBlock(self._program, select_expr)
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return (
             f"ParserState(operations={self._operationBlock!r}, "
             f"transitions={self._transitionBlock!r})"
         )
 
-    def __str__(self) -> str:
+    def __str__(self):
         n_spaces = 2
         output = [
             "Operations:",

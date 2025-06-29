@@ -21,8 +21,8 @@ formal verifier for P4 packet parsers.
 
 Octopus depends on the `p4c-graphs` tool to generate the IR JSON representation of P4 programs.
 
-- Tested with: `p4c-graphs` version 1.2.x.x
-- Requires: Python 3.10 or later; tested up to 3.13
+- Tested with: `p4c-graphs` version 1.2.x.x;
+- Requires: Python 3.10 or later; tested up to 3.13.
 
 Ensure `p4c-graphs` is available on your system's `PATH` if you provide P4 programs as input.
 
@@ -181,6 +181,16 @@ Octopus provides a command-line interface (CLI) with the following options:
 | `-S`  | `--stat`                   | Measure and print bisimulation execution time and memory usage             |
 | `-s`  | `--solvers`                | Specify which SMT solvers to use along with their options                  |
 |       | `--solvers-global-options` | Specify global options for all solvers                                     |
+
+## Verifying Claims and Benchmarking
+
+To verify the claims made in the paper, you can run the benchmark runner script.
+This script will execute the equivalence checks on the Leapfrog benchmark files and output the results.
+See `tests/runner.py`, or execute the script with `--help`, for more details.
+
+To add benchmarks or test cases, see the `tests` directory.
+Within this directory, you can find subdirectories for correct cases, incorrect cases, and benchmarks.
+Additionally, a template file has been provided (`tests/framework_template.p4`) to help you get started.
 
 ## License
 

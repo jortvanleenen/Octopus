@@ -15,7 +15,7 @@ parser Parser(packet_in pkt, out headers_t hdr) {
     state start {
         pkt.extract(hdr.mpls);
         hdr.temp.label = hdr.mpls.label >> 8 & 0x1;
-        transition select(hdr.temp.label[0:0]) {
+        transition select(hdr.temp.label) {
             0: start;
             1: parse_udp;
         }

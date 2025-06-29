@@ -1,7 +1,7 @@
 """
 This module defines BitVector, a class representing a vector of bits.
 
-TODO: refactor str occurrences in code to use this class, probably...
+TODO: improve the class, and then refactor the code to use it, see issue #3.
 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)

@@ -14,8 +14,8 @@ from typing import Any, Generator
 logger = logging.getLogger(__name__)
 
 
-class AutoRepr:
-    """A base class for objects that automatically generate a representation string."""
+class ReprMixin:
+    """A base class for objects that automatically generates a representation string."""
 
     def __repr__(self):
         cls = self.__class__.__name__
@@ -43,11 +43,12 @@ def setup_logging(verbosity: int) -> None:
 
 
 @contextmanager
-def timed_block(label: str) -> Generator[None, Any, None]:
+def stat_block(label: str) -> Generator[None, Any, None]:
     """
     Context manager to measure wall time, CPU time, and memory usage of a code block.
 
-    :param label: a label for the block of code being timed
+    :param label: a label for the block of code that is being measured
+    :return: a generator that yields control to the block of code
     """
     tracemalloc.start()
     start_wall = time.perf_counter()

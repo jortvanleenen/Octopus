@@ -6,6 +6,8 @@ Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
+from __future__ import annotations
+
 import copy
 
 from program.parser_program import ParserProgram
@@ -18,6 +20,13 @@ class DFA:
         """A class representing a state of the automaton."""
 
         def __init__(self, state_name: str, store: dict[str, str], buffer: str):
+            """
+            Initialise a configuration of the DFA.
+
+            :param state_name: the name of the state
+            :param store: the content of the store (header fields)
+            :param buffer: the content of the buffer (input bits)
+            """
             self.state = state_name
             self.store = store
             self.buffer = buffer
@@ -56,7 +65,7 @@ class DFA:
     def __init__(self, program: ParserProgram):
         self.program = program
 
-    def step(self, configuration: "DFA.Configuration", bit: str) -> "DFA.Configuration":
+    def step(self, configuration: DFA.Configuration, bit: str) -> DFA.Configuration:
         """
         Perform a single step (configuration -> configuration) in the DFA.
 
@@ -80,7 +89,7 @@ class DFA:
 
         return DFA.Configuration("reject", s, "")
 
-    def multi_step(self, config: "DFA.Configuration", bits: str) -> "DFA.Configuration":
+    def multi_step(self, config: DFA.Configuration, bits: str) -> DFA.Configuration:
         """
         Perform multiple steps in the DFA.
 
@@ -93,11 +102,19 @@ class DFA:
         return config
 
     @staticmethod
-    def initial_config(q0: str, store: dict[str, str]) -> "DFA.Configuration":
+    def initial_config(
+        q0: str = "start", store: dict[str, str] = None, buffer: str = ""
+    ) -> DFA.Configuration:
         """
         Create the initial configuration of the DFA.
 
+        In P4, the initial state is always called "start".
+
         :param q0: the initial state of the DFA
         :param store: the initial store (header fields)
+        :param buffer: the initial buffer (input bits)
+        :return: the initial configuration
         """
-        return DFA.Configuration(q0, store, "")
+        if store is None:
+            store = {}
+        return DFA.Configuration(q0, store, buffer)

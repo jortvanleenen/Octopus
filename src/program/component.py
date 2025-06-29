@@ -1,23 +1,24 @@
 """
-This module defines Component, a class representing an operation in a P4 parser state.
+This module defines Component, a class structure representing an operation in a P4 parser state.
 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
+
+from __future__ import annotations
 
 import copy
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable
 
-from bisimulation import symbolic
 from bisimulation.symbolic.formula import And, Equals, FormulaManager, PureFormula
 from program.expression import (
+    Concatenate,
     Expression,
     Reference,
     Slice,
     parse_expression,
-    Concatenate,
 )
 
 if TYPE_CHECKING:
@@ -58,12 +59,13 @@ class Component(ABC):
 
         :param manager: the FormulaManager to use for generating the postcondition
         :param pf: the PureFormula representing what we currently know
+        :return: a PureFormula representing the strongest postcondition
         """
         pass
 
 
 class Assignment(Component):
-    def __init__(self, program: "ParserProgram", component: dict = None) -> None:
+    def __init__(self, program: ParserProgram, component: dict = None):
         self._program: ParserProgram = program
         self.left: Slice | Reference | None = None
         self.right: Expression | None = None
@@ -86,12 +88,14 @@ class Assignment(Component):
     def strongest_postcondition(
         self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
-        left = self._program.left
-        logger.debug(f"Header variables at start of assignment SP (left: {left}): {pf.header_field_vars}")
+        left = self._program.is_left
+        logger.debug(
+            f"Header variables at start of assignment SP (left: {left}): {pf.header_field_vars}"
+        )
 
         if isinstance(self.left, Slice):
             raise NotImplementedError(
-                "Assignment with left-hand slice is not supported"
+                "Assignment with left-hand slice is not yet supported"
             )
             # reference = self.left.reference.reference
         elif isinstance(self.left, Reference):
@@ -101,18 +105,16 @@ class Assignment(Component):
                 "Assignment left-hand side must be a Slice or Reference, "
                 f"but got {type(self.left).__name__}"
             )
-        # reference_var = pf.get_header_field_var(reference, for_left)
-        new_var = manager.fresh_variable(len(reference))
-        # if reference_var is not None:
-        #     substitution = {reference_var: new_var}
-        #     pf.substitute(substitution)
 
-        pf.set_header_field_var(reference.reference, self._program.left, new_var)
+        new_var = manager.fresh_variable(len(reference))
+        pf.set_header_field_var(reference.reference, self._program.is_left, new_var)
 
         right_copy = copy.deepcopy(self.right)
         right_copy.to_formula(pf)
 
-        logger.debug(f"Header variables at end of assignment SP (left: {left}): {pf.header_field_vars}")
+        logger.debug(
+            f"Header variables at end of assignment SP (left: {left}): {pf.header_field_vars}"
+        )
 
         return PureFormula(
             And(pf.root, Equals(new_var, right_copy)),
@@ -120,17 +122,17 @@ class Assignment(Component):
             pf.buf_vars,
         )
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f"Assignment(left={self.left!r}, right={self.right!r})"
 
-    def __str__(self) -> str:
+    def __str__(self):
         return f"{self.left} = {self.right}"
 
 
 class Extract(Component):
     """A class representing an extract method call in a P4 parser state."""
 
-    def __init__(self, program: "ParserProgram", call: dict = None) -> None:
+    def __init__(self, program: ParserProgram, call: dict = None):
         self.program: ParserProgram = program
         self.header_reference: str | None = None
         self.header_content: dict[str, int] | None = None
@@ -160,10 +162,11 @@ class Extract(Component):
     def strongest_postcondition(
         self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
-        substitution = {}
-        left = self.program.left
+        left = self.program.is_left
         buffer_var = pf.get_buffer_var(left)
-        logger.debug(f"Buffer variables at start of extract SP (left: {left}): {pf.buf_vars}")
+        logger.debug(
+            f"Buffer variables at start of extract SP (left: {left}): {pf.buf_vars}"
+        )
         if buffer_var is None:
             raise ValueError("No buffer variable found for the pure formula")
 
@@ -181,9 +184,6 @@ class Extract(Component):
             variable = manager.fresh_variable(field_size)
 
             store_name = self.header_reference + "." + field
-            # old_variable = pf.get_header_field_var(store_name, left)
-            # if old_variable is not None:
-            #     substitution[old_variable] = variable
             pf.set_header_field_var(store_name, left, variable)
 
             if new_buffer is None:
@@ -191,32 +191,31 @@ class Extract(Component):
             else:
                 new_buffer = Concatenate(self.program, left=variable, right=new_buffer)
 
-        # substitution[buffer_var] = new_buffer
-        # pf.substitute(substitution)
-
         new_pf = PureFormula(
             And(pf.root, Equals(buffer_var, new_buffer)),
             pf.header_field_vars,
             pf.buf_vars,
         )
 
-        logger.debug(f"Buffer variables at end of extract SP (left: {left}): {new_pf.buf_vars}")
+        logger.debug(
+            f"Buffer variables at end of extract SP (left: {left}): {new_pf.buf_vars}"
+        )
 
         return new_pf
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f"Extract(header_reference={self.header_reference!r}, header_content={self.header_content!r}, size={self.size!r})"
 
-    def __str__(self) -> str:
+    def __str__(self):
         return f"extract({self.header_reference})"
 
 
-_METHOD_DISPATCH: dict[str, Callable[["ParserProgram", dict], Component]] = {
+_METHOD_DISPATCH: dict[str, Callable[[ParserProgram, dict], Component]] = {
     "extract": lambda program, call: Extract(program, call),
 }
 
 
-def parse_method_call(program: "ParserProgram", component: dict) -> Component | None:
+def parse_method_call(program: ParserProgram, component: dict) -> Component | None:
     """
     Parse a method call component into a specific MethodCall subclass.
 

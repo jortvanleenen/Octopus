@@ -24,7 +24,7 @@ from automata.dfa import DFA
 from bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
 from octopus import constants
 from octopus.__about__ import __version__
-from octopus.utils import setup_logging, timed_block
+from octopus.utils import setup_logging, stat_block
 from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
@@ -126,7 +126,7 @@ def create_portfolio(args: argparse.Namespace) -> Portfolio:
         except (SyntaxError, ValueError) as e:
             raise ValueError(
                 f"Invalid solvers global options format: {args.solvers_global_options}. "
-                "Expected a dictionary, e.g., {'option': 'value'}."
+                "Expected a dictionary, e.g., {'option': 'value'}"
             ) from e
 
     available_solvers: list[str] = list(
@@ -148,7 +148,7 @@ def create_portfolio(args: argparse.Namespace) -> Portfolio:
             if name in available_solvers:
                 selected_solvers.append((name, opts))
             else:
-                logger.warning(f"Solver '{name}' with options {opts} is not available.")
+                logger.warning(f"Solver '{name}' is not available.")
         else:
             logger.error(
                 f"Invalid solver format: {solver}. "
@@ -179,7 +179,7 @@ def read_p4_files(files: list[str], in_json: bool) -> list[dict]:
     if shutil.which("p4c-graphs") is None:
         raise FileNotFoundError(
             "Required tool 'p4c-graphs' not found in PATH. "
-            "Please ensure it is installed and available in your system PATH."
+            "Please ensure it is installed and available in your system PATH"
         )
 
     jsons = []
@@ -220,8 +220,8 @@ def read_p4_files(files: list[str], in_json: bool) -> list[dict]:
             except subprocess.CalledProcessError as e:
                 logger.error(
                     f"p4c-graphs failed, it reported:\n"
-                    f"- stdout: {e.stdout}\n"
-                    f"- stderr: {e.stderr}"
+                    f"  stdout: {e.stdout}\n"
+                    f"  stderr: {e.stderr}"
                 )
                 raise RuntimeError(
                     f"p4c-graphs failed with exit code {e.returncode}"
@@ -254,9 +254,11 @@ def select_bisimulation_method(
         return naive_bisimulation, "Naive"
     else:
         portfolio = create_portfolio(args)
+        # This is needed to prevent recursion limit errors in symbolic bisimulation
+        sys.setrecursionlimit(10000)
         logger.info(
-            f"Using symbolic bisimulation (leaps: {not args.disable_leaps})"
-            f" with solvers: {portfolio.solvers}"
+            f"Using symbolic bisimulation (leaps: {not args.disable_leaps}) "
+            f"with solver(s): {portfolio.solvers}"
         )
         return partial(
             symbolic_bisimulation,
@@ -294,7 +296,7 @@ def main(args: Any = None) -> None:
     logger.debug(f"Parser object 2 (str)\n{parsers[1]}")
 
     if args.stat:
-        with timed_block(f"{method_name} bisimulation"):
+        with stat_block(f"{method_name} bisimulation"):
             are_equal, certificate = method(parsers[0], parsers[1])
     else:
         are_equal, certificate = method(parsers[0], parsers[1])
@@ -306,8 +308,7 @@ def main(args: Any = None) -> None:
         message = "The two parsers are NOT equivalent."
         header = "--- Counterexample ---"
 
-    print (f"{message}")
-
+    print(f"{message}")
     if args.output:
         try:
             with open(args.output, "w", encoding="utf-8") as f:
