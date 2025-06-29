@@ -209,15 +209,16 @@ def run_benchmark(
             output_stream.write(result.stderr + "\n")
             output_stream.flush()
 
-        if i > 0: # Skip the first run due to cold start effects
+        if i > 0:  # Skip the first run due to cold start effects
             time_match = re.search(
-                r"Elapsed \(wall clock\) time.*?:\s*(\d+):(\d+(?:\.\d+)?)",
+                r"Elapsed \(wall clock\) time.*?:\s*(?:(\d+):)?(\d+):(\d+(?:\.\d+)?)",
                 result.stderr,
             )
             if time_match:
-                minutes = int(time_match.group(1))
-                seconds = float(time_match.group(2))
-                total_time = minutes * 60 + seconds
+                hours = int(time_match.group(1)) if time_match.group(1) else 0
+                minutes = int(time_match.group(2))
+                seconds = float(time_match.group(3))
+                total_time = hours * 3600 + minutes * 60 + seconds
                 times.append(total_time)
 
             memory_match = re.search(
@@ -226,7 +227,7 @@ def run_benchmark(
             )
             if memory_match:
                 memory_usage_kb = int(memory_match.group(1))
-                mib = (memory_usage_kb * 1000) / (1024 ** 2)
+                mib = (memory_usage_kb * 1000) / (1024**2)
                 memory_usages.append(mib)
 
     avg_time = statistics.mean(times)
