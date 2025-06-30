@@ -13,11 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-## [v1.0.0] - 2025-07-01
+## [v1.0.1] - 2025-06-30
+
+This release represents the version of the codebase that was published alongside its accompanying paper (see the
+README.md file).
+
+### Added
+
+- An example on how to run benchmarks.
+
+### Changed
+
+- Fixed the regular expression for wall time in the benchmark runner;
+- Added a dependency for the time package in the Dockerfile to aid in benchmarking.
+
+## [v1.0.0] - 2025-06-29
 
 This is the first stable release of Octopus.
-Additionally, it represents the version of the codebase that was published alongside its accompanying paper (see the
-README.md file).
 
 ## [v0.2.0] - 2025-06-23
 
