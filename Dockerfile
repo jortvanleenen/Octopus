@@ -29,7 +29,7 @@ WORKDIR /octopus
 COPY --from=builder /usr/local /usr/local
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libboost_* /usr/lib/x86_64-linux-gnu/
 
-RUN apt-get update && apt-get install -y --no-install-recommends cpp
+RUN apt-get update && apt-get install -y --no-install-recommends cpp time
 
 COPY . /octopus
 
