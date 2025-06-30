@@ -188,6 +188,12 @@ To verify the claims made in the paper, you can run the benchmark runner script.
 This script will execute the equivalence checks on the Leapfrog benchmark files and output the results.
 See `tests/runner.py`, or execute the script with `--help`, for more details.
 
+As an example of how to run the benchmarks, run the container interactively and execute the following command:
+
+```bash
+python3 tests/runner.py -o o.txt
+```
+
 To add benchmarks or test cases, see the `tests` directory.
 Within this directory, you can find subdirectories for correct cases, incorrect cases, and benchmarks.
 Additionally, a template file has been provided (`tests/framework_template.p4`) to help you get started.
