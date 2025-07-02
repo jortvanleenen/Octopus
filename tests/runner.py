@@ -106,9 +106,14 @@ def get_all_benchmarks() -> List[Benchmark]:
             Path("tests/leapfrog_benchmarks/state_rearrangement/separate_states.p4"),
         ),
         Benchmark(
-            "variable_length_formats",
-            Path("tests/leapfrog_benchmarks/variable_length_formats/ipoptions.p4"),
-            Path("tests/leapfrog_benchmarks/variable_length_formats/timestamp.p4"),
+            "variable_length_formats_2",
+            Path("tests/leapfrog_benchmarks/variable_length_formats_2/ipoptions.p4"),
+            Path("tests/leapfrog_benchmarks/variable_length_formats_2/timestamp.p4"),
+        ),
+        Benchmark(
+            "variable_length_formats_3",
+            Path("tests/leapfrog_benchmarks/variable_length_formats_3/ipoptions.p4"),
+            Path("tests/leapfrog_benchmarks/variable_length_formats_3/timestamp.p4"),
         ),
     ]
 
@@ -121,7 +126,7 @@ def get_all_run_variants() -> List[BenchmarkRun]:
     """
     return [
         BenchmarkRun("octopus_default", {}),
-        BenchmarkRun("octopus_no_leaps", {"disable_leaps": True}),
+        BenchmarkRun("octopus_no_leaps", {"disable-leaps": True}),
         BenchmarkRun("octopus_z3", {"solvers": ["z3"]}),
         BenchmarkRun("octopus_cvc5", {"solvers": ["cvc5"]}),
     ]
@@ -182,8 +187,8 @@ def run_benchmark(
             tmp_path,
         ]
 
-        if variant.arguments.get("disable_leaps"):
-            cmd.append("--disable_leaps")
+        if variant.arguments.get("disable-leaps"):
+            cmd.append("--disable-leaps")
 
         solvers = variant.arguments.get("solvers")
         if solvers:

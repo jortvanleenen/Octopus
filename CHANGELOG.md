@@ -13,10 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-## [v1.0.1] - 2025-06-30
+## [v1.0.2] - 2025-07-02
 
 This release represents the version of the codebase that was published alongside its accompanying paper (see the
 README.md file).
+
+### Added
+
+- Added the IPOptions2 benchmark.
+
+### Changed
+
+### Removed
+
+## [v1.0.1] - 2025-06-30
 
 ### Added
 
