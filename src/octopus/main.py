@@ -66,7 +66,7 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "-L",
-        "--disable_leaps",
+        "--disable-leaps",
         action="store_true",
         help="disable leaps in symbolic bisimulation (ignored if --naive is set)",
     )
