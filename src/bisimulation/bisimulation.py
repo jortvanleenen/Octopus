@@ -6,6 +6,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import logging
+from typing import Any
 
 import pysmt.shortcuts as pysmt
 
@@ -69,10 +70,11 @@ def naive_bisimulation(
     return True, seen
 
 
-def get_trace(guarded_form: GuardedFormula) -> str:
+def get_trace(solver: Any, guarded_form: GuardedFormula) -> str:
     """
     Generate a trace of the guarded formula.
 
+    :param solver: a solver (portfolio) instance to obtain a model from
     :param guarded_form: the guarded formula to generate a trace for
     :return: a string representation of the trace
     """
@@ -84,14 +86,59 @@ def get_trace(guarded_form: GuardedFormula) -> str:
     trace.reverse()
 
     lines = []
-    for step, g in enumerate(trace):
-        lines.append(f"Step {step}:")
-        lines.append(f"  Left state: {g.state_l}, Right state: {g.state_r}")
-        lines.append(f"  Buffer lengths: left={g.buf_len_l}, right={g.buf_len_r}")
-        lines.append(f"  Header fields: {g.pf.header_field_vars}")
-        lines.append(f"  Buffer vars: {g.pf.buf_vars}")
-        lines.append(f"  Formula root: {g.pf.root}")
+    buf_vars_left = []
+    buf_vars_right = []
+    for step, g_form in enumerate(trace):
+        buf_var_left = g_form.pf.get_buffer_var(left=True)
+        if buf_var_left is not None and (
+            len(buf_vars_left) < 1 or buf_vars_left[-1] != buf_var_left
+        ):
+            buf_vars_left.append(buf_var_left.to_smt(g_form.pf))
+        buf_var_right = g_form.pf.get_buffer_var(left=False)
+        if buf_var_right is not None and (
+            len(buf_vars_right) < 1 or buf_vars_right[-1] != buf_var_right
+        ):
+            buf_vars_right.append(buf_var_right.to_smt(g_form.pf))
+
+        lines.append(f"Step {step} (left, right):")
+        lines.append("  At start:")
+        lines.append(f"  - State:   {g_form.state_l}, {g_form.state_r}")
+        lines.append(f"  - Buffer:  {g_form.buf_len_l}, {g_form.buf_len_r}")
+        lines.append("  After operation(s):")
+
+        buf_l = len(g_form.pf.buf_vars[True] or "")
+        buf_r = len(g_form.pf.buf_vars[False] or "")
+        lines.append(f"  - Buffer:  {buf_l}, {buf_r}")
+
+        left_fields = [
+            name for name, left in g_form.pf.header_field_vars.keys() if left
+        ]
+        right_fields = [
+            name for name, left in g_form.pf.header_field_vars.keys() if not left
+        ]
+        lines.append("  - Store:")
+        lines.append(f"    - Left:  {left_fields}")
+        lines.append(f"    - Right: {right_fields}")
         lines.append("")
+
+    model = solver.get_model()
+    if model is not None:
+        left_ex = ""
+        right_ex = ""
+        if len(buf_vars_left) > 0:
+            left_ex = bin(model.get_value(pysmt.And(*buf_vars_left)).constant_value())
+        if len(buf_vars_right) > 0:
+            right_ex = bin(model.get_value(pysmt.And(*buf_vars_right)).constant_value())
+        if len(left_ex) > len(right_ex):
+            counterexample = left_ex
+        else:
+            counterexample = right_ex
+        if len(buf_vars_left) == 0 and len(buf_vars_right) == 0:
+            counterexample = "N/A (no buffer variables were used)"
+
+        lines.insert(
+            0, f"A stream for which both parsers differ is:\n{counterexample}\n"
+        )
 
     return "\n".join(lines)
 
@@ -107,7 +154,7 @@ def is_terminal(state_name: str) -> bool:
 
 
 def has_new_information(
-    knowledge: set[GuardedFormula], guarded_form: GuardedFormula, s: pysmt.Solver
+    knowledge: set[GuardedFormula], guarded_form: GuardedFormula, s: Any
 ) -> bool:
     """
     Check if the guarded formula contains new information.
@@ -132,7 +179,7 @@ def symbolic_bisimulation(
     parser1: ParserProgram,
     parser2: ParserProgram,
     enable_leaps: bool,
-    solver_portfolio: pysmt.Portfolio,
+    solver_portfolio: Any,
 ) -> tuple[bool, str]:
     """
     Check whether two P4 packet parsers are bisimilar using symbolic execution.
@@ -167,7 +214,7 @@ def symbolic_bisimulation(
             state_l = guarded_form.state_l
             state_r = guarded_form.state_r
             if (state_l == "accept") != (state_r == "accept"):
-                return False, get_trace(guarded_form)
+                return False, get_trace(s, guarded_form)
 
             if is_terminal(state_l) and is_terminal(state_r):
                 logger.debug("Both states are terminal, skipping further processing")
