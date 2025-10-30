@@ -70,11 +70,31 @@ def naive_bisimulation(
     return True, seen
 
 
-def get_trace(solver: Any, guarded_form: GuardedFormula) -> str:
+def _get_relevant_formulas(
+    knowledge: set[GuardedFormula], guarded_form: GuardedFormula
+) -> set[PureFormula]:
+    """
+    Get relevant pure formulas from knowledge for the given guarded formula.
+
+    :param knowledge: a set of previously seen guarded formulas
+    :param guarded_form: the guarded formula to check against
+    :return: a set of relevant pure formulas
+    """
+    relevant_pfs = set()
+    for seen_guarded_form in knowledge:
+        if guarded_form.has_equal_guard(seen_guarded_form):
+            relevant_pfs.add(seen_guarded_form.pf)
+    return relevant_pfs
+
+
+def get_trace(
+    solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
+) -> str:
     """
     Generate a trace of the guarded formula.
 
     :param solver: a solver (portfolio) instance to obtain a model from
+    :param relevant_pfs: a set of relevant, previously seen pure formulas
     :param guarded_form: the guarded formula to generate a trace for
     :return: a string representation of the trace
     """
@@ -121,6 +141,11 @@ def get_trace(solver: Any, guarded_form: GuardedFormula) -> str:
         lines.append(f"    - Right: {right_fields}")
         lines.append("")
 
+    solver.is_sat(
+        pysmt.Or(
+            guarded_form.pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
+        )
+    )
     model = solver.get_model()
     if model is not None:
         left_ex = ""
@@ -154,21 +179,17 @@ def is_terminal(state_name: str) -> bool:
 
 
 def has_new_information(
-    knowledge: set[GuardedFormula], guarded_form: GuardedFormula, s: Any
+    solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
 ) -> bool:
     """
     Check if the guarded formula contains new information.
 
-    :param knowledge: a set of previously seen guarded formulas
+    :param solver: a solver instance to check satisfiability
+    :param relevant_pfs: a set of relevant, previously seen pure formulas
     :param guarded_form: the guarded formula to check
-    :param s: a solver instance to check satisfiability
     :return: True if the guarded formula contains new information, False otherwise
     """
-    relevant_pfs = set()
-    for seen_guarded_form in knowledge:
-        if guarded_form.has_equal_guard(seen_guarded_form):
-            relevant_pfs.add(seen_guarded_form.pf)
-    return not s.is_valid(
+    return not solver.is_valid(
         pysmt.Implies(
             guarded_form.pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
         )
@@ -204,8 +225,9 @@ def symbolic_bisimulation(
         while len(work_queue) > 0:
             guarded_form = work_queue.pop(0)
             current_pf = guarded_form.pf
+            relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
 
-            if not has_new_information(knowledge, guarded_form, s):
+            if not has_new_information(s, relevant_pfs, guarded_form):
                 logger.debug(
                     f"Considered guarded formula information known: {guarded_form}"
                 )
@@ -214,7 +236,7 @@ def symbolic_bisimulation(
             state_l = guarded_form.state_l
             state_r = guarded_form.state_r
             if (state_l == "accept") != (state_r == "accept"):
-                return False, get_trace(s, guarded_form)
+                return False, get_trace(s, relevant_pfs, guarded_form)
 
             if is_terminal(state_l) and is_terminal(state_r):
                 logger.debug("Both states are terminal, skipping further processing")
