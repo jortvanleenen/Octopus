@@ -86,11 +86,6 @@ class OperationBlock(Component):
                     continue
             self._components.append(parsed_component)
 
-    def eval(self, store: dict[str, str], buffer: str):
-        for component in self._components:
-            store, buffer = component.eval(store, buffer)
-        return store, buffer
-
     def strongest_postcondition(
         self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:

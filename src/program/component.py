@@ -40,17 +40,6 @@ class Component(ABC):
         pass
 
     @abstractmethod
-    def eval(self, store: dict[str, str], buffer: str) -> tuple[dict[str, str], str]:
-        """
-        Evaluate the component using the provided store and buffer.
-
-        :param store: the current store
-        :param buffer: the current buffer
-        :return: a tuple containing the updated store and buffer
-        """
-        pass
-
-    @abstractmethod
     def strongest_postcondition(
         self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
@@ -75,15 +64,6 @@ class Assignment(Component):
     def parse(self, component: dict) -> None:
         self.left = parse_expression(self._program, component["left"])
         self.right = parse_expression(self._program, component["right"], len(self.left))
-
-    def eval(self, store: dict[str, str], buffer: str) -> tuple[dict[str, str], str]:
-        right_value = self.right.eval(store)
-        if isinstance(self.left, Slice):
-            store[self.left.reference][self.left.lsb : self.left.msb] = right_value
-        else:
-            store[self.left.reference] = right_value
-
-        return store, buffer
 
     def strongest_postcondition(
         self, manager: FormulaManager, pf: PureFormula
@@ -145,19 +125,6 @@ class Extract(Component):
         self.header_reference = self.program.output_name + "." + header_name
         self.header_content: dict = self.program.get_header(self.header_reference)
         self.size = sum(self.header_content.values())
-
-    def eval(self, store: dict[str, str], buffer: str):
-        """Evaluate the extract method call."""
-        if self.header_content is None or self.size is None:
-            logger.warning("Extract method call has not yet been parsed")
-            return store, buffer
-
-        for field in self.header_content:
-            field_size = self.header_content[field]
-            store[self.header_reference + "." + field] = buffer[:field_size]
-            buffer = buffer[field_size:]
-
-        return store, buffer
 
     def strongest_postcondition(
         self, manager: FormulaManager, pf: PureFormula

@@ -1,6 +1,7 @@
 """
-This module defines classes to support symbolic execution by allowing the creation and manipulation of formula nodes,
-as well as the management of formulas in a symbolic execution context.
+This module defines classes to support symbolic execution by allowing the
+creation and manipulation of formula nodes, as well as the management of
+formulas in a symbolic execution context.
 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)

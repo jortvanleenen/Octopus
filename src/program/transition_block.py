@@ -120,26 +120,6 @@ class TransitionBlock:
 
             logger.info(f"Parsed transition to '{to_state_name}' for '{for_exprs}'")
 
-    def eval(self, store: dict) -> str:
-        """
-        Evaluate the transition block with the given store.
-
-        :param store: the store containing the values for the selectors
-        :return: the name of the state to transition to, or "reject" if no match is found
-        """
-        if len(self._selectors) == 0:
-            return self._cases[tuple([DontCare()])]
-
-        evaluated_selectors = [expression.eval(store) for expression in self._selectors]
-        for key, state in self._cases.items():
-            for_values = [expression.eval(store) for expression in key]
-            if (
-                len(for_values) == 1 and isinstance(for_values[0], DontCare)
-            ) or for_values == evaluated_selectors:
-                return state
-
-        return "reject"
-
     def symbolic_transition(self, pf) -> set[tuple[FormulaNode, str]]:
         """
         Generate symbolic transitions based on the transition block.
