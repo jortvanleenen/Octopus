@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from bisimulation.symbolic.formula import FormulaManager, PureFormula
+from bisimulation.formula import FormulaManager, PureFormula
 from program.component import Assignment, Component, Extract, parse_method_call
 
 if TYPE_CHECKING:

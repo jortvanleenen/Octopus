@@ -11,7 +11,7 @@ import copy
 import logging
 from typing import TYPE_CHECKING
 
-from bisimulation.symbolic.formula import (
+from bisimulation.formula import (
     TRUE,
     And,
     Equals,

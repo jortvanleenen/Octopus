@@ -13,15 +13,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from functools import partial
+from contextlib import nullcontext
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from pysmt.logics import get_logic_by_name
 from pysmt.shortcuts import Portfolio, get_env
 
-from automata.dfa import DFA
-from bisimulation.bisimulation import naive_bisimulation, symbolic_bisimulation
+from bisimulation.bisimulation import symbolic_bisimulation
 from octopus import constants
 from octopus.__about__ import __version__
 from octopus.utils import setup_logging, stat_block
@@ -59,16 +58,10 @@ def parse_arguments() -> argparse.Namespace:
         help="increase output verbosity (-v, -vv, -vvv)",
     )
     parser.add_argument(
-        "-n",
-        "--naive",
-        action="store_true",
-        help="use naive bisimulation instead of symbolic bisimulation",
-    )
-    parser.add_argument(
         "-L",
         "--disable-leaps",
         action="store_true",
-        help="disable leaps in symbolic bisimulation (ignored if --naive is set)",
+        help="disable leaps; only use single-step bisimulation",
     )
     parser.add_argument(
         "-o",
@@ -92,8 +85,8 @@ def parse_arguments() -> argparse.Namespace:
         "-s",
         "--solvers",
         type=str,
-        default="['z3', 'cvc5']",
-        help="list of solvers, possibly with options, to use for symbolic bisimulation",
+        default="['cvc5']",
+        help="list of solvers, possibly with options, to use for bisimulation",
     )
     parser.add_argument(
         "--solvers-global-options",
@@ -101,10 +94,47 @@ def parse_arguments() -> argparse.Namespace:
         metavar="GLOBAL_OPTIONS",
         help="global options for the provided solvers",
     )
+    parser.add_argument(
+        "--constraint-string",
+        type=str,
+        help="define an additional constraint for accepting pairs via a string",
+    )
+    parser.add_argument(
+        "--constraint-file",
+        type=str,
+        help="define an additional constraint for accepting pairs via a file",
+    )
     return parser.parse_args()
 
 
-def create_portfolio(args: argparse.Namespace) -> Portfolio:
+def parse_constraint(args: argparse.Namespace) -> Any:
+    """
+    Parse the additional constraint from the command-line arguments.
+
+    :param args: the parsed command-line arguments
+    :return: the parsed constraint, or None if no constraint is provided
+    """
+    if args.constraint_string:
+        constraint = args.constraint_string
+        logger.info(f"Using constraint from string: {constraint}")
+    elif args.constraint_file:
+        try:
+            with open(args.constraint_file, "r", encoding="utf-8") as f:
+                constraint = f.read()
+            logger.info(
+                f"Using constraint from file '{args.constraint_file}': {constraint}"
+            )
+        except OSError as e:
+            raise OSError(
+                f"Error opening constraint file '{args.constraint_file}': {e.strerror}"
+            ) from e
+    else:
+        constraint = None
+        logger.info("No additional constraint provided.")
+    return constraint
+
+
+def create_portfolio(args: argparse.Namespace):
     """
     Given a list of wanted solvers, return a portfolio of available solvers.
 
@@ -234,39 +264,6 @@ def read_p4_files(files: list[str], in_json: bool) -> list[dict]:
     return jsons
 
 
-def select_bisimulation_method(
-    args: argparse.Namespace,
-) -> tuple[
-    Callable[
-        [ParserProgram, ParserProgram],
-        tuple[bool, set[tuple[DFA.Configuration, DFA.Configuration]]],
-    ],
-    str,
-]:
-    """
-    Select the bisimulation method based on the command-line arguments.
-
-    :param args: the parsed command-line arguments
-    :return: a tuple containing the selected bisimulation method and its name
-    """
-    if args.naive:
-        logger.info("Using naive bisimulation")
-        return naive_bisimulation, "Naive"
-    else:
-        portfolio = create_portfolio(args)
-        # This is needed to prevent recursion limit errors in symbolic bisimulation
-        sys.setrecursionlimit(10000)
-        logger.info(
-            f"Using symbolic bisimulation (leaps: {not args.disable_leaps}) "
-            f"with solver(s): {portfolio.solvers}"
-        )
-        return partial(
-            symbolic_bisimulation,
-            enable_leaps=not args.disable_leaps,
-            solver_portfolio=portfolio,
-        ), "Symbolic"
-
-
 def main(args: Any = None) -> None:
     """Entry point of the program."""
     logger.info("Starting...")
@@ -278,14 +275,18 @@ def main(args: Any = None) -> None:
     else:
         logger.debug(f"Received the following arguments: {args}")
 
-    method, method_name = select_bisimulation_method(args)
+    sys.setrecursionlimit(10000)  # Required for larger parsers
+
+    portfolio = create_portfolio(args)
+    constraint = parse_constraint(args)
+    logger.info(f"Leaps are {'disabled' if args.disable_leaps else 'enabled'}")
 
     logger.info("Reading P4 files...")
     ir_jsons = read_p4_files([args.file1, args.file2], args.json)
-
-    logger.info("Converted both P4 files to IR JSON format")
-    logger.debug(f"IR JSON of file 1:\n{ir_jsons[0]}")
-    logger.debug(f"IR JSON of file 2:\n{ir_jsons[1]}")
+    if not args.json:
+        logger.info("Converted both P4 files to IR JSON format")
+        logger.debug(f"IR JSON of file 1:\n{ir_jsons[0]}")
+        logger.debug(f"IR JSON of file 2:\n{ir_jsons[1]}")
 
     logger.info("Creating Parser objects...")
     parsers = [ParserProgram(j, i == 0) for i, j in enumerate(ir_jsons)]
@@ -295,11 +296,15 @@ def main(args: Any = None) -> None:
     logger.debug(f"Parser object 2 (repr):\n{parsers[1]!r}")
     logger.debug(f"Parser object 2 (str)\n{parsers[1]}")
 
-    if args.stat:
-        with stat_block(f"{method_name} bisimulation"):
-            are_equal, certificate = method(parsers[0], parsers[1])
-    else:
-        are_equal, certificate = method(parsers[0], parsers[1])
+    ctx = stat_block("Symbolic bisimulation") if args.stat else nullcontext()
+    with ctx:
+        are_equal, certificate = symbolic_bisimulation(
+            parsers[0],
+            parsers[1],
+            constraint=constraint,
+            enable_leaps=not args.disable_leaps,
+            solver_portfolio=portfolio,
+        )
 
     if are_equal:
         message = "The two parsers are equivalent."
@@ -328,6 +333,6 @@ def main(args: Any = None) -> None:
 if __name__ == "__main__":
     try:
         main()
-    except Exception:
-        logger.exception("An unexpected error occurred.")
+    except Exception as e:
+        logger.exception(f"An unexpected error occurred: {e}")
         sys.exit(1)

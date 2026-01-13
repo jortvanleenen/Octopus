@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import pysmt.shortcuts as pysmt
 from pysmt.shortcuts import BV, TRUE, BVConcat, BVExtract
 
-from bisimulation.symbolic.formula import (
+from bisimulation.formula import (
     FormulaNode,
     PureFormula,
     Variable,

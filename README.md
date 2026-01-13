@@ -114,31 +114,31 @@ One has to provide the `-j` option to Octopus in the latter case.
 
 Check two IR JSON files (using symbolic bisimulation by default):
 
-```
+```shell
 octopus -j parser1.json parser2.json
 ```
 
 Check two P4 source files (Octopus invokes `p4c-graphs` internally):
 
-```
+```shell
 octopus program1.p4 program2.p4
 ```
 
 Use symbolic bisimulation with leaps disabled:
 
-```
+```shell
 octopus program1.p4 program2.p4 --disable_leaps
 ```
 
 Write output (certificate or counterexample) to a file:
 
-```
+```shell
 octopus -j parser1.json parser2.json --output result.txt
 ```
 
 Exit with status code 1 if the parsers are not equivalent:
 
-```
+```shell
 octopus -j parser1.json parser2.json --fail-on-mismatch
 ```
 
@@ -146,21 +146,34 @@ _Note: this is useful for scripting or CI/CD pipelines._
 
 Print bisimulation execution time and memory usage:
 
-```
+```shell
 octopus -j parser1.json parser2.json --stat
 ```
 
 Customise the SMT solver portfolio and provide (global) options:
 
-```
+```shell
 octopus -j p1.json p2.json \
 --solvers '["z3",("cvc5",{"incremental":False})]' \
 --solvers-global-options '{"generate_models":False}'
 ```
 
-_Note: evaluation of the options is done using `ast.literal_eval()`, so it must be a valid Python literal._
+_Note: evaluation of the options is done using `ast.literal_eval()`, so the argument must be a valid Python literal._
 _For `--solvers`, the following object is accepted: `list[str | tuple[str, dict[str, Any]]]`._
 _For `--solvers-global-options`, the following object is accepted: `dict[str, Any]`._
+
+Perform external filtering by specifying an additional constraint that must hold for accepting pairs:
+
+```shell
+octopus p1.p4 p2.p4 \
+--constraint-string "input.packet[0] == output.packet[0]"
+```
+
+_Note: a (larger) constraint can also be specified using an external file in combination with the
+`--constraint-file` option._
+_Evaluation of these options is (also) done using `ast.literal_eval()`, so the argument must be a valid Python 
+literal._
+__
 
 ## CLI Options
 
@@ -174,13 +187,14 @@ Octopus provides a command-line interface (CLI) with the following options:
 |       | `file1`                    | Path to the first P4 program                                               |
 |       | `file2`                    | Path to the second P4 program                                              |
 | `-v`  | `--verbosity`              | Increase output verbosity (`-v`, `-vv`, `-vvv`)                            |
-| `-n`  | `--naive`                  | Use naive bisimulation instead of symbolic bisimulation                    |
-| `-L`  | `--disable_leaps`          | Disable leaps in symbolic bisimulation (ignored if `--naive` is set)       |
+| `-L`  | `--disable_leaps`          | Disable leaps; only use single-step bisimulation                           |
 | `-o`  | `--output`                 | Write the bisimulation certificate or counterexample to the specified file |
 | `-f`  | `--fail-on-mismatch`       | Exit with code 1 if the parsers are not equivalent                         |
 | `-S`  | `--stat`                   | Measure and print bisimulation execution time and memory usage             |
 | `-s`  | `--solvers`                | Specify which SMT solvers to use along with their options                  |
 |       | `--solvers-global-options` | Specify global options for all solvers                                     |
+|       | `--constraint-string`      | Define an additional constraint for accepting pairs via a string.          |
+|       | `--constraint-file `       | Define an additional constraint for accepting pairs via an external file.  |            
 
 ## Verifying Claims and Benchmarking
 

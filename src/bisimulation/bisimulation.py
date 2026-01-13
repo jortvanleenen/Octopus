@@ -5,13 +5,14 @@ Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
+import ast
 import logging
-from typing import Any
+from typing import Any, Mapping
 
 import pysmt.shortcuts as pysmt
+from pysmt.shortcuts import BVConcat
 
-from automata.dfa import DFA
-from bisimulation.symbolic.formula import (
+from bisimulation.formula import (
     TRUE,
     And,
     Equals,
@@ -25,53 +26,8 @@ from program.parser_program import ParserProgram
 logger = logging.getLogger(__name__)
 
 
-def naive_bisimulation(
-    parser1: ParserProgram, parser2: ParserProgram
-) -> tuple[bool, set[tuple[DFA.Configuration, DFA.Configuration]]]:
-    """
-    Check whether two P4 packet parsers are bisimilar.
-
-    This algorithm checks for bisimilarity by representing the two parsers as
-    DFAs. This approach is considered naive due to the accompanying state
-    explosion, as no symbolic representation is used. Additionally, no
-    optimisations, such as leaps, are performed.
-
-    The bisimulation is performed in a forward manner.
-
-    :param parser1: the first P4 parser program
-    :param parser2: the second P4 parser program
-    :return: a boolean indicating bisimilarity, and seen configurations or a counterexample
-    """
-
-    dfa1 = DFA(parser1)
-    dfa2 = DFA(parser2)
-    config1 = DFA.initial_config()
-    config2 = DFA.initial_config()
-
-    seen = set()
-    work_queue = [(config1, config2)]
-    while len(work_queue) > 0:
-        config1, config2 = work_queue.pop(0)
-
-        if (config1, config2) in seen:
-            continue
-
-        if config1.is_accepting() == config2.is_accepting():
-            seen.add((config1, config2))
-            for bit in ["0", "1"]:
-                next_config1 = dfa1.step(config1, bit)
-                next_config2 = dfa2.step(config2, bit)
-                work_queue.append((next_config1, next_config2))
-        else:
-            return False, {
-                (config1, config2),
-            }
-
-    return True, seen
-
-
 def _get_relevant_formulas(
-    knowledge: set[GuardedFormula], guarded_form: GuardedFormula
+        knowledge: set[GuardedFormula], guarded_form: GuardedFormula
 ) -> set[PureFormula]:
     """
     Get relevant pure formulas from knowledge for the given guarded formula.
@@ -88,7 +44,7 @@ def _get_relevant_formulas(
 
 
 def get_trace(
-    solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
+        solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
 ) -> str:
     """
     Generate a trace of the guarded formula.
@@ -111,12 +67,12 @@ def get_trace(
     for step, g_form in enumerate(trace):
         buf_var_left = g_form.pf.get_buffer_var(left=True)
         if buf_var_left is not None and (
-            len(buf_vars_left) < 1 or buf_vars_left[-1] != buf_var_left
+                len(buf_vars_left) < 1 or buf_vars_left[-1] != buf_var_left
         ):
             buf_vars_left.append(buf_var_left.to_smt(g_form.pf))
         buf_var_right = g_form.pf.get_buffer_var(left=False)
         if buf_var_right is not None and (
-            len(buf_vars_right) < 1 or buf_vars_right[-1] != buf_var_right
+                len(buf_vars_right) < 1 or buf_vars_right[-1] != buf_var_right
         ):
             buf_vars_right.append(buf_var_right.to_smt(g_form.pf))
 
@@ -168,6 +124,79 @@ def get_trace(
     return "\n".join(lines)
 
 
+def constraint_to_smt(constraint: Any, pf: PureFormula) -> Any:
+    """
+    Take a constraint string and convert it to an SMT formula.
+
+    For example, "('hdr.f0' + 'hdr.f1') == 'hdr.f'" is interpreted as requiring
+    the concatenation of two fields in the left parser (left side of equality)
+    to be equal to a field in the right parser (right side of equality).
+    """
+
+    class UnsafeExpression(ValueError):
+        """
+        Exception raised for unsafe expressions in the constraint.
+        """
+
+        pass
+
+    def _eval(node: ast.AST, left) -> Any:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if left is None:
+                raise UnsafeExpression("Unclear attribution of field to left or right parser.")
+
+            var = pf.get_header_field_var(node.value, left=left)
+            if var is None:
+                return None
+            return var.to_smt(pf)
+
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            left_smt = _eval(node.left, left=left)
+            right_smt = _eval(node.right, left=left)
+
+            if (left_smt is None) != (right_smt is None):
+                return pysmt.FALSE()
+
+            if left_smt is None:
+                return None
+
+            return pysmt.BVConcat(left_smt, right_smt)
+
+        if isinstance(node, ast.Compare):
+            if (
+                    len(node.ops) != 1
+                    or len(node.comparators) != 1
+            ):
+                raise UnsafeExpression("Only simple (two element) comparisons are allowed.")
+
+            left_smt = _eval(node.left, left=True)
+            right_smt = _eval(node.comparators[0], left=False)
+
+            if (left_smt is None) != (right_smt is None):
+                return pysmt.FALSE()
+
+            if left_smt is None:
+                return pysmt.TRUE()
+
+            operator = node.ops[0]
+            match operator:
+                case ast.Eq():
+                    return pysmt.Equals(left_smt, right_smt)
+                case ast.NotEq():
+                    return pysmt.Not(pysmt.Equals(left_smt, right_smt))
+                case _:
+                    raise UnsafeExpression(
+                        f"Disallowed comparison operator: {operator.__class__.__name__}"
+                    )
+
+        raise UnsafeExpression(f"Disallowed syntax: {node.__class__.__name__}")
+
+    return pysmt.And(
+        _eval(ast.parse(constraint, mode="eval").body, left=None),
+        pf.to_smt()
+    )
+
+
 def is_terminal(state_name: str) -> bool:
     """
     Check if a state is terminal.
@@ -179,7 +208,7 @@ def is_terminal(state_name: str) -> bool:
 
 
 def has_new_information(
-    solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
+        solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
 ) -> bool:
     """
     Check if the guarded formula contains new information.
@@ -197,10 +226,11 @@ def has_new_information(
 
 
 def symbolic_bisimulation(
-    parser1: ParserProgram,
-    parser2: ParserProgram,
-    enable_leaps: bool,
-    solver_portfolio: Any,
+        parser1: ParserProgram,
+        parser2: ParserProgram,
+        solver_portfolio: Any,
+        constraint: Any = None,
+        enable_leaps: bool = True,
 ) -> tuple[bool, str]:
     """
     Check whether two P4 packet parsers are bisimilar using symbolic execution.
@@ -213,8 +243,9 @@ def symbolic_bisimulation(
 
     :param parser1: the first P4 parser program
     :param parser2: the second P4 parser program
-    :param enable_leaps: whether to enable leaps in the bisimulation
     :param solver_portfolio: the solver portfolio to use for symbolic execution
+    :param constraint: an optional constraint to apply during bisimulation
+    :param enable_leaps: whether to enable leaps in the bisimulation
     :return: a boolean indicating bisimilarity, and seen formulas or a counterexample
     """
 
@@ -237,6 +268,11 @@ def symbolic_bisimulation(
             state_r = guarded_form.state_r
             if (state_l == "accept") != (state_r == "accept"):
                 return False, get_trace(s, relevant_pfs, guarded_form)
+
+            if constraint is not None:
+                constraint_smt = constraint_to_smt(constraint, current_pf)
+                if not s.is_valid(constraint_smt):
+                    return False, get_trace(s, relevant_pfs, guarded_form)
 
             if is_terminal(state_l) and is_terminal(state_r):
                 logger.debug("Both states are terminal, skipping further processing")
