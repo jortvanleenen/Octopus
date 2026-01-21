@@ -198,6 +198,33 @@ To add benchmarks or test cases, see the `tests` directory.
 Within this directory, you can find subdirectories for correct cases, incorrect cases, and benchmarks.
 Additionally, a template file has been provided (`tests/framework_template.p4`) to help you get started.
 
+### Leapfrog Benchmarks
+The benchmark set is taken from Doenges et al. (2022).
+As our manner of input differs from theirs, we have provided a mapping from our folder names to their benchmark names.
+- **States** denotes the total number of states in both parser programs.  
+- **Branched** is the number of bits tested in all `transition select` statements.  
+- **Total** is the total number of bits across all variables.  
+
+| Category      | Name                     | File                  | States | Branched (b) | Total (b) |
+|---------------|--------------------------|-----------------------|--------|--------------|-----------|
+| Utility       | State rearrangement      | `IPFilter`            | 5      | 8            | 256       |
+|               | Variable-length format 2 | `IPOptions2`          | 30     | 32           | 672       |
+|               | Variable-length format 3 | `IPOptions3`          | 45     | 96           | 672       |
+|               | Header initialisation    | `SelfComparison`      | 10     | 12           | 736       |
+|               | Speculative extraction   | `MPLSVectorized`      | 5      | 3            | 192       |
+|               | Relational verification  | `SloppyStrictStores`  | 6      | 32           | 1056      |
+|               | External filtering       | `SloppyStrictFilter`  | 6      | 32           | 1056      |
+| Applicability | Edge                     | `EdgeSelf`            | 28     | 52           | 2584      |
+|               | Service provider         | `ServiceproviderSelf` | 22     | 25           | 2536      |
+|               | Datacenter               | `DataCenterSelf`      | 30     | 274          | 2272      |
+|               | Enterprise               | `EnterpriseSelf`      | 22     | 80           | 1952      |
+|               | Translation validation   | `EdgeTrans`           | 30     | 56           | 3036      |
+
+**Notes**
+- Full filenames in Leapfrog are `<name-in-table>Proof.v`, except for `SloppyStrictStores` and `SloppyStrictFilter`, which are as is.
+- The Leapfrog GitHub repository incorrectly lists `EthernetProof.v` as the benchmark file for *state rearrangement*.
+- The number of branched and total bits has been corrected for most benchmarks, as these were incorrect in the Leapfrog paper.
+
 ## License
 
 This project is licensed under the MIT License.

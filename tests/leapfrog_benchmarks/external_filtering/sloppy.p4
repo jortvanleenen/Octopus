@@ -2,9 +2,9 @@
 #include <core.p4>
 // HEADER END
 
-header eth_t   { bit<112> data; }
-header ipv4_t  { bit<128> data; }
-header ipv6_t  { bit<288> data; }
+header eth_t  { bit<112> data; }
+header ipv4_t { bit<128> data; }
+header ipv6_t { bit<288> data; }
 
 struct headers_t {
     eth_t   eth;
