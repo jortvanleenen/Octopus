@@ -171,7 +171,7 @@ octopus p1.p4 p2.p4 \
 
 _Note: a (larger) constraint can also be specified using an external file in combination with the
 `--constraint-file` option._
-_Evaluation of these options is (also) done using `ast.literal_eval()`, so the argument must be a valid Python 
+_Evaluation of these options is (also) done using `ast.literal_eval()`, so the argument must be a valid Python
 literal._
 __
 
@@ -213,11 +213,14 @@ Within this directory, you can find subdirectories for correct cases, incorrect 
 Additionally, a template file has been provided (`tests/framework_template.p4`) to help you get started.
 
 ### Leapfrog Benchmarks
+
 The benchmark set is taken from Doenges et al. (2022).
-As our manner of input differs from theirs, we have provided a mapping from our folder names to their benchmark names.
-- **States** denotes the total number of states in both parser programs.  
-- **Branched** is the number of bits tested in all `transition select` statements.  
-- **Total** is the total number of bits across all variables.  
+As our manner of input differs from theirs, we have provided a mapping from our folder names to their benchmark
+filenames.
+
+- **States** denotes the total number of states in both parser programs.
+- **Branched** is the number of bits tested in all `transition select` statements.
+- **Total** is the total number of bits across all variables.
 
 | Category      | Name                     | File                  | States | Branched (b) | Total (b) |
 |---------------|--------------------------|-----------------------|--------|--------------|-----------|
@@ -235,9 +238,15 @@ As our manner of input differs from theirs, we have provided a mapping from our 
 |               | Translation validation   | `EdgeTrans`           | 30     | 56           | 3036      |
 
 **Notes**
-- Full filenames in Leapfrog are `<name-in-table>Proof.v`, except for `SloppyStrictStores` and `SloppyStrictFilter`, which are as is.
+
+- Full filenames in Leapfrog are `<name-in-table>Proof.v`, except for `SloppyStrictStores` and `SloppyStrictFilter`,
+  which are as is.
 - The Leapfrog GitHub repository incorrectly lists `EthernetProof.v` as the benchmark file for *state rearrangement*.
-- The number of branched and total bits has been corrected for most benchmarks, as these were incorrect in the Leapfrog paper.
+- The number of branched and total bits has been corrected for most benchmarks, as these were incorrect in the Leapfrog
+  paper.
+- In Leapfrog's Enterprise benchmark, the size of the IPv4 header was incorrectly specified. We were able to
+  adjust this to the correct value by looking at the original code in
+  the [parser-gen repository](https://github.com/grg/parser-gen/blob/master/examples/headers-enterprise.txt).
 
 ## License
 
