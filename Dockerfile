@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+# Stage 1: Build p4c from source
 FROM python:3.10-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -21,6 +22,7 @@ RUN git clone --depth=1 --recursive https://github.com/p4lang/p4c.git /p4c && \
       -DENABLE_GTESTS=OFF \
     && make -j4 && make install
 
+# Stage 2: Create final image
 FROM python:3.10-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -36,7 +38,7 @@ COPY . /octopus
 RUN pip install --upgrade pip --no-cache-dir && \
     pip install --no-cache-dir hatch && \
     pip install --no-cache-dir -e .[dev] && \
-    python3 -m pysmt install --z3 --cvc5 --confirm-agreement && \
+    python3 -m pysmt install --cvc5 --confirm-agreement && \
     python3 -m pysmt install --check
 
 ENTRYPOINT ["octopus"]
