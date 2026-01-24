@@ -87,19 +87,20 @@ class Assignment(Component):
             )
 
         new_var = manager.fresh_variable(len(reference))
-        pf.set_header_field_var(reference.reference, self._program.is_left, new_var)
+        new_pf = pf.deepcopy()
+        new_pf.set_header_field_var(reference.reference, self._program.is_left, new_var)
 
         right_copy = copy.deepcopy(self.right)
         right_copy.to_formula(pf)
 
         logger.debug(
-            f"Header variables at end of assignment SP (left: {left}): {pf.header_field_vars}"
+            f"Header variables at end of assignment SP (left: {left}): {new_pf.header_field_vars}"
         )
 
         return PureFormula(
-            And(pf.root, Equals(new_var, right_copy)),
-            pf.header_field_vars,
-            pf.buf_vars,
+            And(new_pf.root, Equals(new_var, right_copy)),
+            new_pf.header_field_vars,
+            new_pf.buf_vars,
         )
 
     def __repr__(self):
