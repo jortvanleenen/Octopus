@@ -19,7 +19,9 @@ class ReprMixin:
 
     def __repr__(self):
         cls = self.__class__.__name__
-        args = ", ".join(f"{k!r}={v!r}" for k, v in self.__dict__.items())
+        str_filter = ["_program", "program"]
+        filtered_items = {k: v for k, v in self.__dict__.items() if k not in str_filter}
+        args = ", ".join(f"{k!r}={v!r}" for k, v in filtered_items.items())
         return f"{cls}({args})"
 
 
