@@ -5,13 +5,12 @@ Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
-import ast
 import logging
-from typing import Any, Mapping
+from typing import Any
 
 import pysmt.shortcuts as pysmt
-from pysmt.shortcuts import BVConcat
 
+from bisimulation.constraint import constraint_to_smt
 from bisimulation.formula import (
     TRUE,
     And,
@@ -43,7 +42,7 @@ def _get_relevant_formulas(
     return relevant_pfs
 
 
-def get_trace(
+def _get_trace(
         solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
 ) -> str:
     """
@@ -63,18 +62,19 @@ def get_trace(
 
     lines = []
     buf_vars_left = []
+    previous_buf_left = None
     buf_vars_right = []
+    previous_buf_right = None
     for step, g_form in enumerate(trace):
         buf_var_left = g_form.pf.get_buffer_var(left=True)
-        if buf_var_left is not None and (
-                len(buf_vars_left) < 1 or buf_vars_left[-1] != buf_var_left
-        ):
+        if previous_buf_left != buf_var_left:
             buf_vars_left.append(buf_var_left.to_smt(g_form.pf))
+        previous_buf_left = buf_var_left
+
         buf_var_right = g_form.pf.get_buffer_var(left=False)
-        if buf_var_right is not None and (
-                len(buf_vars_right) < 1 or buf_vars_right[-1] != buf_var_right
-        ):
+        if previous_buf_right != buf_var_right:
             buf_vars_right.append(buf_var_right.to_smt(g_form.pf))
+        previous_buf_right = buf_var_right
 
         lines.append(f"Step {step} (left, right):")
         lines.append("  At start:")
@@ -124,80 +124,7 @@ def get_trace(
     return "\n".join(lines)
 
 
-def constraint_to_smt(constraint: Any, pf: PureFormula) -> Any:
-    """
-    Take a constraint string and convert it to an SMT formula.
-
-    For example, "('hdr.f0' + 'hdr.f1') == 'hdr.f'" is interpreted as requiring
-    the concatenation of two fields in the left parser (left side of equality)
-    to be equal to a field in the right parser (right side of equality).
-    """
-
-    class UnsafeExpression(ValueError):
-        """
-        Exception raised for unsafe expressions in the constraint.
-        """
-
-        pass
-
-    def _eval(node: ast.AST, left) -> Any:
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            if left is None:
-                raise UnsafeExpression("Unclear attribution of field to left or right parser.")
-
-            var = pf.get_header_field_var(node.value, left=left)
-            if var is None:
-                return None
-            return var.to_smt(pf)
-
-        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-            left_smt = _eval(node.left, left=left)
-            right_smt = _eval(node.right, left=left)
-
-            if (left_smt is None) != (right_smt is None):
-                return pysmt.FALSE()
-
-            if left_smt is None:
-                return None
-
-            return pysmt.BVConcat(left_smt, right_smt)
-
-        if isinstance(node, ast.Compare):
-            if (
-                    len(node.ops) != 1
-                    or len(node.comparators) != 1
-            ):
-                raise UnsafeExpression("Only simple (two element) comparisons are allowed.")
-
-            left_smt = _eval(node.left, left=True)
-            right_smt = _eval(node.comparators[0], left=False)
-
-            if (left_smt is None) != (right_smt is None):
-                return pysmt.FALSE()
-
-            if left_smt is None:
-                return pysmt.TRUE()
-
-            operator = node.ops[0]
-            match operator:
-                case ast.Eq():
-                    return pysmt.Equals(left_smt, right_smt)
-                case ast.NotEq():
-                    return pysmt.Not(pysmt.Equals(left_smt, right_smt))
-                case _:
-                    raise UnsafeExpression(
-                        f"Disallowed comparison operator: {operator.__class__.__name__}"
-                    )
-
-        raise UnsafeExpression(f"Disallowed syntax: {node.__class__.__name__}")
-
-    return pysmt.And(
-        _eval(ast.parse(constraint, mode="eval").body, left=None),
-        pf.to_smt()
-    )
-
-
-def is_terminal(state_name: str) -> bool:
+def _is_terminal(state_name: str) -> bool:
     """
     Check if a state is terminal.
 
@@ -207,7 +134,7 @@ def is_terminal(state_name: str) -> bool:
     return state_name in ["accept", "reject"]
 
 
-def has_new_information(
+def _has_new_information(
         solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
 ) -> bool:
     """
@@ -229,22 +156,24 @@ def symbolic_bisimulation(
         parser1: ParserProgram,
         parser2: ParserProgram,
         solver_portfolio: Any,
-        constraint: Any = None,
+        filter_accepting: Any = None,
+        filter_disagreeing: Any = None,
         enable_leaps: bool = True,
 ) -> tuple[bool, str]:
     """
     Check whether two P4 packet parsers are bisimilar using symbolic execution.
 
     This algorithm checks for bisimilarity by representing the two parsers as
-    modifiers of symbolic formulas. This approach is considered more efficient
-    than the naive bisimulation, as it uses symbolic representations to explore
-    the state space of the parsers. This implementation also allows for
+    modifiers of symbolic formulas. This approach is more efficient than the
+    naive bisimulation, as it uses symbolic representations to explore the
+    state space of the parsers. This implementation also allows for
     optimisations, such as leaps, to be performed.
 
     :param parser1: the first P4 parser program
     :param parser2: the second P4 parser program
     :param solver_portfolio: the solver portfolio to use for symbolic execution
-    :param constraint: an optional constraint to apply during bisimulation
+    :param filter_accepting: an optional filter for accepting pairs
+    :param filter_disagreeing: an optional filter for disagreeing pairs
     :param enable_leaps: whether to enable leaps in the bisimulation
     :return: a boolean indicating bisimilarity, and seen formulas or a counterexample
     """
@@ -252,13 +181,18 @@ def symbolic_bisimulation(
     knowledge: set[GuardedFormula] = set()
     manager = FormulaManager()
     work_queue = [GuardedFormula.initial_guard()]
+    for parser in [parser1, parser2]:
+        left = parser.is_left
+        for field in parser.get_all_fields():
+            var = manager.fresh_variable(parser.get_header(field))
+            work_queue[0].pf.set_header_field_var(field, left, var)
     with solver_portfolio as s:
         while len(work_queue) > 0:
             guarded_form = work_queue.pop(0)
             current_pf = guarded_form.pf
             relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
 
-            if not has_new_information(s, relevant_pfs, guarded_form):
+            if not _has_new_information(s, relevant_pfs, guarded_form):
                 logger.debug(
                     f"Considered guarded formula information known: {guarded_form}"
                 )
@@ -267,14 +201,22 @@ def symbolic_bisimulation(
             state_l = guarded_form.state_l
             state_r = guarded_form.state_r
             if (state_l == "accept") != (state_r == "accept"):
-                return False, get_trace(s, relevant_pfs, guarded_form)
+                if filter_disagreeing is None:
+                    return False, _get_trace(s, relevant_pfs, guarded_form)
 
-            if constraint is not None:
-                constraint_smt = constraint_to_smt(constraint, current_pf)
-                if not s.is_valid(constraint_smt):
-                    return False, get_trace(s, relevant_pfs, guarded_form)
+                constraint_smt = constraint_to_smt(filter_disagreeing, current_pf)
+                if not s.is_sat(constraint_smt):
+                    return False, _get_trace(s, relevant_pfs, guarded_form)
+                else:
+                    knowledge.add(guarded_form)
+                    continue
 
-            if is_terminal(state_l) and is_terminal(state_r):
+            if state_l == "accept" and state_r == "accept" and filter_accepting is not None:
+                relation_smt = constraint_to_smt(filter_accepting, current_pf)
+                if not s.is_sat(relation_smt):
+                    return False, _get_trace(s, relevant_pfs, guarded_form)
+
+            if _is_terminal(state_l) and _is_terminal(state_r):
                 logger.debug("Both states are terminal, skipping further processing")
                 knowledge.add(guarded_form)
                 continue
@@ -311,7 +253,7 @@ def symbolic_bisimulation(
             transition_r = not reject_r and (buf_len_r + leap == op_size_r)
 
             new_bits_var = manager.fresh_variable(leap)
-            new_root = current_pf.root
+            new_pf = current_pf.deepcopy()
 
             def extend_buffer(parser: ParserProgram, *, left: bool) -> None:
                 """
@@ -320,15 +262,15 @@ def symbolic_bisimulation(
                 :param parser: the parser program to use for the extension
                 :param left: whether to extend the left or right buffer
                 """
-                nonlocal new_root
+                nonlocal new_pf
                 old_buf = current_pf.get_buffer_var(left=left)
                 if old_buf is None:
-                    current_pf.set_buffer_var(left=left, var=new_bits_var)
+                    new_pf.set_buffer_var(left=left, var=new_bits_var)
                 else:
                     new_buf = manager.fresh_variable(len(old_buf) + leap)
-                    current_pf.set_buffer_var(left=left, var=new_buf)
-                    new_root = And(
-                        new_root,
+                    new_pf.set_buffer_var(left=left, var=new_buf)
+                    new_pf.root = And(
+                        new_pf.root,
                         Equals(
                             new_buf,
                             Concatenate(parser, left=old_buf, right=new_bits_var),
@@ -338,55 +280,47 @@ def symbolic_bisimulation(
             extend_buffer(parser1, left=parser1.is_left)
             extend_buffer(parser2, left=parser2.is_left)
 
-            pf = PureFormula(
-                new_root, current_pf.header_field_vars, current_pf.buf_vars
-            )
-
             logger.info(
                 f"Equivalence checking loop status\n"
                 f"Left - state: {state_l}, op. size: {op_size_l}, transitioning: {transition_l}\n"
                 f"Right - state: {state_r}, op. size: {op_size_r}, transitioning: {transition_r}\n"
             )
-            logger.debug(f"Buffers: {pf.buf_vars}")
+            logger.debug(f"Buffers: {new_pf.buf_vars}")
 
             if transition_l:
-                pf = op_block_l.strongest_postcondition(manager, pf)
+                new_pf = op_block_l.strongest_postcondition(manager, new_pf)
             if transition_r:
-                pf = op_block_r.strongest_postcondition(manager, pf)
+                new_pf = op_block_r.strongest_postcondition(manager, new_pf)
 
             true_form = TRUE()
             left_trans = (
-                trans_block_l.symbolic_transition(pf)
+                trans_block_l.symbolic_transition(new_pf)
                 if transition_l
                 else [(true_form, state_l)]
             )
             right_trans = (
-                trans_block_r.symbolic_transition(pf)
+                trans_block_r.symbolic_transition(new_pf)
                 if transition_r
                 else [(true_form, state_r)]
             )
 
             for form_l, to_l in left_trans:
                 for form_r, to_r in right_trans:
-                    pf_new = PureFormula.clone(
-                        And(pf.root, And(form_l, form_r)),
-                        pf.header_field_vars,
-                        pf.buf_vars,
+                    copy_pf = PureFormula.clone(
+                        And(new_pf.root, And(form_l, form_r)),
+                        new_pf.header_field_vars,
+                        new_pf.buf_vars,
                     )
-                    if s.is_sat(pf_new.to_smt()):
-                        work_queue.append(
-                            GuardedFormula(
-                                to_l,
-                                to_r,
-                                0 if transition_l else buf_len_l + leap,
-                                0 if transition_r else buf_len_r + leap,
-                                pf_new,
-                                guarded_form,
-                            )
+                    work_queue.append(
+                        GuardedFormula(
+                            to_l,
+                            to_r,
+                            0 if transition_l else buf_len_l + leap,
+                            0 if transition_r else buf_len_r + leap,
+                            copy_pf,
+                            guarded_form,
                         )
-                        logger.debug(
-                            f"Found satisfiable:({to_l}, {to_r}) with formula {pf_new}"
-                        )
+                    )
 
             knowledge.add(guarded_form)
 
