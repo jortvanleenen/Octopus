@@ -95,43 +95,73 @@ def parse_arguments() -> argparse.Namespace:
         help="global options for the provided solvers",
     )
     parser.add_argument(
-        "--constraint-string",
+        "--filter-accepting-string",
         type=str,
-        help="define an additional constraint for accepting pairs via a string",
+        help="define a filter for accepting pairs via a string",
     )
     parser.add_argument(
-        "--constraint-file",
+        "--filter-accepting-file",
         type=str,
-        help="define an additional constraint for accepting pairs via a file",
+        help="define a filter for accepting pairs via a file",
+    )
+    parser.add_argument(
+        "--filter-disagreeing-string",
+        type=str,
+        help="define a filter for disagreeing pairs via a string",
+    )
+    parser.add_argument(
+        "--filter-disagreeing-file",
+        type=str,
+        help="define a filter for disagreeing pairs via a file",
     )
     return parser.parse_args()
 
 
-def parse_constraint(args: argparse.Namespace) -> Any:
+def parse_filters(args: argparse.Namespace) -> tuple[str | None, str | None]:
     """
-    Parse the additional constraint from the command-line arguments.
+    Parse accepting and disagreeing filters from command-line arguments.
 
-    :param args: the parsed command-line arguments
-    :return: the parsed constraint, or None if no constraint is provided
+    :param args: parsed command-line arguments
+    :return: (filter_accepting, filter_disagreeing)
     """
-    if args.constraint_string:
-        constraint = args.constraint_string
-        logger.info(f"Using constraint from string: {constraint}")
-    elif args.constraint_file:
-        try:
-            with open(args.constraint_file, "r", encoding="utf-8") as f:
-                constraint = f.read()
-            logger.info(
-                f"Using constraint from file '{args.constraint_file}': {constraint}"
+
+    def _load_filter(filter_string: str | None, filter_file: str | None, kind: str) -> str | None:
+        if filter_string is not None and filter_file is not None:
+            raise ValueError(
+                f"Specify either --{kind}-string or --{kind}-file, not both."
             )
-        except OSError as e:
-            raise OSError(
-                f"Error opening constraint file '{args.constraint_file}': {e.strerror}"
-            ) from e
-    else:
-        constraint = None
-        logger.info("No additional constraint provided.")
-    return constraint
+
+        if filter_string is not None:
+            logger.info(f"Using {kind} filter from string: {filter_string}")
+            return filter_string
+
+        if filter_file is not None:
+            try:
+                with open(filter_file, "r", encoding="utf-8") as f:
+                    filter_str = f.read()
+                logger.info(f"Using {kind} filter from file '{filter_file}': {filter_str}")
+                return filter_str
+            except OSError as e:
+                raise OSError(
+                    f"Error opening {kind} filter file '{filter_file}': {e.strerror}"
+                ) from e
+
+        logger.info(f"No {kind} filter provided.")
+        return None
+
+    filter_accepting = _load_filter(
+        args.filter_accepting_string,
+        args.filter_accepting_file,
+        "filter-accepting",
+    )
+
+    filter_disagreeing = _load_filter(
+        args.filter_disagreeing_string,
+        args.filter_disagreeing_file,
+        "filter-disagreeing",
+    )
+
+    return filter_accepting, filter_disagreeing
 
 
 def create_portfolio(args: argparse.Namespace):
@@ -278,7 +308,7 @@ def main(args: Any = None) -> None:
     sys.setrecursionlimit(10000)  # Required for larger parsers
 
     portfolio = create_portfolio(args)
-    constraint = parse_constraint(args)
+    filter_accepting, filter_disagreeing = parse_filters(args)
     logger.info(f"Leaps are {'disabled' if args.disable_leaps else 'enabled'}")
 
     logger.info("Reading P4 files...")
@@ -301,7 +331,8 @@ def main(args: Any = None) -> None:
         are_equal, certificate = symbolic_bisimulation(
             parsers[0],
             parsers[1],
-            constraint=constraint,
+            filter_accepting=filter_accepting,
+            filter_disagreeing=filter_disagreeing,
             enable_leaps=not args.disable_leaps,
             solver_portfolio=portfolio,
         )
@@ -334,5 +365,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        logger.exception(f"An unexpected error occurred: {e}")
+        logger.exception(f"An unexpected error occurred:\n{e}")
         sys.exit(1)

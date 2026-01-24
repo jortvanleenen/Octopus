@@ -1,15 +1,19 @@
 # Octopus
 
 Octopus is an equivalence checker for P4 packet parsers, implemented in Python.  
-It supports both naive and optimised symbolic bisimulation techniques for comparing parser behaviour.
+Its implementation uses symbolic bisimulation to compare parser behaviour.
 
-Octopus is accompanied by the paper *"Practical Equivalence Checking of P4 Packet Parsers"* by Jort van Leenen.  
+Octopus is accompanied by the paper *"Octopus: Practical Equivalence Checking of P4 Packet Parsers"* by Jort van
+Leenen and Tobias Kappé.
+This work builds on the first author's bachelor's thesis [*"Practical Equivalence Checking of P4 Packet
+Parsers"*](https://theses.liacs.nl/3410),
+supervised by Tobias Kappé and Jan Martens.
 The implementation builds on theoretical work from [Leapfrog](https://doi.org/10.48550/arXiv.2205.08762), a Rocq-based
 formal verifier for P4 packet parsers.
 
 ## Features
 
-- Equivalence checking for P4 packet parsers using either naive or (optimised) symbolic bisimulation;
+- Equivalence checking for P4 packet parsers using (optimised) symbolic bisimulation;
 - Support for IR (JSON) format from `p4c-graphs`;
 - CLI interface with structured output.
 
@@ -54,7 +58,7 @@ docker run --rm -v "$PWD:/workspace" -w /workspace jortvanleenen/octopus:latest 
   [OPTIONS] FILE1 FILE2
 ```
 
-The image includes the Z3 and cvc5 SMT solvers preinstalled.
+The image includes the cvc5 SMT solver preinstalled.
 To install additional solvers, or to run custom PySMT configurations, use an interactive shell:
 
 ```bash
@@ -112,7 +116,7 @@ One has to provide the `-j` option to Octopus in the latter case.
 
 ### Examples
 
-Check two IR JSON files (using symbolic bisimulation by default):
+Check two IR JSON files (using symbolic bisimulation):
 
 ```shell
 octopus -j parser1.json parser2.json
@@ -166,35 +170,39 @@ Perform external filtering by specifying an additional constraint that must hold
 
 ```shell
 octopus p1.p4 p2.p4 \
---constraint-string "input.packet[0] == output.packet[0]"
+"hdr_l.field0 == (hdr_r.field1 + hdr_r.field2) and hdr_l.field0[15:0] == '0xABCD_16' and True or False"
 ```
 
-_Note: a (larger) constraint can also be specified using an external file in combination with the
-`--constraint-file` option._
-_Evaluation of these options is (also) done using `ast.literal_eval()`, so the argument must be a valid Python
-literal._
-__
+_Note: a (larger) constraint can also be specified using an external file with the
+`--filter-accepting-file` option._
+_Evaluation of these options is done using `ast.parse()` (mode eval), so the argument must be a valid Python
+expression._
+
+Similarly to above, a constraint can be provided that should hold for disagreeing pairs using
+`--filter-disagreeing-string` and `--filter-disagreeing-file` respectively.
 
 ## CLI Options
 
 Octopus provides a command-line interface (CLI) with the following options:
 
-| Short | Long                       | Description                                                                |
-|-------|----------------------------|----------------------------------------------------------------------------|
-| `-h`  | `--help`                   | Show a help message and exit                                               |
-|       | `--version`                | Show the version of Octopus and exit                                       |
-| `-j`  | `--json`                   | Specify that both inputs are in IR (p4c) JSON format                       |
-|       | `file1`                    | Path to the first P4 program                                               |
-|       | `file2`                    | Path to the second P4 program                                              |
-| `-v`  | `--verbosity`              | Increase output verbosity (`-v`, `-vv`, `-vvv`)                            |
-| `-L`  | `--disable_leaps`          | Disable leaps; only use single-step bisimulation                           |
-| `-o`  | `--output`                 | Write the bisimulation certificate or counterexample to the specified file |
-| `-f`  | `--fail-on-mismatch`       | Exit with code 1 if the parsers are not equivalent                         |
-| `-S`  | `--stat`                   | Measure and print bisimulation execution time and memory usage             |
-| `-s`  | `--solvers`                | Specify which SMT solvers to use along with their options                  |
-|       | `--solvers-global-options` | Specify global options for all solvers                                     |
-|       | `--constraint-string`      | Define an additional constraint for accepting pairs via a string.          |
-|       | `--constraint-file `       | Define an additional constraint for accepting pairs via an external file.  |            
+| Short | Long                          | Description                                                                 |
+|-------|-------------------------------|-----------------------------------------------------------------------------|
+| `-h`  | `--help`                      | Show a help message and exit                                                |
+|       | `--version`                   | Show the version of Octopus and exit                                        |
+| `-j`  | `--json`                      | Specify that both inputs are in IR (p4c) JSON format                        |
+|       | `file1`                       | Path to the first P4 program                                                |
+|       | `file2`                       | Path to the second P4 program                                               |
+| `-v`  | `--verbosity`                 | Increase output verbosity (`-v`, `-vv`, `-vvv`)                             |
+| `-L`  | `--disable_leaps`             | Disable leaps; only use single-step bisimulation                            |
+| `-o`  | `--output`                    | Write the bisimulation certificate or counterexample to the specified file  |
+| `-f`  | `--fail-on-mismatch`          | Exit with code 1 if the parsers are not equivalent                          |
+| `-S`  | `--stat`                      | Measure and print bisimulation execution time and memory usage              |
+| `-s`  | `--solvers`                   | Specify which SMT solvers to use along with their options                   |
+|       | `--solvers-global-options`    | Specify global options for all solvers                                      |
+|       | `--filter-accepting-string`   | Define an additional constraint for accepting pairs via a string.           |
+|       | `--filter-accepting-file `    | Define an additional constraint for accepting pairs via an external file.   |
+|       | `--filter-disagreeing-string` | Define an additional constraint for disagreeing pairs via a string.         |
+|       | `--filter-disagreeing-file`   | Define an additional constraint for disagreeing pairs via an external file. |
 
 ## Verifying Claims and Benchmarking
 
