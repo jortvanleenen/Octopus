@@ -228,6 +228,32 @@ class ParserProgram(ReprMixin):
         logger.info(f"Obtained header fields for '{reference}': {type_content}")
         return type_content
 
+    def get_all_fields(self) -> list[str]:
+        """
+        Return all fully qualified field references reachable from the output struct.
+
+        :return: a list of fully qualified field references
+        """
+        if self._output_type is None or self._output_name is None:
+            raise ValueError("Parser output type or name not set")
+
+        result: list[str] = []
+
+        def visit(type_name: str, prefix: str) -> None:
+            type_def = self._types.get(type_name)
+            if not isinstance(type_def, dict):
+                return
+
+            for field, field_type in type_def.items():
+                field_ref = f"{prefix}.{field}"
+                if isinstance(field_type, int):
+                    result.append(field_ref)
+                elif isinstance(field_type, str):
+                    visit(field_type, field_ref)
+
+        visit(self._output_type, self._output_name)
+        return result
+
     def __str__(self):
         n_spaces = 2
         output = [
