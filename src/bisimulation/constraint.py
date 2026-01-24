@@ -1,3 +1,12 @@
+"""
+This module defines constraint_to_smt(), a function that converts a Python AST
+representation of relational constraints into SMT formulas, handling uninitialised
+variables according to specified semantics.
+
+Author: Jort van Leenen
+License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
+"""
+
 import ast
 from typing import Any
 
@@ -8,162 +17,127 @@ from bisimulation.formula import PureFormula
 
 def constraint_to_smt(constraint: Any, pf: PureFormula) -> Any:
     """
-    Take a constraint string and convert it to an SMT formula.
+    Convert a relational constraint into an SMT formula.
 
-    For example, "('hdr.f0' + 'hdr.f1') == 'hdr.f'" is interpreted as requiring
-    the concatenation of two fields in the left parser (left side of equality)
-    to be equal to a field in the right parser (right side of equality).
+    :param constraint: a string representing a Python expression for the constraint
+    :param pf: a PureFormula object representing the current state of variables
+    :return: an SMT formula representing the constraint combined with the PureFormula
+
+    Semantics:
+    - If both sides of a relation are uninitialised, the constraint is dropped.
+    - If exactly one side is uninitialised, the constraint is violated.
+    - If both sides are initialised, the constraint is enforced.
     """
 
     class UnsafeExpression(ValueError):
-        """
-        Exception raised for unsafe expressions in the constraint.
-        """
-
+        """Raised when an unsafe expression is encountered."""
         pass
 
+    UNINIT = object()
+
     def _eval(node: ast.AST) -> Any:
-        if isinstance(node, ast.Attribute) or isinstance(node, ast.Name):
-            def _parse_hdr_field(node):
-                def _get_hdr_str(node):
-                    if isinstance(node, ast.Name):
-                        return node.id
-                    if isinstance(node, ast.Attribute):
-                        return node.attr + '.' + _get_hdr_str(node.value)
+        if isinstance(node, (ast.Attribute, ast.Name)):
+            def _get_hdr_str(n):
+                if isinstance(n, ast.Name):
+                    return n.id
+                if isinstance(n, ast.Attribute):
+                    return _get_hdr_str(n.value) + '.' + n.attr
+                return None
 
-                header = _get_hdr_str(node)
-                return header[::-1], header[4] == "l"
-
-            header, left = _parse_hdr_field(node)
+            header = _get_hdr_str(node)
+            left = header[4] == "l"
+            header = "hdr" + header[5:]
 
             var = pf.get_header_field_var(header, left=left)
             if var is None:
-                return None
+                return UNINIT
             return var.to_smt(pf)
 
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-            left_smt = _eval(node.left)
-            right_smt = _eval(node.right)
+            l = _eval(node.left)
+            r = _eval(node.right)
 
-            if (left_smt is None) != (right_smt is None):
+            if l is UNINIT and r is UNINIT:
+                return UNINIT
+            if l is UNINIT or r is UNINIT:
                 return pysmt.FALSE()
 
-            if left_smt is None:
-                return None
-
-            return pysmt.BVConcat(left_smt, right_smt)
+            return pysmt.BVConcat(l, r)
 
         if isinstance(node, ast.Constant):
-            # format: <value>_bitwidth, e.g. 0x4503_16
-            if isinstance(node.value, str):
-                if '_' not in node.value:
-                    raise UnsafeExpression(
-                        "Constants must specify bitwidth using '_'"
-                    )
-                value_str, bitwidth_str = node.value.split('_', 1)
-                try:
-                    bitwidth = int(bitwidth_str)
-                except ValueError:
-                    raise UnsafeExpression(
-                        f"Invalid bitwidth in constant: {bitwidth_str}"
-                    )
-                try:
-                    if value_str.startswith('0x') or value_str.startswith('0X'):
-                        value = int(value_str, 16)
-                    elif value_str.startswith('0b') or value_str.startswith('0B'):
-                        value = int(value_str, 2)
-                    else:
-                        value = int(value_str)
-                except ValueError:
-                    raise UnsafeExpression(
-                        f"Invalid value in constant: {value_str}"
-                    )
-                return pysmt.BV(value, bitwidth)
+            if isinstance(node.value, bool):
+                return pysmt.TRUE() if node.value else pysmt.FALSE()
+
+            if not isinstance(node.value, str) or '_' not in node.value:
+                raise UnsafeExpression("Constants must be of the form <value>_<bitwidth>")
+
+            val, bw = node.value.split('_', 1)
+            bitwidth = int(bw)
+
+            if val.startswith(('0x', '0X')):
+                value = int(val, 16)
+            elif val.startswith(('0b', '0B')):
+                value = int(val, 2)
             else:
-                raise UnsafeExpression(f"Disallowed constant type: {type(node.value)}")
+                value = int(val)
+
+            return pysmt.BV(value, bitwidth)
 
         if isinstance(node, ast.BoolOp):
-            if len(node.values) != 2:
-                raise UnsafeExpression("Only binary boolean operations are allowed.")
+            smts = [_eval(v) for v in node.values]
+            smts = [s for s in smts if s is not UNINIT]
+            if not smts:
+                return UNINIT
 
-            left_smt = _eval(node.values[0])
-            right_smt = _eval(node.values[1])
+            if isinstance(node.op, ast.And):
+                return pysmt.And(smts)
 
-            if (left_smt is None) != (right_smt is None):
-                return pysmt.FALSE()
+            if isinstance(node.op, ast.Or):
+                return pysmt.Or(smts)
 
-            if left_smt is None:
-                return None
-
-            operator = node.op
-            match operator:
-                case ast.Or():
-                    return pysmt.Or(left_smt, right_smt)
-                case ast.And():
-                    return pysmt.And(left_smt, right_smt)
-                case _:
-                    raise UnsafeExpression(
-                        f"Disallowed boolean operator: {operator.__class__.__name__}"
-                    )
+            raise UnsafeExpression("Unsupported boolean operator")
 
         if isinstance(node, ast.Compare):
-            if (
-                    len(node.ops) != 1
-                    or len(node.comparators) != 1
-            ):
-                raise UnsafeExpression("Only simple (two element) comparisons are allowed.")
+            l = _eval(node.left)
+            r = _eval(node.comparators[0])
 
-            left_smt = _eval(node.left)
-            right_smt = _eval(node.comparators[0])
-
-            if (left_smt is None) != (right_smt is None):
+            if l is UNINIT and r is UNINIT:
+                return UNINIT
+            if l is UNINIT or r is UNINIT:
                 return pysmt.FALSE()
 
-            if left_smt is None:
-                return pysmt.TRUE()
+            if isinstance(node.ops[0], ast.Eq):
+                return pysmt.Equals(l, r)
+            if isinstance(node.ops[0], ast.NotEq):
+                return pysmt.Not(pysmt.Equals(l, r))
 
-            operator = node.ops[0]
-            match operator:
-                case ast.Eq():
-                    return pysmt.Equals(left_smt, right_smt)
-                case ast.NotEq():
-                    return pysmt.Not(pysmt.Equals(left_smt, right_smt))
-                case _:
-                    raise UnsafeExpression(
-                        f"Disallowed comparison operator: {operator.__class__.__name__}"
-                    )
+            raise UnsafeExpression("Unsupported comparison")
 
         if isinstance(node, ast.Subscript):
             base = _eval(node.value)
-            if base is None:
-                return None
+            if base is UNINIT:
+                return UNINIT
 
             if not isinstance(node.slice, ast.Slice):
                 raise UnsafeExpression("Only slicing is allowed")
 
-            lower = node.slice.lower
-            upper = node.slice.upper
-
-            if lower is None or upper is None:
-                raise UnsafeExpression("Slice must specify both bounds")
-
-            if not (isinstance(lower, ast.Constant) and isinstance(upper, ast.Constant)):
+            # In Python AST, lower and upper are reversed for slicing
+            lo = node.slice.upper
+            hi = node.slice.lower
+            if not (isinstance(lo, ast.Constant) and isinstance(hi, ast.Constant)):
                 raise UnsafeExpression("Slice bounds must be constants")
 
-            high = lower.value
-            low = upper.value
-
-            if not (isinstance(high, int) and isinstance(low, int)):
-                raise UnsafeExpression("Slice bounds must be integers")
-
-            if low > high:
-                raise UnsafeExpression("Invalid slice: low > high")
-
+            low = lo.value
+            high = hi.value
             return pysmt.BVExtract(base, low, high)
 
-        raise UnsafeExpression(f"Disallowed syntax: {node.__class__.__name__}")
+        raise UnsafeExpression(f"Unsupported syntax: {type(node).__name__}")
 
-    return pysmt.And(
-        _eval(ast.parse(constraint, mode="eval").body),
-        pf.to_smt()
-    )
+    if constraint:
+        expr = _eval(ast.parse(constraint, mode="eval").body)
+    else:
+        expr = UNINIT
+
+    if expr is UNINIT:
+        return pf.to_smt()
+    return pysmt.And(expr, pf.to_smt())
