@@ -89,7 +89,9 @@ class Variable(FormulaNode):
     def __hash__(self):
         return hash((self.name, self._size))
 
-    def __eq__(self, other: FormulaNode) -> bool:
+    def __eq__(self, other: FormulaNode | None) -> bool:
+        if other is None:
+            return NotImplemented
         if isinstance(other, Variable):
             return self.name == other.name and self._size == other._size
         raise TypeError(f"Cannot compare Variable with {type(other).__name__}")
@@ -229,7 +231,7 @@ class PureFormula(ReprMixin):
             header_field_vars if header_field_vars is not None else {}
         )
 
-        self._buf_vars = buf_vars if buf_vars is not None else {}
+        self._buf_vars = buf_vars if buf_vars is not None else {True: None, False: None}
         self._used_vars = (
             used_vars if used_vars is not None else self.root.used_vars(self)
         )
@@ -281,6 +283,16 @@ class PureFormula(ReprMixin):
         :return: set of Variable instances used in this formula
         """
         return self._used_vars
+
+    def deepcopy(self) -> PureFormula:
+        """
+        Create a deep copy of the PureFormula instance.
+        """
+        return PureFormula.clone(
+            self.root,
+            self.header_field_vars,
+            self.buf_vars,
+        )
 
     def get_header_field_var(self, name: str, left: bool) -> Variable | None:
         """
