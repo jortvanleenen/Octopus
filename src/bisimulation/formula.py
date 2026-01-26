@@ -49,7 +49,7 @@ class FormulaNode(ABC, ReprMixin):
 
     @abstractmethod
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         """
         Substitute variables in the formula with the given mapping.
@@ -79,7 +79,7 @@ class Variable(FormulaNode):
         return {self}
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return mapping.get(self, self)
 
@@ -111,7 +111,7 @@ class Not(FormulaNode):
         return self.subformula.used_vars(pf)
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return Not(self.subformula.substitute(pf, mapping))
 
@@ -131,7 +131,7 @@ class And(FormulaNode):
         return self.left.used_vars(pf) | self.right.used_vars(pf)
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return And(
             self.left.substitute(pf, mapping),
@@ -150,7 +150,7 @@ class TRUE(FormulaNode):
         return set()
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return TRUE()
 
@@ -173,7 +173,7 @@ class Equals(FormulaNode):
         return self.left.used_vars(pf) | self.right.used_vars(pf)
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return Equals(
             self.left.substitute(pf, mapping),
@@ -212,11 +212,12 @@ class FormulaManager(ReprMixin):
 
 class PureFormula(ReprMixin):
     def __init__(
-        self,
-        root: FormulaNode = TRUE(),
-        header_field_vars: dict[tuple[str, bool], Variable] = None,
-        buf_vars: dict[bool, Variable] = None,
-        used_vars: set[Variable] = None,
+            self,
+            root: FormulaNode = TRUE(),
+            header_field_vars: dict[tuple[str, bool], Variable] = None,
+            buf_vars: dict[bool, Variable] = None,
+            used_vars: set[Variable] = None,
+            stream_var: Variable = None,
     ):
         """
         Initialise a PureFormula instance.
@@ -225,6 +226,7 @@ class PureFormula(ReprMixin):
         :param header_field_vars: the header field variables used in this formula
         :param buf_vars: the buffer variables used in this formula
         :param used_vars: the set of variables used in this formula, defaults to those used by the root node
+        :param stream_var: the variable representing input stream slice
         """
         self.root = root
         self._header_field_vars = (
@@ -235,13 +237,15 @@ class PureFormula(ReprMixin):
         self._used_vars = (
             used_vars if used_vars is not None else self.root.used_vars(self)
         )
+        self.stream_var = stream_var if stream_var is not None else None
 
     @classmethod
     def clone(
-        cls,
-        root: FormulaNode,
-        header_field_vars: dict[tuple[str, bool], Variable],
-        buf_vars: dict[bool, Variable],
+            cls,
+            root: FormulaNode,
+            header_field_vars: dict[tuple[str, bool], Variable],
+            buf_vars: dict[bool, Variable],
+            stream_var: Variable,
     ):
         """
         Create a clone of the PureFormula with deep copies of its components.
@@ -249,12 +253,14 @@ class PureFormula(ReprMixin):
         :param root: the root formula node
         :param header_field_vars: the header field variables used in this formula
         :param buf_vars: the buffer variables used in this formula
+        :param stream_var: the variable representing input stream slice
         :return: PureFormula instance with deep copies of the components
         """
         return cls(
             copy.deepcopy(root),
             copy.deepcopy(header_field_vars),
             copy.deepcopy(buf_vars),
+            stream_var=stream_var,
         )
 
     @property
@@ -292,6 +298,7 @@ class PureFormula(ReprMixin):
             self.root,
             self.header_field_vars,
             self.buf_vars,
+            self.stream_var,
         )
 
     def get_header_field_var(self, name: str, left: bool) -> Variable | None:
@@ -364,13 +371,13 @@ class GuardedFormula:
     """A template-guarded formula for symbolic execution."""
 
     def __init__(
-        self,
-        state_left: str | None = None,
-        state_right: str | None = None,
-        buffer_length_left: int | None = None,
-        buffer_length_right: int | None = None,
-        pure_formula: PureFormula = PureFormula(),
-        prev_guarded_formula: GuardedFormula | None = None,
+            self,
+            state_left: str | None = None,
+            state_right: str | None = None,
+            buffer_length_left: int | None = None,
+            buffer_length_right: int | None = None,
+            pure_formula: PureFormula = PureFormula(),
+            prev_guarded_formula: GuardedFormula | None = None,
     ) -> None:
         """
         Initialise a GuardedFormula instance.
@@ -418,10 +425,10 @@ class GuardedFormula:
                 f"Cannot compare GuardedFormula with {type(other).__name__}"
             )
         return (
-            self.state_l == other.state_l
-            and self.state_r == other.state_r
-            and self.buf_len_l == other.buf_len_l
-            and self.buf_len_r == other.buf_len_r
+                self.state_l == other.state_l
+                and self.state_r == other.state_r
+                and self.buf_len_l == other.buf_len_l
+                and self.buf_len_r == other.buf_len_r
         )
 
     def __repr__(self):

@@ -61,40 +61,19 @@ def _get_trace(
     trace.reverse()
 
     lines = []
-    buf_vars_left = []
-    previous_buf_left = None
-    buf_vars_right = []
-    previous_buf_right = None
+    buffer_vars = []
     for step, g_form in enumerate(trace):
-        buf_var_left = g_form.pf.get_buffer_var(left=True)
-        if previous_buf_left != buf_var_left:
-            buf_vars_left.append(buf_var_left.to_smt(g_form.pf))
-        previous_buf_left = buf_var_left
-
-        buf_var_right = g_form.pf.get_buffer_var(left=False)
-        if previous_buf_right != buf_var_right:
-            buf_vars_right.append(buf_var_right.to_smt(g_form.pf))
-        previous_buf_right = buf_var_right
+        if g_form.pf.stream_var is not None:
+            buffer_vars.append(g_form.pf.stream_var)
 
         lines.append(f"Step {step} (left, right):")
         lines.append("  At start:")
         lines.append(f"  - State:   {g_form.state_l}, {g_form.state_r}")
         lines.append(f"  - Buffer:  {g_form.buf_len_l}, {g_form.buf_len_r}")
         lines.append("  After operation(s):")
-
         buf_l = len(g_form.pf.buf_vars[True] or "")
         buf_r = len(g_form.pf.buf_vars[False] or "")
         lines.append(f"  - Buffer:  {buf_l}, {buf_r}")
-
-        left_fields = [
-            name for name, left in g_form.pf.header_field_vars.keys() if left
-        ]
-        right_fields = [
-            name for name, left in g_form.pf.header_field_vars.keys() if not left
-        ]
-        lines.append("  - Store:")
-        lines.append(f"    - Left:  {left_fields}")
-        lines.append(f"    - Right: {right_fields}")
         lines.append("")
 
     solver.is_sat(
@@ -104,18 +83,15 @@ def _get_trace(
     )
     model = solver.get_model()
     if model is not None:
-        left_ex = ""
-        right_ex = ""
-        if len(buf_vars_left) > 0:
-            left_ex = bin(model.get_value(pysmt.And(*buf_vars_left)).constant_value())
-        if len(buf_vars_right) > 0:
-            right_ex = bin(model.get_value(pysmt.And(*buf_vars_right)).constant_value())
-        if len(left_ex) > len(right_ex):
-            counterexample = left_ex
+        if not buffer_vars:
+            counterexample = "N/A (divergence caused by initial store)"
         else:
-            counterexample = right_ex
-        if len(buf_vars_left) == 0 and len(buf_vars_right) == 0:
-            counterexample = "N/A (no buffer variables were used)"
+            buffer_vars_smt = [var.to_smt(guarded_form.pf) for var in buffer_vars]
+            stream = bin(
+                model.get_value(pysmt.BVConcat(*buffer_vars_smt)).constant_value()
+            )
+            length = sum(len(var) for var in buffer_vars)
+            counterexample = stream + '\n' + f"Length: {length} bits"
 
         lines.insert(
             0, f"A stream for which both parsers differ is:\n{counterexample}\n"
@@ -184,7 +160,8 @@ def symbolic_bisimulation(
     for parser in [parser1, parser2]:
         left = parser.is_left
         for field in parser.get_all_fields():
-            var = manager.fresh_variable(parser.get_header(field))
+            field_size = parser.get_header(field)
+            var = manager.fresh_variable(field_size)
             work_queue[0].pf.set_header_field_var(field, left, var)
     with solver_portfolio as s:
         while len(work_queue) > 0:
@@ -221,36 +198,30 @@ def symbolic_bisimulation(
                 knowledge.add(guarded_form)
                 continue
 
-            buf_len_l = guarded_form.buf_len_l
-            buf_len_r = guarded_form.buf_len_r
+            terminal_l = _is_terminal(state_l)
+            terminal_r = _is_terminal(state_r)
 
-            reject_l = state_l == "reject"
-            reject_r = state_r == "reject"
-
-            if not reject_l:
+            if not terminal_l:
+                buf_len_l = guarded_form.buf_len_l
                 op_block_l = parser1.states[state_l].operation_block
                 trans_block_l = parser1.states[state_l].transition_block
                 op_size_l = op_block_l.size
 
-            if not reject_r:
+            if not terminal_r:
+                buf_len_r = guarded_form.buf_len_r
                 op_block_r = parser2.states[state_r].operation_block
                 trans_block_r = parser2.states[state_r].transition_block
                 op_size_r = op_block_r.size
 
             if enable_leaps:
-                if not reject_l and not reject_r:
+                if not terminal_l and not terminal_r:
                     leap = min(op_size_l - buf_len_l, op_size_r - buf_len_r)
-                elif not reject_l:
+                elif not terminal_l:
                     leap = op_size_l - buf_len_l
-                elif not reject_r:
+                elif not terminal_r:
                     leap = op_size_r - buf_len_r
-                else:
-                    leap = 1
             else:
                 leap = 1
-
-            transition_l = not reject_l and (buf_len_l + leap == op_size_l)
-            transition_r = not reject_r and (buf_len_r + leap == op_size_r)
 
             new_bits_var = manager.fresh_variable(leap)
             new_pf = current_pf.deepcopy()
@@ -262,6 +233,12 @@ def symbolic_bisimulation(
                 :param parser: the parser program to use for the extension
                 :param left: whether to extend the left or right buffer
                 """
+                nonlocal terminal_l
+                if left and terminal_l:
+                    return
+                nonlocal terminal_r
+                if not left and terminal_r:
+                    return
                 nonlocal new_pf
                 old_buf = current_pf.get_buffer_var(left=left)
                 if old_buf is None:
@@ -280,6 +257,8 @@ def symbolic_bisimulation(
             extend_buffer(parser1, left=parser1.is_left)
             extend_buffer(parser2, left=parser2.is_left)
 
+            transition_l = not terminal_l and (buf_len_l + leap == op_size_l)
+            transition_r = not terminal_r and (buf_len_r + leap == op_size_r)
             logger.info(
                 f"Equivalence checking loop status\n"
                 f"Left - state: {state_l}, op. size: {op_size_l}, transitioning: {transition_l}\n"
@@ -296,12 +275,12 @@ def symbolic_bisimulation(
             left_trans = (
                 trans_block_l.symbolic_transition(new_pf)
                 if transition_l
-                else [(true_form, state_l)]
+                else [(true_form, "reject" if terminal_l else state_l)]
             )
             right_trans = (
                 trans_block_r.symbolic_transition(new_pf)
                 if transition_r
-                else [(true_form, state_r)]
+                else [(true_form, "reject" if terminal_r else state_r)]
             )
 
             for form_l, to_l in left_trans:
@@ -310,6 +289,7 @@ def symbolic_bisimulation(
                         And(new_pf.root, And(form_l, form_r)),
                         new_pf.header_field_vars,
                         new_pf.buf_vars,
+                        new_bits_var,
                     )
                     work_queue.append(
                         GuardedFormula(
