@@ -128,7 +128,7 @@ for col, kind in enumerate(["field", "header", "complex"]):
 
     for x, t, m, lbl in data[kind]:
         if kind == "complex":
-            if lbl != "4,3":
+            if lbl != "4,3" and lbl != "6,2":
                 ax_time.annotate(
                     lbl, (x, t),
                     textcoords="offset points",
