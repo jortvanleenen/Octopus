@@ -41,7 +41,7 @@ class Component(ABC):
 
     @abstractmethod
     def strongest_postcondition(
-        self, manager: FormulaManager, pf: PureFormula
+            self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
         """
         Generate the strongest postcondition for this component.
@@ -66,7 +66,7 @@ class Assignment(Component):
         self.right = parse_expression(self._program, component["right"], len(self.left))
 
     def strongest_postcondition(
-        self, manager: FormulaManager, pf: PureFormula
+            self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
         left = self._program.is_left
         logger.debug(
@@ -125,10 +125,21 @@ class Extract(Component):
         header_name = call["arguments"]["vec"][0]["expression"]["member"]
         self.header_reference = self.program.output_name + "." + header_name
         self.header_content: dict = self.program.get_header(self.header_reference)
-        self.size = sum(self.header_content.values())
+
+        sizes = []
+        for val in self.header_content.values():
+            if isinstance(val, int):
+                sizes.append(val)
+            else:
+                try:
+                    sizes.append(self.program.typedefs[val])
+                except KeyError:
+                    raise KeyError(f"Missing typedef: '{val}'") from None
+
+        self.size = sum(sizes)
 
     def strongest_postcondition(
-        self, manager: FormulaManager, pf: PureFormula
+            self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
         left = self.program.is_left
         buffer_var = pf.get_buffer_var(left)
@@ -149,6 +160,8 @@ class Extract(Component):
             pf.set_buffer_var(left, new_buffer)
 
         for field, field_size in self.header_content.items():
+            if isinstance(field_size, str):
+                field_size = self.program.typedefs[field_size]
             variable = manager.fresh_variable(field_size)
 
             store_name = self.header_reference + "." + field

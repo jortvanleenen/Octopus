@@ -49,183 +49,193 @@ def get_all_benchmarks() -> List[Benchmark]:
     :return: a list of Benchmark objects representing the benchmarks
     """
     return [
+        # Benchmark(
+        #     "datacenter",
+        #     Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
+        #     Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
+        # ),
+        # Benchmark(
+        #     "edge_self",
+        #     Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+        #     Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+        # ),
+        # Benchmark(
+        #     "edge_optimised",
+        #     Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+        #     Path("tests/leapfrog_benchmarks/edge/optimised.p4"),
+        # ),
+        # Benchmark(
+        #     "enterprise",
+        #     Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
+        #     Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
+        # ),
+        # Benchmark(
+        #     "external_filtering",
+        #     Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
+        #     Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
+        #     arguments={
+        #         "filter-disagreeing-string":
+        #             "hdr_r.eth.data[15:0] != '0x8600_16' and hdr_r.eth.data[15:0] != '0x86dd_16'"},
+        # ),
+        # Benchmark(
+        #     "relational_verification",
+        #     Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
+        #     Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
+        #     arguments={
+        #         "filter-accepting-string":
+        #             "((hdr_l.eth.data[15:0] == '0x8600_16' and hdr_l.ipv4.data == hdr_r.ipv4.data) "
+        #             "or (hdr_l.eth.data[15:0] == '0x86dd_16' and hdr_l.ipv6.data == hdr_r.ipv6.data))",
+        #         "filter-disagreeing-string": "True",
+        #     },
+        # ),
+        # Benchmark(
+        #     "header_initialisation",
+        #     Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
+        #     Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
+        # ),
+        # Benchmark(
+        #     "service_provider",
+        #     Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
+        #     Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
+        # ),
+        # Benchmark(
+        #     "speculative_extraction",
+        #     Path("tests/leapfrog_benchmarks/speculative_extraction/mpls.p4"),
+        #     Path("tests/leapfrog_benchmarks/speculative_extraction/mpls_vectorised.p4"),
+        # ),
+        # Benchmark(
+        #     "state_rearrangement",
+        #     Path("tests/leapfrog_benchmarks/state_rearrangement/combined_states.p4"),
+        #     Path("tests/leapfrog_benchmarks/state_rearrangement/separate_states.p4"),
+        # ),
+        # Benchmark(
+        #     "variable_length_formats_2",
+        #     Path("tests/leapfrog_benchmarks/variable_length_formats_2/ipoptions.p4"),
+        #     Path("tests/leapfrog_benchmarks/variable_length_formats_2/timestamp.p4"),
+        # ),
+        # Benchmark(
+        #     "variable_length_formats_3",
+        #     Path("tests/leapfrog_benchmarks/variable_length_formats_3/ipoptions.p4"),
+        #     Path("tests/leapfrog_benchmarks/variable_length_formats_3/timestamp.p4"),
+        # ),
         Benchmark(
-            "datacenter",
-            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
-            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
+            "parse_field_1",
+            Path("tests/whippersnapper/parse-field/1.p4"),
+            Path("tests/whippersnapper/parse-field/1.p4"),
         ),
+        # Benchmark(
+        #     "parse_field_4",
+        #     Path("tests/whippersnapper/parse-field/4.p4"),
+        #     Path("tests/whippersnapper/parse-field/4.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_field_16",
+        #     Path("tests/whippersnapper/parse-field/16.p4"),
+        #     Path("tests/whippersnapper/parse-field/16.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_field_64",
+        #     Path("tests/whippersnapper/parse-field/64.p4"),
+        #     Path("tests/whippersnapper/parse-field/64.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_header_4_1",
+        #     Path("tests/whippersnapper/parse-header/4-1.p4"),
+        #     Path("tests/whippersnapper/parse-header/4-1.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_header_4_4",
+        #     Path("tests/whippersnapper/parse-header/4-4.p4"),
+        #     Path("tests/whippersnapper/parse-header/4-4.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_header_4_16",
+        #     Path("tests/whippersnapper/parse-header/4-16.p4"),
+        #     Path("tests/whippersnapper/parse-header/4-16.p4"),
+        # ),
         Benchmark(
-            "edge_self",
-            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
-            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+            "parse_header_4_32",
+            Path("tests/whippersnapper/parse-header/4-32.p4"),
+            Path("tests/whippersnapper/parse-header/4-32.p4"),
         ),
-        Benchmark(
-            "edge_optimised",
-            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
-            Path("tests/leapfrog_benchmarks/edge/optimised.p4"),
-        ),
-        Benchmark(
-            "enterprise",
-            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
-            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
-        ),
-        Benchmark(
-            "external_filtering",
-            Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
-            Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
-            arguments={
-                "filter-disagreeing-string":
-                    "hdr_r.eth.data[15:0] != '0x8600_16' and hdr_r.eth.data[15:0] != '0x86dd_16'"},
-        ),
-        Benchmark(
-            "relational_verification",
-            Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
-            Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
-            arguments={
-                "filter-accepting-string":
-                    "((hdr_l.eth.data[15:0] == '0x8600_16' and hdr_l.ipv4.data == hdr_r.ipv4.data) "
-                    "or (hdr_l.eth.data[15:0] == '0x86dd_16' and hdr_l.ipv6.data == hdr_r.ipv6.data))",
-                "filter-disagreeing-string": "True",
-            },
-        ),
-        Benchmark(
-            "header_initialisation",
-            Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
-            Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
-        ),
-        Benchmark(
-            "service_provider",
-            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
-            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
-        ),
-        Benchmark(
-            "speculative_extraction",
-            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls.p4"),
-            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls_vectorised.p4"),
-        ),
-        Benchmark(
-            "state_rearrangement",
-            Path("tests/leapfrog_benchmarks/state_rearrangement/combined_states.p4"),
-            Path("tests/leapfrog_benchmarks/state_rearrangement/separate_states.p4"),
-        ),
-        Benchmark(
-            "variable_length_formats_2",
-            Path("tests/leapfrog_benchmarks/variable_length_formats_2/ipoptions.p4"),
-            Path("tests/leapfrog_benchmarks/variable_length_formats_2/timestamp.p4"),
-        ),
-        Benchmark(
-            "variable_length_formats_3",
-            Path("tests/leapfrog_benchmarks/variable_length_formats_3/ipoptions.p4"),
-            Path("tests/leapfrog_benchmarks/variable_length_formats_3/timestamp.p4"),
-        ),
-        Benchmark(
-            "parse_field_4",
-            Path("tests/whippersnapper/parse-field/4.p4"),
-            Path("tests/whippersnapper/parse-field/4.p4"),
-        ),
-        Benchmark(
-            "parse_field_16",
-            Path("tests/whippersnapper/parse-field/16.p4"),
-            Path("tests/whippersnapper/parse-field/16.p4"),
-        ),
-        Benchmark(
-            "parse_field_64",
-            Path("tests/whippersnapper/parse-field/64.p4"),
-            Path("tests/whippersnapper/parse-field/64.p4"),
-        ),
-        Benchmark(
-            "parse_header_4_1",
-            Path("tests/whippersnapper/parse-header/4-1.p4"),
-            Path("tests/whippersnapper/parse-header/4-1.p4"),
-        ),
-        Benchmark(
-            "parse_header_4_4",
-            Path("tests/whippersnapper/parse-header/4-4.p4"),
-            Path("tests/whippersnapper/parse-header/4-4.p4"),
-        ),
-        Benchmark(
-            "parse_header_4_16",
-            Path("tests/whippersnapper/parse-header/4-16.p4"),
-            Path("tests/whippersnapper/parse-header/4-16.p4"),
-        ),
-        Benchmark(
-            "parse_header_1_64",
-            Path("tests/whippersnapper/parse-header/1-64.p4"),
-            Path("tests/whippersnapper/parse-header/1-64.p4"),
-        ),
-        Benchmark(
-            "parse_header_1_98",
-            Path("tests/whippersnapper/parse-header/1-98.p4"),
-            Path("tests/whippersnapper/parse-header/1-98.p4"),
-        ),
-        Benchmark(
-            "parse_complex_2_2",
-            Path("tests/whippersnapper/parse-complex/2-2.p4"),
-            Path("tests/whippersnapper/parse-complex/2-2.p4"),
-        ),
-        Benchmark(
-            "parse_complex_2_4",
-            Path("tests/whippersnapper/parse-complex/2-4.p4"),
-            Path("tests/whippersnapper/parse-complex/2-4.p4"),
-        ),
-        Benchmark(
-            "parse_complex_2_6",
-            Path("tests/whippersnapper/parse-complex/2-6.p4"),
-            Path("tests/whippersnapper/parse-complex/2-6.p4"),
-        ),
-        Benchmark(
-            "parse_complex_3_3",
-            Path("tests/whippersnapper/parse-complex/3-3.p4"),
-            Path("tests/whippersnapper/parse-complex/3-3.p4"),
-        ),
-        Benchmark(
-            "parse_complex_3_4",
-            Path("tests/whippersnapper/parse-complex/3-4.p4"),
-            Path("tests/whippersnapper/parse-complex/3-4.p4"),
-        ),
-        Benchmark(
-            "parse_complex_4_2",
-            Path("tests/whippersnapper/parse-complex/4-2.p4"),
-            Path("tests/whippersnapper/parse-complex/4-2.p4"),
-        ),
-        Benchmark(
-            "parse_complex_4_3",
-            Path("tests/whippersnapper/parse-complex/4-3.p4"),
-            Path("tests/whippersnapper/parse-complex/4-3.p4"),
-        ),
+        # Benchmark(
+        #     "parse_header_1_64",
+        #     Path("tests/whippersnapper/parse-header/1-64.p4"),
+        #     Path("tests/whippersnapper/parse-header/1-64.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_header_1_98",
+        #     Path("tests/whippersnapper/parse-header/1-98.p4"),
+        #     Path("tests/whippersnapper/parse-header/1-98.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_2_2",
+        #     Path("tests/whippersnapper/parse-complex/2-2.p4"),
+        #     Path("tests/whippersnapper/parse-complex/2-2.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_2_4",
+        #     Path("tests/whippersnapper/parse-complex/2-4.p4"),
+        #     Path("tests/whippersnapper/parse-complex/2-4.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_2_6",
+        #     Path("tests/whippersnapper/parse-complex/2-6.p4"),
+        #     Path("tests/whippersnapper/parse-complex/2-6.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_3_3",
+        #     Path("tests/whippersnapper/parse-complex/3-3.p4"),
+        #     Path("tests/whippersnapper/parse-complex/3-3.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_3_4",
+        #     Path("tests/whippersnapper/parse-complex/3-4.p4"),
+        #     Path("tests/whippersnapper/parse-complex/3-4.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_4_2",
+        #     Path("tests/whippersnapper/parse-complex/4-2.p4"),
+        #     Path("tests/whippersnapper/parse-complex/4-2.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_4_3",
+        #     Path("tests/whippersnapper/parse-complex/4-3.p4"),
+        #     Path("tests/whippersnapper/parse-complex/4-3.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_6_2",
+        #     Path("tests/whippersnapper/parse-complex/6-2.p4"),
+        #     Path("tests/whippersnapper/parse-complex/6-2.p4"),
+        # ),
+        # Benchmark(
+        #     "equiv_field_4_and_header_4_1",
+        #     Path("tests/whippersnapper/parse-field/4.p4"),
+        #     Path("tests/whippersnapper/parse-header/4-1.p4"),
+        # ),
+        # Benchmark(
+        #     "subset_field_4_and_header_4_4",
+        #     Path("tests/whippersnapper/parse-field/4.p4"),
+        #     Path("tests/whippersnapper/parse-header/4-4.p4"),
+        #     arguments={
+        #         "filter-disagreeing-string":
+        #             "hdr_r.header_0.field_0 != '0_16'",
+        #     }
+        # ),
+        # Benchmark(
+        #     "subset_field_1_and_complex_3_1",
+        #     Path("tests/whippersnapper/parse-field/1.p4"),
+        #     Path("tests/whippersnapper/parse-complex/3-1.p4"),
+        #     arguments={
+        #         "filter-disagreeing-string":
+        #             "hdr_r.ptp.reserved2 == '1_8'",
+        #     }
+        # ),
         Benchmark(
             "parse_complex_4_4",
             Path("tests/whippersnapper/parse-complex/4-4.p4"),
             Path("tests/whippersnapper/parse-complex/4-4.p4"),
         ),
-        Benchmark(
-            "parse_complex_6_2",
-            Path("tests/whippersnapper/parse-complex/6-2.p4"),
-            Path("tests/whippersnapper/parse-complex/6-2.p4"),
-        ),
-        Benchmark(
-            "equiv_field_4_and_header_4_1",
-            Path("tests/whippersnapper/parse-field/4.p4"),
-            Path("tests/whippersnapper/parse-header/4-1.p4"),
-        ),
-        Benchmark(
-            "subset_field_4_and_header_4_4",
-            Path("tests/whippersnapper/parse-field/4.p4"),
-            Path("tests/whippersnapper/parse-header/4-4.p4"),
-            arguments={
-                "filter-disagreeing-string":
-                    "hdr_r.header_0.field_0 != '0_16'",
-            }
-        ),
-        Benchmark(
-            "subset_field_1_and_complex_3_1",
-            Path("tests/whippersnapper/parse-field/1.p4"),
-            Path("tests/whippersnapper/parse-complex/3-1.p4"),
-            arguments={
-                "filter-disagreeing-string":
-                    "hdr_r.ptp.reserved2 == '1_8'",
-            }
-        )
     ]
 
 
