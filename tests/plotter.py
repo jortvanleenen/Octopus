@@ -100,31 +100,13 @@ for col, kind in enumerate(["field", "header", "complex"]):
     ax_mem.set_zorder(1)
     ax_time.patch.set_visible(False)
 
-    xfit = np.linspace(xs.min(), xs.max(), 300)
+    # Time: solid line + circles
+    ax_time.plot(xs, ts, linestyle='-', linewidth=2, color=TIME_COLOUR, zorder=3)
+    ax_time.scatter(xs, ts, marker='o', color=TIME_COLOUR, zorder=4, s=100)
 
-    # ---- Time fit ----
-    if kind == "field":
-        tfit = np.poly1d(np.polyfit(xs, ts, 1))(xfit)
-    elif kind == "header":
-        tfit = np.poly1d(np.polyfit(xs, ts, 2))(xfit)
-    else:  # complex
-        tfit = np.poly1d(np.polyfit(xs, ts, 3))(xfit)
-
-    # ---- Memory fit ----
-    if kind == "field":
-        mfit = np.poly1d(np.polyfit(xs, ms, 1))(xfit)
-    elif kind == "header":
-        mfit = np.poly1d(np.polyfit(xs, ms, 2))(xfit)
-    else:  # complex
-        mfit = np.poly1d(np.polyfit(xs, ms, 3))(xfit)
-
-    # Time: solid + circles
-    ax_time.scatter(xs, ts, marker="o", color=TIME_COLOUR, zorder=4, s=100)
-    ax_time.plot(xfit, tfit, linestyle="-", linewidth=2, color=TIME_COLOUR)
-
-    # Memory: dashed + squares
-    ax_mem.scatter(xs, ms, marker="s", color=MEM_COLOUR, zorder=4, s=100)
-    ax_mem.plot(xfit, mfit, linestyle="--", linewidth=2, color=MEM_COLOUR)
+    # Memory: dashed line + squares
+    ax_mem.plot(xs, ms, linestyle='--', linewidth=2, color=MEM_COLOUR, zorder=3)
+    ax_mem.scatter(xs, ms, marker='s', color=MEM_COLOUR, zorder=4, s=100)
 
     ax_time.set_title(titles[kind], fontweight="bold")
     ax_time.set_xlabel(x_axes[kind], fontweight="bold")
