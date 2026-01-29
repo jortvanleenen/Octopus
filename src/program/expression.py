@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import pysmt.shortcuts as pysmt
 from pysmt.shortcuts import BV, TRUE, BVConcat, BVExtract
 
-from bisimulation.symbolic.formula import (
+from bisimulation.formula import (
     FormulaNode,
     PureFormula,
     Variable,
@@ -28,16 +28,6 @@ logger = logging.getLogger(__name__)
 
 class Expression(FormulaNode):
     """An abstract base class representing an expression in a P4 parser state."""
-
-    @abstractmethod
-    def eval(self, store: dict[str, str]) -> str:
-        """
-        Evaluate the expression using the provided store.
-
-        :param store: the current store
-        :return: the evaluated value of the expression
-        """
-        pass
 
     def to_formula(self, pf) -> None:
         """
@@ -99,9 +89,6 @@ class Concatenate(BinaryExpression):
         self.left = parse_expression(self._program, obj["left"])
         self.right = parse_expression(self._program, obj["right"])
 
-    def eval(self, store: dict[str, str]) -> str:
-        return self.left.eval(store) + self.right.eval(store)
-
     def to_smt(self, pf: PureFormula):
         return BVConcat(self.left.to_smt(pf), self.right.to_smt(pf))
 
@@ -137,13 +124,6 @@ class Slice(Expression):
         self.reference = Reference(self._program, obj["e0"])
         self.msb = obj["e1"]["value"]
         self.lsb = obj["e2"]["value"]
-
-    def eval(self, store: dict[str, str]) -> str:
-        value = self.reference.eval(store)
-        length = len(self.reference)
-        start = length - self.msb - 1
-        end = length - self.lsb
-        return value[start:end]
 
     def to_smt(self, pf: PureFormula) -> Any:
         return BVExtract(
@@ -188,9 +168,6 @@ class Constant(Expression):
         if self._size is not None:
             self.value = self.value.zfill(self._size)
 
-    def eval(self, store: dict[str, str]) -> str:
-        return self.value
-
     def to_smt(self, pf: PureFormula) -> Any:
         if self._size is None:
             logger.warning("No size for constant of value %s", self.numeric_value)
@@ -222,9 +199,6 @@ class Constant(Expression):
 class DontCare(Expression):
     def __init__(self) -> None:
         pass
-
-    def eval(self, store: dict[str, str]) -> DontCare:
-        return self
 
     def to_smt(self, pf: PureFormula) -> Any:
         return TRUE()
@@ -284,13 +258,6 @@ class Reference(Expression):
 
         self._size = self._program.get_header(self._reference)
 
-    def eval(self, store: dict[str, str]) -> str:
-        if self._reference in store:
-            return store[self._reference]
-        else:
-            logger.warning(f"Reference '{self._reference}' not found in store.")
-            return ""
-
     def to_formula(self, pf):
         self.variable = pf.get_header_field_var(self._reference, self._program.is_left)
 
@@ -344,11 +311,6 @@ class BVAnd(BinaryExpression):
         self.left = parse_expression(self._program, obj["left"])
         self.right = parse_expression(self._program, obj["right"], len(self.left))
 
-    def eval(self, store: dict[str, str]) -> str:
-        left_value: str = self.left.eval(store)
-        right_value: str = self.right.eval(store)
-        return bin(int(left_value, 2) & int(right_value, 2))[2:]
-
     def to_smt(self, pf: PureFormula) -> Any:
         return pysmt.BVAnd(self.left.to_smt(pf), self.right.to_smt(pf))
 
@@ -395,11 +357,6 @@ class BVLShr(BinaryExpression):
         """
         self.left = parse_expression(self._program, obj["left"])
         self.right = parse_expression(self._program, obj["right"], len(self.left))
-
-    def eval(self, store: dict[str, str]) -> str:
-        left_value: int = int(self.left.eval(store), 2)
-        right_value: int = int(self.right.eval(store), 2)
-        return bin(left_value >> right_value)[2:]
 
     def to_smt(self, pf: PureFormula) -> Any:
         return pysmt.BVLShr(self.left.to_smt(pf), self.right.to_smt(pf))

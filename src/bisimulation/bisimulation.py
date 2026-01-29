@@ -6,11 +6,12 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import logging
+from typing import Any
 
 import pysmt.shortcuts as pysmt
 
-from automata.dfa import DFA
-from bisimulation.symbolic.formula import (
+from bisimulation.constraint import constraint_to_smt
+from bisimulation.formula import (
     TRUE,
     And,
     Equals,
@@ -24,55 +25,31 @@ from program.parser_program import ParserProgram
 logger = logging.getLogger(__name__)
 
 
-def naive_bisimulation(
-    parser1: ParserProgram, parser2: ParserProgram
-) -> tuple[bool, set[tuple[DFA.Configuration, DFA.Configuration]]]:
+def _get_relevant_formulas(
+        knowledge: set[GuardedFormula], guarded_form: GuardedFormula
+) -> set[PureFormula]:
     """
-    Check whether two P4 packet parsers are bisimilar.
+    Get relevant pure formulas from knowledge for the given guarded formula.
 
-    This algorithm checks for bisimilarity by representing the two parsers as
-    DFAs. This approach is considered naive due to the accompanying state
-    explosion, as no symbolic representation is used. Additionally, no
-    optimisations, such as leaps, are performed.
-
-    The bisimulation is performed in a forward manner.
-
-    :param parser1: the first P4 parser program
-    :param parser2: the second P4 parser program
-    :return: a boolean indicating bisimilarity, and seen configurations or a counterexample
+    :param knowledge: a set of previously seen guarded formulas
+    :param guarded_form: the guarded formula to check against
+    :return: a set of relevant pure formulas
     """
-
-    dfa1 = DFA(parser1)
-    dfa2 = DFA(parser2)
-    config1 = DFA.initial_config()
-    config2 = DFA.initial_config()
-
-    seen = set()
-    work_queue = [(config1, config2)]
-    while len(work_queue) > 0:
-        config1, config2 = work_queue.pop(0)
-
-        if (config1, config2) in seen:
-            continue
-
-        if config1.is_accepting() == config2.is_accepting():
-            seen.add((config1, config2))
-            for bit in ["0", "1"]:
-                next_config1 = dfa1.step(config1, bit)
-                next_config2 = dfa2.step(config2, bit)
-                work_queue.append((next_config1, next_config2))
-        else:
-            return False, {
-                (config1, config2),
-            }
-
-    return True, seen
+    relevant_pfs = set()
+    for seen_guarded_form in knowledge:
+        if guarded_form.has_equal_guard(seen_guarded_form):
+            relevant_pfs.add(seen_guarded_form.pf)
+    return relevant_pfs
 
 
-def get_trace(guarded_form: GuardedFormula) -> str:
+def _get_trace(
+        solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
+) -> str:
     """
     Generate a trace of the guarded formula.
 
+    :param solver: a solver (portfolio) instance to obtain a model from
+    :param relevant_pfs: a set of relevant, previously seen pure formulas
     :param guarded_form: the guarded formula to generate a trace for
     :return: a string representation of the trace
     """
@@ -84,19 +61,49 @@ def get_trace(guarded_form: GuardedFormula) -> str:
     trace.reverse()
 
     lines = []
-    for step, g in enumerate(trace):
-        lines.append(f"Step {step}:")
-        lines.append(f"  Left state: {g.state_l}, Right state: {g.state_r}")
-        lines.append(f"  Buffer lengths: left={g.buf_len_l}, right={g.buf_len_r}")
-        lines.append(f"  Header fields: {g.pf.header_field_vars}")
-        lines.append(f"  Buffer vars: {g.pf.buf_vars}")
-        lines.append(f"  Formula root: {g.pf.root}")
+    buffer_vars = []
+    for step, g_form in enumerate(trace):
+        if g_form.pf.stream_var is not None:
+            buffer_vars.append(g_form.pf.stream_var)
+
+        lines.append(f"Step {step} (left, right):")
+        lines.append("  At start:")
+        lines.append(f"  - State:   {g_form.state_l}, {g_form.state_r}")
+        lines.append(f"  - Buffer:  {g_form.buf_len_l}, {g_form.buf_len_r}")
+        lines.append("  After operation(s):")
+        buf_l = len(g_form.pf.buf_vars[True] or "")
+        buf_r = len(g_form.pf.buf_vars[False] or "")
+        lines.append(f"  - Buffer:  {buf_l}, {buf_r}")
         lines.append("")
+
+    solver.is_sat(
+        pysmt.Or(
+            guarded_form.pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
+        )
+    )
+    model = solver.get_model()
+    if model is not None:
+        buffer_vars_smt = [var.to_smt(guarded_form.pf) for var in buffer_vars]
+
+        if len(buffer_vars_smt) == 0:
+            counterexample = "N/A (no buffered input)"
+        elif len(buffer_vars_smt) == 1:
+            val = model.get_value(buffer_vars_smt[0]).constant_value()
+            length = len(buffer_vars[0]) if buffer_vars else 0
+            counterexample = bin(val) + '\n' + f"Length: {length} bits"
+        else:
+            val = model.get_value(pysmt.BVConcat(*buffer_vars_smt)).constant_value()
+            length = sum(len(var) for var in buffer_vars)
+            counterexample = bin(val) + '\n' + f"Length: {length} bits"
+
+        lines.insert(
+            0, f"A stream for which both parsers differ is:\n{counterexample}\n"
+        )
 
     return "\n".join(lines)
 
 
-def is_terminal(state_name: str) -> bool:
+def _is_terminal(state_name: str) -> bool:
     """
     Check if a state is terminal.
 
@@ -106,22 +113,18 @@ def is_terminal(state_name: str) -> bool:
     return state_name in ["accept", "reject"]
 
 
-def has_new_information(
-    knowledge: set[GuardedFormula], guarded_form: GuardedFormula, s: pysmt.Solver
+def _has_new_information(
+        solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
 ) -> bool:
     """
     Check if the guarded formula contains new information.
 
-    :param knowledge: a set of previously seen guarded formulas
+    :param solver: a solver instance to check satisfiability
+    :param relevant_pfs: a set of relevant, previously seen pure formulas
     :param guarded_form: the guarded formula to check
-    :param s: a solver instance to check satisfiability
     :return: True if the guarded formula contains new information, False otherwise
     """
-    relevant_pfs = set()
-    for seen_guarded_form in knowledge:
-        if guarded_form.has_equal_guard(seen_guarded_form):
-            relevant_pfs.add(seen_guarded_form.pf)
-    return not s.is_valid(
+    return not solver.is_valid(
         pysmt.Implies(
             guarded_form.pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
         )
@@ -129,36 +132,47 @@ def has_new_information(
 
 
 def symbolic_bisimulation(
-    parser1: ParserProgram,
-    parser2: ParserProgram,
-    enable_leaps: bool,
-    solver_portfolio: pysmt.Portfolio,
+        parser1: ParserProgram,
+        parser2: ParserProgram,
+        solver_portfolio: Any,
+        filter_accepting: Any = None,
+        filter_disagreeing: Any = None,
+        enable_leaps: bool = True,
 ) -> tuple[bool, str]:
     """
     Check whether two P4 packet parsers are bisimilar using symbolic execution.
 
     This algorithm checks for bisimilarity by representing the two parsers as
-    modifiers of symbolic formulas. This approach is considered more efficient
-    than the naive bisimulation, as it uses symbolic representations to explore
-    the state space of the parsers. This implementation also allows for
+    modifiers of symbolic formulas. This approach is more efficient than the
+    naive bisimulation, as it uses symbolic representations to explore the
+    state space of the parsers. This implementation also allows for
     optimisations, such as leaps, to be performed.
 
     :param parser1: the first P4 parser program
     :param parser2: the second P4 parser program
-    :param enable_leaps: whether to enable leaps in the bisimulation
     :param solver_portfolio: the solver portfolio to use for symbolic execution
+    :param filter_accepting: an optional filter for accepting pairs
+    :param filter_disagreeing: an optional filter for disagreeing pairs
+    :param enable_leaps: whether to enable leaps in the bisimulation
     :return: a boolean indicating bisimilarity, and seen formulas or a counterexample
     """
 
     knowledge: set[GuardedFormula] = set()
     manager = FormulaManager()
     work_queue = [GuardedFormula.initial_guard()]
+    for parser in [parser1, parser2]:
+        left = parser.is_left
+        for field in parser.get_all_fields():
+            field_size = parser.get_header(field)
+            var = manager.fresh_variable(field_size)
+            work_queue[0].pf.set_header_field_var(field, left, var)
     with solver_portfolio as s:
         while len(work_queue) > 0:
             guarded_form = work_queue.pop(0)
             current_pf = guarded_form.pf
+            relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
 
-            if not has_new_information(knowledge, guarded_form, s):
+            if not _has_new_information(s, relevant_pfs, guarded_form):
                 logger.debug(
                     f"Considered guarded formula information known: {guarded_form}"
                 )
@@ -167,46 +181,53 @@ def symbolic_bisimulation(
             state_l = guarded_form.state_l
             state_r = guarded_form.state_r
             if (state_l == "accept") != (state_r == "accept"):
-                return False, get_trace(guarded_form)
+                if filter_disagreeing is None:
+                    return False, _get_trace(s, relevant_pfs, guarded_form)
 
-            if is_terminal(state_l) and is_terminal(state_r):
+                constraint_smt = constraint_to_smt(filter_disagreeing, current_pf)
+                if not s.is_sat(constraint_smt):
+                    return False, _get_trace(s, relevant_pfs, guarded_form)
+                else:
+                    knowledge.add(guarded_form)
+                    continue
+
+            if state_l == "accept" and state_r == "accept" and filter_accepting is not None:
+                relation_smt = constraint_to_smt(filter_accepting, current_pf)
+                if not s.is_sat(relation_smt):
+                    return False, _get_trace(s, relevant_pfs, guarded_form)
+
+            if _is_terminal(state_l) and _is_terminal(state_r):
                 logger.debug("Both states are terminal, skipping further processing")
                 knowledge.add(guarded_form)
                 continue
 
-            buf_len_l = guarded_form.buf_len_l
-            buf_len_r = guarded_form.buf_len_r
+            terminal_l = _is_terminal(state_l)
+            terminal_r = _is_terminal(state_r)
 
-            reject_l = state_l == "reject"
-            reject_r = state_r == "reject"
-
-            if not reject_l:
+            if not terminal_l:
+                buf_len_l = guarded_form.buf_len_l
                 op_block_l = parser1.states[state_l].operation_block
                 trans_block_l = parser1.states[state_l].transition_block
                 op_size_l = op_block_l.size
 
-            if not reject_r:
+            if not terminal_r:
+                buf_len_r = guarded_form.buf_len_r
                 op_block_r = parser2.states[state_r].operation_block
                 trans_block_r = parser2.states[state_r].transition_block
                 op_size_r = op_block_r.size
 
             if enable_leaps:
-                if not reject_l and not reject_r:
+                if not terminal_l and not terminal_r:
                     leap = min(op_size_l - buf_len_l, op_size_r - buf_len_r)
-                elif not reject_l:
+                elif not terminal_l:
                     leap = op_size_l - buf_len_l
-                elif not reject_r:
+                elif not terminal_r:
                     leap = op_size_r - buf_len_r
-                else:
-                    leap = 1
             else:
                 leap = 1
 
-            transition_l = not reject_l and (buf_len_l + leap == op_size_l)
-            transition_r = not reject_r and (buf_len_r + leap == op_size_r)
-
             new_bits_var = manager.fresh_variable(leap)
-            new_root = current_pf.root
+            new_pf = current_pf.deepcopy()
 
             def extend_buffer(parser: ParserProgram, *, left: bool) -> None:
                 """
@@ -215,15 +236,21 @@ def symbolic_bisimulation(
                 :param parser: the parser program to use for the extension
                 :param left: whether to extend the left or right buffer
                 """
-                nonlocal new_root
+                nonlocal terminal_l
+                if left and terminal_l:
+                    return
+                nonlocal terminal_r
+                if not left and terminal_r:
+                    return
+                nonlocal new_pf
                 old_buf = current_pf.get_buffer_var(left=left)
                 if old_buf is None:
-                    current_pf.set_buffer_var(left=left, var=new_bits_var)
+                    new_pf.set_buffer_var(left=left, var=new_bits_var)
                 else:
                     new_buf = manager.fresh_variable(len(old_buf) + leap)
-                    current_pf.set_buffer_var(left=left, var=new_buf)
-                    new_root = And(
-                        new_root,
+                    new_pf.set_buffer_var(left=left, var=new_buf)
+                    new_pf.root = And(
+                        new_pf.root,
                         Equals(
                             new_buf,
                             Concatenate(parser, left=old_buf, right=new_bits_var),
@@ -233,55 +260,50 @@ def symbolic_bisimulation(
             extend_buffer(parser1, left=parser1.is_left)
             extend_buffer(parser2, left=parser2.is_left)
 
-            pf = PureFormula(
-                new_root, current_pf.header_field_vars, current_pf.buf_vars
-            )
-
+            transition_l = not terminal_l and (buf_len_l + leap == op_size_l)
+            transition_r = not terminal_r and (buf_len_r + leap == op_size_r)
             logger.info(
                 f"Equivalence checking loop status\n"
                 f"Left - state: {state_l}, op. size: {op_size_l}, transitioning: {transition_l}\n"
                 f"Right - state: {state_r}, op. size: {op_size_r}, transitioning: {transition_r}\n"
             )
-            logger.debug(f"Buffers: {pf.buf_vars}")
+            logger.debug(f"Buffers: {new_pf.buf_vars}")
 
             if transition_l:
-                pf = op_block_l.strongest_postcondition(manager, pf)
+                new_pf = op_block_l.strongest_postcondition(manager, new_pf)
             if transition_r:
-                pf = op_block_r.strongest_postcondition(manager, pf)
+                new_pf = op_block_r.strongest_postcondition(manager, new_pf)
 
             true_form = TRUE()
             left_trans = (
-                trans_block_l.symbolic_transition(pf)
+                trans_block_l.symbolic_transition(new_pf)
                 if transition_l
-                else [(true_form, state_l)]
+                else [(true_form, "reject" if terminal_l else state_l)]
             )
             right_trans = (
-                trans_block_r.symbolic_transition(pf)
+                trans_block_r.symbolic_transition(new_pf)
                 if transition_r
-                else [(true_form, state_r)]
+                else [(true_form, "reject" if terminal_r else state_r)]
             )
 
             for form_l, to_l in left_trans:
                 for form_r, to_r in right_trans:
-                    pf_new = PureFormula.clone(
-                        And(pf.root, And(form_l, form_r)),
-                        pf.header_field_vars,
-                        pf.buf_vars,
+                    copy_pf = PureFormula.clone(
+                        And(new_pf.root, And(form_l, form_r)),
+                        new_pf.header_field_vars,
+                        new_pf.buf_vars,
+                        new_bits_var,
                     )
-                    if s.is_sat(pf_new.to_smt()):
-                        work_queue.append(
-                            GuardedFormula(
-                                to_l,
-                                to_r,
-                                0 if transition_l else buf_len_l + leap,
-                                0 if transition_r else buf_len_r + leap,
-                                pf_new,
-                                guarded_form,
-                            )
+                    work_queue.append(
+                        GuardedFormula(
+                            to_l,
+                            to_r,
+                            0 if transition_l else buf_len_l + leap,
+                            0 if transition_r else buf_len_r + leap,
+                            copy_pf,
+                            guarded_form,
                         )
-                        logger.debug(
-                            f"Found satisfiable:({to_l}, {to_r}) with formula {pf_new}"
-                        )
+                    )
 
             knowledge.add(guarded_form)
 

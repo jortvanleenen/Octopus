@@ -25,6 +25,7 @@ class ParserProgram(ReprMixin):
         :param is_left: whether this is the left parser program (True) or the right one (False)
         """
         self._types: dict[str, dict | int] = {}
+        self._typedefs: dict[str, int] = {}
 
         self._input_name: str | None = None
         self._output_name: str | None = None
@@ -45,6 +46,15 @@ class ParserProgram(ReprMixin):
         :return: a dictionary of type names to their fields or sizes, or None if no types are defined
         """
         return self._types
+
+    @property
+    def typedefs(self) -> dict[str, int]:
+        """
+        Get the typedefs of the parser program.
+
+        :return: a dictionary of typedef names to their sizes
+        """
+        return self._typedefs
 
     @property
     def input_name(self) -> str | None:
@@ -104,6 +114,8 @@ class ParserProgram(ReprMixin):
 
         for obj in data["objects"]["vec"]:
             match obj["Node_Type"]:
+                case "Type_Typedef":
+                    self._parse_typedef(obj)
                 case "Type_Header" | "Type_Struct":
                     logger.info(f"Parsing type '{obj['Node_Type']}'...")
                     logger.debug(f"For: '{obj}'")
@@ -121,6 +133,17 @@ class ParserProgram(ReprMixin):
                     logger.debug(
                         f"Ignoring type '{obj['Node_Type']}' of object '{obj}'"
                     )
+
+    def _parse_typedef(self, obj: dict) -> None:
+        """
+        Parse a typedef of string aliases to integer sizes.
+
+        :param obj: the typedef object to parse
+        """
+        type_name = obj["name"]
+        size = obj["type"]["size"]
+        logger.info(f"Parsed typedef '{type_name}' with size: {size}")
+        self.typedefs[type_name] = size
 
     def _parse_data_type(self, obj: dict) -> None:
         """
@@ -172,7 +195,7 @@ class ParserProgram(ReprMixin):
             if parameter["direction"] == "out":
                 self._output_name = name
                 self._output_type = parameter["type"]["path"]["name"]
-            else:
+            elif parameter["type"]["path"]["name"] == "packet_in":
                 self._input_name = name
 
         if self._input_name is None or self._output_name is None:
@@ -227,6 +250,32 @@ class ParserProgram(ReprMixin):
 
         logger.info(f"Obtained header fields for '{reference}': {type_content}")
         return type_content
+
+    def get_all_fields(self) -> list[str]:
+        """
+        Return all fully qualified field references reachable from the output struct.
+
+        :return: a list of fully qualified field references
+        """
+        if self._output_type is None or self._output_name is None:
+            raise ValueError("Parser output type or name not set")
+
+        result: list[str] = []
+
+        def visit(type_name: str, prefix: str) -> None:
+            type_def = self._types.get(type_name)
+            if not isinstance(type_def, dict):
+                return
+
+            for field, field_type in type_def.items():
+                field_ref = f"{prefix}.{field}"
+                if isinstance(field_type, int):
+                    result.append(field_ref)
+                elif isinstance(field_type, str):
+                    visit(field_type, field_ref)
+
+        visit(self._output_type, self._output_name)
+        return result
 
     def __str__(self):
         n_spaces = 2

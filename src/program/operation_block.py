@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from bisimulation.symbolic.formula import FormulaManager, PureFormula
+from bisimulation.formula import FormulaManager, PureFormula
 from program.component import Assignment, Component, Extract, parse_method_call
 
 if TYPE_CHECKING:
@@ -85,11 +85,6 @@ class OperationBlock(Component):
                     )
                     continue
             self._components.append(parsed_component)
-
-    def eval(self, store: dict[str, str], buffer: str):
-        for component in self._components:
-            store, buffer = component.eval(store, buffer)
-        return store, buffer
 
     def strongest_postcondition(
         self, manager: FormulaManager, pf: PureFormula

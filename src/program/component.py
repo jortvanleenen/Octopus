@@ -12,7 +12,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable
 
-from bisimulation.symbolic.formula import And, Equals, FormulaManager, PureFormula
+from bisimulation.formula import And, Equals, FormulaManager, PureFormula
 from program.expression import (
     Concatenate,
     Expression,
@@ -40,19 +40,8 @@ class Component(ABC):
         pass
 
     @abstractmethod
-    def eval(self, store: dict[str, str], buffer: str) -> tuple[dict[str, str], str]:
-        """
-        Evaluate the component using the provided store and buffer.
-
-        :param store: the current store
-        :param buffer: the current buffer
-        :return: a tuple containing the updated store and buffer
-        """
-        pass
-
-    @abstractmethod
     def strongest_postcondition(
-        self, manager: FormulaManager, pf: PureFormula
+            self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
         """
         Generate the strongest postcondition for this component.
@@ -76,17 +65,8 @@ class Assignment(Component):
         self.left = parse_expression(self._program, component["left"])
         self.right = parse_expression(self._program, component["right"], len(self.left))
 
-    def eval(self, store: dict[str, str], buffer: str) -> tuple[dict[str, str], str]:
-        right_value = self.right.eval(store)
-        if isinstance(self.left, Slice):
-            store[self.left.reference][self.left.lsb : self.left.msb] = right_value
-        else:
-            store[self.left.reference] = right_value
-
-        return store, buffer
-
     def strongest_postcondition(
-        self, manager: FormulaManager, pf: PureFormula
+            self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
         left = self._program.is_left
         logger.debug(
@@ -107,19 +87,20 @@ class Assignment(Component):
             )
 
         new_var = manager.fresh_variable(len(reference))
-        pf.set_header_field_var(reference.reference, self._program.is_left, new_var)
+        new_pf = pf.deepcopy()
+        new_pf.set_header_field_var(reference.reference, self._program.is_left, new_var)
 
         right_copy = copy.deepcopy(self.right)
         right_copy.to_formula(pf)
 
         logger.debug(
-            f"Header variables at end of assignment SP (left: {left}): {pf.header_field_vars}"
+            f"Header variables at end of assignment SP (left: {left}): {new_pf.header_field_vars}"
         )
 
         return PureFormula(
-            And(pf.root, Equals(new_var, right_copy)),
-            pf.header_field_vars,
-            pf.buf_vars,
+            And(new_pf.root, Equals(new_var, right_copy)),
+            new_pf.header_field_vars,
+            new_pf.buf_vars,
         )
 
     def __repr__(self):
@@ -144,23 +125,21 @@ class Extract(Component):
         header_name = call["arguments"]["vec"][0]["expression"]["member"]
         self.header_reference = self.program.output_name + "." + header_name
         self.header_content: dict = self.program.get_header(self.header_reference)
-        self.size = sum(self.header_content.values())
 
-    def eval(self, store: dict[str, str], buffer: str):
-        """Evaluate the extract method call."""
-        if self.header_content is None or self.size is None:
-            logger.warning("Extract method call has not yet been parsed")
-            return store, buffer
+        sizes = []
+        for val in self.header_content.values():
+            if isinstance(val, int):
+                sizes.append(val)
+            else:
+                try:
+                    sizes.append(self.program.typedefs[val])
+                except KeyError:
+                    raise KeyError(f"Missing typedef: '{val}'") from None
 
-        for field in self.header_content:
-            field_size = self.header_content[field]
-            store[self.header_reference + "." + field] = buffer[:field_size]
-            buffer = buffer[field_size:]
-
-        return store, buffer
+        self.size = sum(sizes)
 
     def strongest_postcondition(
-        self, manager: FormulaManager, pf: PureFormula
+            self, manager: FormulaManager, pf: PureFormula
     ) -> PureFormula:
         left = self.program.is_left
         buffer_var = pf.get_buffer_var(left)
@@ -181,6 +160,8 @@ class Extract(Component):
             pf.set_buffer_var(left, new_buffer)
 
         for field, field_size in self.header_content.items():
+            if isinstance(field_size, str):
+                field_size = self.program.typedefs[field_size]
             variable = manager.fresh_variable(field_size)
 
             store_name = self.header_reference + "." + field

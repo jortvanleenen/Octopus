@@ -1,15 +1,19 @@
 # Octopus
 
 Octopus is an equivalence checker for P4 packet parsers, implemented in Python.  
-It supports both naive and optimised symbolic bisimulation techniques for comparing parser behaviour.
+Its implementation uses symbolic bisimulation to compare parser behaviour.
 
-Octopus is accompanied by the paper *"Practical Equivalence Checking of P4 Packet Parsers"* by Jort van Leenen.  
+Octopus is accompanied by the paper *"Octopus: Practical Equivalence Checking of P4 Packet Parsers"* by Jort van
+Leenen and Tobias Kappé.
+This work builds on the first author's bachelor's thesis [*"Practical Equivalence Checking of P4 Packet
+Parsers"*](https://theses.liacs.nl/3410),
+supervised by Tobias Kappé and Jan Martens.
 The implementation builds on theoretical work from [Leapfrog](https://doi.org/10.48550/arXiv.2205.08762), a Rocq-based
 formal verifier for P4 packet parsers.
 
 ## Features
 
-- Equivalence checking for P4 packet parsers using either naive or (optimised) symbolic bisimulation;
+- Equivalence checking for P4 packet parsers using (optimised) symbolic bisimulation;
 - Support for IR (JSON) format from `p4c-graphs`;
 - CLI interface with structured output.
 
@@ -54,7 +58,7 @@ docker run --rm -v "$PWD:/workspace" -w /workspace jortvanleenen/octopus:latest 
   [OPTIONS] FILE1 FILE2
 ```
 
-The image includes the Z3 and cvc5 SMT solvers preinstalled.
+The image includes the cvc5 SMT solver preinstalled.
 To install additional solvers, or to run custom PySMT configurations, use an interactive shell:
 
 ```bash
@@ -112,33 +116,33 @@ One has to provide the `-j` option to Octopus in the latter case.
 
 ### Examples
 
-Check two IR JSON files (using symbolic bisimulation by default):
+Check two IR JSON files (using symbolic bisimulation):
 
-```
+```shell
 octopus -j parser1.json parser2.json
 ```
 
 Check two P4 source files (Octopus invokes `p4c-graphs` internally):
 
-```
+```shell
 octopus program1.p4 program2.p4
 ```
 
 Use symbolic bisimulation with leaps disabled:
 
-```
+```shell
 octopus program1.p4 program2.p4 --disable_leaps
 ```
 
 Write output (certificate or counterexample) to a file:
 
-```
+```shell
 octopus -j parser1.json parser2.json --output result.txt
 ```
 
 Exit with status code 1 if the parsers are not equivalent:
 
-```
+```shell
 octopus -j parser1.json parser2.json --fail-on-mismatch
 ```
 
@@ -146,41 +150,59 @@ _Note: this is useful for scripting or CI/CD pipelines._
 
 Print bisimulation execution time and memory usage:
 
-```
+```shell
 octopus -j parser1.json parser2.json --stat
 ```
 
 Customise the SMT solver portfolio and provide (global) options:
 
-```
+```shell
 octopus -j p1.json p2.json \
 --solvers '["z3",("cvc5",{"incremental":False})]' \
 --solvers-global-options '{"generate_models":False}'
 ```
 
-_Note: evaluation of the options is done using `ast.literal_eval()`, so it must be a valid Python literal._
+_Note: evaluation of the options is done using `ast.literal_eval()`, so the argument must be a valid Python literal._
 _For `--solvers`, the following object is accepted: `list[str | tuple[str, dict[str, Any]]]`._
 _For `--solvers-global-options`, the following object is accepted: `dict[str, Any]`._
+
+Perform external filtering by specifying an additional constraint that must hold for accepting pairs:
+
+```shell
+octopus p1.p4 p2.p4 \
+"hdr_l.field0 == (hdr_r.field1 + hdr_r.field2) and hdr_l.field0[15:0] == '0xABCD_16' and True or False"
+```
+
+_Note: a (larger) constraint can also be specified using an external file with the
+`--filter-accepting-file` option._
+_Evaluation of these options is done using `ast.parse()` (mode eval), so the argument must be a valid Python
+expression._
+
+Similarly to above, a constraint can be provided that should hold for disagreeing pairs using
+`--filter-disagreeing-string` and `--filter-disagreeing-file` respectively.
 
 ## CLI Options
 
 Octopus provides a command-line interface (CLI) with the following options:
 
-| Short | Long                       | Description                                                                |
-|-------|----------------------------|----------------------------------------------------------------------------|
-| `-h`  | `--help`                   | Show a help message and exit                                               |
-|       | `--version`                | Show the version of Octopus and exit                                       |
-| `-j`  | `--json`                   | Specify that both inputs are in IR (p4c) JSON format                       |
-|       | `file1`                    | Path to the first P4 program                                               |
-|       | `file2`                    | Path to the second P4 program                                              |
-| `-v`  | `--verbosity`              | Increase output verbosity (`-v`, `-vv`, `-vvv`)                            |
-| `-n`  | `--naive`                  | Use naive bisimulation instead of symbolic bisimulation                    |
-| `-L`  | `--disable_leaps`          | Disable leaps in symbolic bisimulation (ignored if `--naive` is set)       |
-| `-o`  | `--output`                 | Write the bisimulation certificate or counterexample to the specified file |
-| `-f`  | `--fail-on-mismatch`       | Exit with code 1 if the parsers are not equivalent                         |
-| `-S`  | `--stat`                   | Measure and print bisimulation execution time and memory usage             |
-| `-s`  | `--solvers`                | Specify which SMT solvers to use along with their options                  |
-|       | `--solvers-global-options` | Specify global options for all solvers                                     |
+| Short | Long                          | Description                                                                 |
+|-------|-------------------------------|-----------------------------------------------------------------------------|
+| `-h`  | `--help`                      | Show a help message and exit                                                |
+|       | `--version`                   | Show the version of Octopus and exit                                        |
+| `-j`  | `--json`                      | Specify that both inputs are in IR (p4c) JSON format                        |
+|       | `file1`                       | Path to the first P4 program                                                |
+|       | `file2`                       | Path to the second P4 program                                               |
+| `-v`  | `--verbosity`                 | Increase output verbosity (`-v`, `-vv`, `-vvv`)                             |
+| `-L`  | `--disable_leaps`             | Disable leaps; only use single-step bisimulation                            |
+| `-o`  | `--output`                    | Write the bisimulation certificate or counterexample to the specified file  |
+| `-f`  | `--fail-on-mismatch`          | Exit with code 1 if the parsers are not equivalent                          |
+| `-S`  | `--stat`                      | Measure and print bisimulation execution time and memory usage              |
+| `-s`  | `--solvers`                   | Specify which SMT solvers to use along with their options                   |
+|       | `--solvers-global-options`    | Specify global options for all solvers                                      |
+|       | `--filter-accepting-string`   | Define an additional constraint for accepting pairs via a string.           |
+|       | `--filter-accepting-file `    | Define an additional constraint for accepting pairs via an external file.   |
+|       | `--filter-disagreeing-string` | Define an additional constraint for disagreeing pairs via a string.         |
+|       | `--filter-disagreeing-file`   | Define an additional constraint for disagreeing pairs via an external file. |
 
 ## Verifying Claims and Benchmarking
 
@@ -197,6 +219,42 @@ python3 tests/runner.py -o o.txt
 To add benchmarks or test cases, see the `tests` directory.
 Within this directory, you can find subdirectories for correct cases, incorrect cases, and benchmarks.
 Additionally, a template file has been provided (`tests/framework_template.p4`) to help you get started.
+
+### Leapfrog Benchmarks
+
+The benchmark set is taken from Doenges et al. (2022).
+As our manner of input differs from theirs, we have provided a mapping from our folder names to their benchmark
+filenames.
+
+- **States** denotes the total number of states in both parser programs.
+- **Branched** is the number of bits tested in all `transition select` statements.
+- **Total** is the total number of bits across all variables.
+
+| Category      | Name                     | File                  | States | Branched (b) | Total (b) |
+|---------------|--------------------------|-----------------------|--------|--------------|-----------|
+| Utility       | State rearrangement      | `IPFilter`            | 5      | 8            | 256       |
+|               | Variable-length format 2 | `IPOptions2`          | 30     | 32           | 672       |
+|               | Variable-length format 3 | `IPOptions3`          | 45     | 96           | 672       |
+|               | Header initialisation    | `SelfComparison`      | 10     | 12           | 736       |
+|               | Speculative extraction   | `MPLSVectorized`      | 5      | 3            | 192       |
+|               | Relational verification  | `SloppyStrictStores`  | 6      | 32           | 1056      |
+|               | External filtering       | `SloppyStrictFilter`  | 6      | 32           | 1056      |
+| Applicability | Edge                     | `EdgeSelf`            | 28     | 52           | 2584      |
+|               | Service provider         | `ServiceproviderSelf` | 22     | 25           | 2536      |
+|               | Datacenter               | `DataCenterSelf`      | 30     | 274          | 2272      |
+|               | Enterprise               | `EnterpriseSelf`      | 22     | 80           | 1952      |
+|               | Translation validation   | `EdgeTrans`           | 30     | 56           | 3036      |
+
+**Notes**
+
+- Full filenames in Leapfrog are `<name-in-table>Proof.v`, except for `SloppyStrictStores` and `SloppyStrictFilter`,
+  which are as is.
+- The Leapfrog GitHub repository incorrectly lists `EthernetProof.v` as the benchmark file for *state rearrangement*.
+- The number of branched and total bits has been corrected for most benchmarks, as these were incorrect in the Leapfrog
+  paper.
+- In Leapfrog's Enterprise benchmark, the size of the IPv4 header was incorrectly specified. We were able to
+  adjust this to the correct value by looking at the original code in
+  the [parser-gen repository](https://github.com/grg/parser-gen/blob/master/examples/headers-enterprise.txt).
 
 ## License
 

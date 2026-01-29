@@ -8,10 +8,10 @@ header ip_t   { bit<160> data; }
 header udp_t  { bit<64> data; }
 
 struct headers_t {
-    eth_t   eth;
-    vlan_t  vlan;
-    ip_t    ip;
-    udp_t   udp;
+    eth_t  eth;
+    vlan_t vlan;
+    ip_t   ip;
+    udp_t  udp;
 }
 
 parser Parser(packet_in pkt, out headers_t hdr) {

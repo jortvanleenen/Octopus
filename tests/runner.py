@@ -31,6 +31,7 @@ class Benchmark:
     name: str
     file1: Path
     file2: Path
+    arguments: dict[str, Any] = None
 
 
 @dataclass(frozen=True)
@@ -48,72 +49,192 @@ def get_all_benchmarks() -> List[Benchmark]:
     :return: a list of Benchmark objects representing the benchmarks
     """
     return [
-        Benchmark(
-            "datacenter",
-            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
-            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
-        ),
-        Benchmark(
-            "edge_self",
-            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
-            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
-        ),
-        Benchmark(
-            "edge_optimised",
-            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
-            Path("tests/leapfrog_benchmarks/edge/optimised.p4"),
-        ),
-        Benchmark(
-            "enterprise",
-            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
-            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
-        ),
         # Benchmark(
-        #     "extended_syntax",
-        #     Path("tests/correct_cases/extended_syntax/mpls_default.p4"),
-        #     Path("tests/correct_cases/extended_syntax/mpls_extended.p4"),
+        #     "datacenter",
+        #     Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
+        #     Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
+        # ),
+        # Benchmark(
+        #     "edge_self",
+        #     Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+        #     Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+        # ),
+        # Benchmark(
+        #     "edge_optimised",
+        #     Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+        #     Path("tests/leapfrog_benchmarks/edge/optimised.p4"),
+        # ),
+        # Benchmark(
+        #     "enterprise",
+        #     Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
+        #     Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
         # ),
         # Benchmark(
         #     "external_filtering",
         #     Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
         #     Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
+        #     arguments={
+        #         "filter-disagreeing-string":
+        #             "hdr_r.eth.data[15:0] != '0x8600_16' and hdr_r.eth.data[15:0] != '0x86dd_16'"},
+        # ),
+        # Benchmark(
+        #     "relational_verification",
+        #     Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
+        #     Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
+        #     arguments={
+        #         "filter-accepting-string":
+        #             "((hdr_l.eth.data[15:0] == '0x8600_16' and hdr_l.ipv4.data == hdr_r.ipv4.data) "
+        #             "or (hdr_l.eth.data[15:0] == '0x86dd_16' and hdr_l.ipv6.data == hdr_r.ipv6.data))",
+        #         "filter-disagreeing-string": "True",
+        #     },
+        # ),
+        # Benchmark(
+        #     "header_initialisation",
+        #     Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
+        #     Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
+        # ),
+        # Benchmark(
+        #     "service_provider",
+        #     Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
+        #     Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
+        # ),
+        # Benchmark(
+        #     "speculative_extraction",
+        #     Path("tests/leapfrog_benchmarks/speculative_extraction/mpls.p4"),
+        #     Path("tests/leapfrog_benchmarks/speculative_extraction/mpls_vectorised.p4"),
+        # ),
+        # Benchmark(
+        #     "state_rearrangement",
+        #     Path("tests/leapfrog_benchmarks/state_rearrangement/combined_states.p4"),
+        #     Path("tests/leapfrog_benchmarks/state_rearrangement/separate_states.p4"),
+        # ),
+        # Benchmark(
+        #     "variable_length_formats_2",
+        #     Path("tests/leapfrog_benchmarks/variable_length_formats_2/ipoptions.p4"),
+        #     Path("tests/leapfrog_benchmarks/variable_length_formats_2/timestamp.p4"),
+        # ),
+        # Benchmark(
+        #     "variable_length_formats_3",
+        #     Path("tests/leapfrog_benchmarks/variable_length_formats_3/ipoptions.p4"),
+        #     Path("tests/leapfrog_benchmarks/variable_length_formats_3/timestamp.p4"),
         # ),
         Benchmark(
-            "header_initialisation_correct",
-            Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
-            Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
+            "parse_field_1",
+            Path("tests/whippersnapper/parse-field/1.p4"),
+            Path("tests/whippersnapper/parse-field/1.p4"),
         ),
         # Benchmark(
-        #     "header_initialisation_incorrect",
-        #     Path("tests/leapfrog_benchmarks/header_initialisation/incorrect.p4"),
-        #     Path(
-        #         "tests/leapfrog_benchmarks/header_initialisation/incorrect.p4"
-        #     ),
+        #     "parse_field_4",
+        #     Path("tests/whippersnapper/parse-field/4.p4"),
+        #     Path("tests/whippersnapper/parse-field/4.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_field_16",
+        #     Path("tests/whippersnapper/parse-field/16.p4"),
+        #     Path("tests/whippersnapper/parse-field/16.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_field_64",
+        #     Path("tests/whippersnapper/parse-field/64.p4"),
+        #     Path("tests/whippersnapper/parse-field/64.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_header_4_1",
+        #     Path("tests/whippersnapper/parse-header/4-1.p4"),
+        #     Path("tests/whippersnapper/parse-header/4-1.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_header_4_4",
+        #     Path("tests/whippersnapper/parse-header/4-4.p4"),
+        #     Path("tests/whippersnapper/parse-header/4-4.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_header_4_16",
+        #     Path("tests/whippersnapper/parse-header/4-16.p4"),
+        #     Path("tests/whippersnapper/parse-header/4-16.p4"),
         # ),
         Benchmark(
-            "service_provider",
-            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
-            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
+            "parse_header_4_32",
+            Path("tests/whippersnapper/parse-header/4-32.p4"),
+            Path("tests/whippersnapper/parse-header/4-32.p4"),
         ),
+        # Benchmark(
+        #     "parse_header_1_64",
+        #     Path("tests/whippersnapper/parse-header/1-64.p4"),
+        #     Path("tests/whippersnapper/parse-header/1-64.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_header_1_98",
+        #     Path("tests/whippersnapper/parse-header/1-98.p4"),
+        #     Path("tests/whippersnapper/parse-header/1-98.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_2_2",
+        #     Path("tests/whippersnapper/parse-complex/2-2.p4"),
+        #     Path("tests/whippersnapper/parse-complex/2-2.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_2_4",
+        #     Path("tests/whippersnapper/parse-complex/2-4.p4"),
+        #     Path("tests/whippersnapper/parse-complex/2-4.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_2_6",
+        #     Path("tests/whippersnapper/parse-complex/2-6.p4"),
+        #     Path("tests/whippersnapper/parse-complex/2-6.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_3_3",
+        #     Path("tests/whippersnapper/parse-complex/3-3.p4"),
+        #     Path("tests/whippersnapper/parse-complex/3-3.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_3_4",
+        #     Path("tests/whippersnapper/parse-complex/3-4.p4"),
+        #     Path("tests/whippersnapper/parse-complex/3-4.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_4_2",
+        #     Path("tests/whippersnapper/parse-complex/4-2.p4"),
+        #     Path("tests/whippersnapper/parse-complex/4-2.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_4_3",
+        #     Path("tests/whippersnapper/parse-complex/4-3.p4"),
+        #     Path("tests/whippersnapper/parse-complex/4-3.p4"),
+        # ),
+        # Benchmark(
+        #     "parse_complex_6_2",
+        #     Path("tests/whippersnapper/parse-complex/6-2.p4"),
+        #     Path("tests/whippersnapper/parse-complex/6-2.p4"),
+        # ),
+        # Benchmark(
+        #     "equiv_field_4_and_header_4_1",
+        #     Path("tests/whippersnapper/parse-field/4.p4"),
+        #     Path("tests/whippersnapper/parse-header/4-1.p4"),
+        # ),
+        # Benchmark(
+        #     "subset_field_4_and_header_4_4",
+        #     Path("tests/whippersnapper/parse-field/4.p4"),
+        #     Path("tests/whippersnapper/parse-header/4-4.p4"),
+        #     arguments={
+        #         "filter-disagreeing-string":
+        #             "hdr_r.header_0.field_0 != '0_16'",
+        #     }
+        # ),
+        # Benchmark(
+        #     "subset_field_1_and_complex_3_1",
+        #     Path("tests/whippersnapper/parse-field/1.p4"),
+        #     Path("tests/whippersnapper/parse-complex/3-1.p4"),
+        #     arguments={
+        #         "filter-disagreeing-string":
+        #             "hdr_r.ptp.reserved2 == '1_8'",
+        #     }
+        # ),
         Benchmark(
-            "speculative_extraction",
-            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls.p4"),
-            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls_vectorised.p4"),
-        ),
-        Benchmark(
-            "state_rearrangement",
-            Path("tests/leapfrog_benchmarks/state_rearrangement/combined_states.p4"),
-            Path("tests/leapfrog_benchmarks/state_rearrangement/separate_states.p4"),
-        ),
-        Benchmark(
-            "variable_length_formats_2",
-            Path("tests/leapfrog_benchmarks/variable_length_formats_2/ipoptions.p4"),
-            Path("tests/leapfrog_benchmarks/variable_length_formats_2/timestamp.p4"),
-        ),
-        Benchmark(
-            "variable_length_formats_3",
-            Path("tests/leapfrog_benchmarks/variable_length_formats_3/ipoptions.p4"),
-            Path("tests/leapfrog_benchmarks/variable_length_formats_3/timestamp.p4"),
+            "parse_complex_4_4",
+            Path("tests/whippersnapper/parse-complex/4-4.p4"),
+            Path("tests/whippersnapper/parse-complex/4-4.p4"),
         ),
     ]
 
@@ -126,16 +247,13 @@ def get_all_run_variants() -> List[BenchmarkRun]:
     """
     return [
         BenchmarkRun("octopus_default", {}),
-        BenchmarkRun("octopus_no_leaps", {"disable-leaps": True}),
-        BenchmarkRun("octopus_z3", {"solvers": ["z3"]}),
-        BenchmarkRun("octopus_cvc5", {"solvers": ["cvc5"]}),
     ]
 
 
 def run_benchmarks(
-    benchmarks: List[Benchmark],
-    variants: List[BenchmarkRun],
-    output_file: str | None = None,
+        benchmarks: List[Benchmark],
+        variants: List[BenchmarkRun],
+        output_file: str | None = None,
 ) -> None:
     """
     Run the benchmarks with the given variants and output the results.
@@ -163,10 +281,10 @@ def run_benchmarks(
 
 
 def run_benchmark(
-    benchmark: Benchmark,
-    variant: BenchmarkRun,
-    output_stream: TextIOWrapper,
-    tmp_path: str,
+        benchmark: Benchmark,
+        variant: BenchmarkRun,
+        output_stream: TextIOWrapper,
+        tmp_path: str,
 ) -> None:
     """
     Run a single benchmark with the given variant and output the results.
@@ -187,12 +305,13 @@ def run_benchmark(
             tmp_path,
         ]
 
-        if variant.arguments.get("disable-leaps"):
-            cmd.append("--disable-leaps")
+        if variant.arguments:
+            for arg_name, arg_value in variant.arguments.items():
+                cmd.extend([f"--{arg_name}", str(arg_value)])
 
-        solvers = variant.arguments.get("solvers")
-        if solvers:
-            cmd.extend(["--solvers", str(solvers)])
+        if benchmark.arguments:
+            for arg_name, arg_value in benchmark.arguments.items():
+                cmd.extend([f"--{arg_name}", str(arg_value)])
 
         cmd.extend(
             [
@@ -232,7 +351,7 @@ def run_benchmark(
             )
             if memory_match:
                 memory_usage_kb = int(memory_match.group(1))
-                mib = (memory_usage_kb * 1000) / (1024**2)
+                mib = (memory_usage_kb * 1000) / (1024 ** 2)
                 memory_usages.append(mib)
 
     avg_time = statistics.mean(times)
@@ -258,7 +377,7 @@ def main() -> None:
         "--benchmark",
         nargs="+",
         help="List of benchmarks to run. If not provided, all benchmarks will be run. Available: "
-        + ", ".join(available_benchmark_names),
+             + ", ".join(available_benchmark_names),
     )
 
     available_variant_names = [variant.name for variant in get_all_run_variants()]
@@ -266,7 +385,7 @@ def main() -> None:
         "--variant",
         nargs="+",
         help="List of variants to run. If not provided, all variants will be run. Available: "
-        + ", ".join(available_variant_names),
+             + ", ".join(available_variant_names),
     )
 
     parser.add_argument(
