@@ -72,6 +72,8 @@ def run_equivalence_checks(p4_files: list[Path]) -> None:
             break
 
         out = result.stdout
+        print(result.stdout)
+        print(result.stderr)
 
         wall_match = wall_re.search(out)
         mem_match = mem_re.search(out)
