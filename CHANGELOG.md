@@ -13,10 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-## [v1.2.0] - 2026-01-29
+## [v1.2.1] - 2026-01-29
 
 This release represents the version of the codebase that was published alongside its accompanying paper (see the
 README.md file).
+
+### Added
+
+### Changed
+
+- Improved description of benchmarks in README.md.
+
+### Removed
+
+## [v1.2.0] - 2026-01-29
+
 ### Added
 
 - Added `p4-programs-survey` benchmark, representing P4 parsers 'in the wild'.
