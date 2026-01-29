@@ -19,14 +19,14 @@ formal verifier for P4 packet parsers.
 
 ## Limitations
 
-- Only a subset of P4-16 constructs and features are supported.
+- Only a subset of P4_16 constructs and features are supported.
 
 ## Dependencies and Compatibility
 
 Octopus depends on the `p4c-graphs` tool to generate the IR JSON representation of P4 programs.
 
 - Tested with: `p4c-graphs` version 1.2.x.x;
-- Requires: Python 3.10 or later; tested up to 3.13.
+- Requires: Python 3.12 or later; tested up to 3.13.
 
 Ensure `p4c-graphs` is available on your system's `PATH` if you provide P4 programs as input.
 
@@ -206,9 +206,17 @@ Octopus provides a command-line interface (CLI) with the following options:
 
 ## Verifying Claims and Benchmarking
 
-To verify the claims made in the paper, you can run the benchmark runner script.
-This script will execute the equivalence checks on the Leapfrog benchmark files and output the results.
-See `tests/runner.py`, or execute the script with `--help`, for more details.
+To verify the claims made in the paper, you can run the benchmark scripts, which are also included in the Docker image.
+These scripts will execute the equivalence checks and output the relevant results.
+
+- See `tests/runner.py` for the Leapfrog and Whippersnapper benchmarks.
+Execute the script with `--help`, for more details.
+
+- See `tests/plotter.py` for the figure generation part of the Whippersnapper benchmarks, including the raw data that 
+was used to generate this.
+
+- See `tests/programs-survey-exp.py` for the code responsible for statistics and equivalence class generation over 
+  the `p4-programs-survey` parsers.
 
 As an example of how to run the benchmarks, run the container interactively and execute the following command:
 
