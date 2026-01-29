@@ -233,7 +233,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
         packet.extract(hdr.accnt_bal_req);
         transition accept;
     }
-    @name(".parse_ethernet") state parse_ethernet {
+    @name(".start") state start {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             16w0x800: parse_ipv4;
@@ -292,9 +292,6 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
             16w1234: parse_lr;
             default: accept;
         }
-    }
-    @name(".start") state start {
-        transition parse_ethernet;
     }
 }
 

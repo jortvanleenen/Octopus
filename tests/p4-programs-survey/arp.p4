@@ -1,7 +1,6 @@
-/* -*- P4_16 -*- */
-
+// HEADER START
 #include <core.p4>
-#include <v1model.p4>
+// HEADER END
 
 /*************************************************************************
  ***********************  C O N S T A N T S  *****************************
@@ -85,26 +84,11 @@ struct my_headers_t {
 }
 
 /*************************************************************************
- ***********************  M E T A D A T A  *******************************
- *************************************************************************/
-        /*  Define the global metadata for your program */
-
-struct my_metadata_t {
-    ipv4_addr_t dst_ipv4;
-    mac_addr_t  mac_da;
-    mac_addr_t  mac_sa;
-    port_id_t   egress_port;
-    mac_addr_t  my_mac;
-}
-
-/*************************************************************************
  ***********************  P A R S E R  ***********************************
  *************************************************************************/
-parser MyParser(
+parser Parser(
     packet_in             packet,
-    out   my_headers_t    hdr,
-    inout my_metadata_t   meta,
-    inout standard_metadata_t standard_metadata)
+    out   my_headers_t    hdr)
 {
     state start {
         packet.extract(hdr.ethernet);
@@ -127,13 +111,11 @@ parser MyParser(
 
     state parse_arp_ipv4 {
         packet.extract(hdr.arp_ipv4);
-        meta.dst_ipv4 = hdr.arp_ipv4.tpa;
         transition accept;
     }            
 
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
-        meta.dst_ipv4 = hdr.ipv4.dstAddr;
         transition select(hdr.ipv4.protocol) {
             IPPROTO_ICMP : parse_icmp;
             default      : accept;
@@ -146,160 +128,11 @@ parser MyParser(
     }    
 }
 
-/*************************************************************************
- ************   C H E C K S U M    V E R I F I C A T I O N   *************
- *************************************************************************/
-control MyVerifyChecksum(
-    in    my_headers_t   hdr,
-    inout my_metadata_t  meta)
-{
-    apply {     }
-}
+// FOOTER START
+parser Parser_t(
+    packet_in             packet,
+    out   my_headers_t    hdr);
+package Package(Parser_t p);
 
-/*************************************************************************
- **************  I N G R E S S   P R O C E S S I N G   *******************
- *************************************************************************/
-control MyIngress(
-    inout my_headers_t     hdr,
-    inout my_metadata_t    meta,
-    inout standard_metadata_t  standard_metadata)
-{
-    action drop() {
-        mark_to_drop();
-        exit;
-    }
-    
-    action set_dst_info(mac_addr_t mac_da,
-                        mac_addr_t mac_sa,
-                        port_id_t  egress_port)
-    {
-        meta.mac_da      = mac_da;
-        meta.mac_sa      = mac_sa;
-        meta.egress_port = egress_port;
-    }
-    
-    table ipv4_lpm {
-        key     = { meta.dst_ipv4 : lpm; }
-        actions = { set_dst_info; drop;  }
-        default_action = drop();
-    }
-
-    action forward_ipv4() {
-        hdr.ethernet.dstAddr = meta.mac_da;
-        hdr.ethernet.srcAddr = meta.mac_sa;
-        hdr.ipv4.ttl         = hdr.ipv4.ttl - 1;
-        
-        standard_metadata.egress_spec = meta.egress_port;
-    }
-
-    action send_arp_reply() {
-        hdr.ethernet.dstAddr = hdr.arp_ipv4.sha;
-        hdr.ethernet.srcAddr = meta.mac_da;
-        
-        hdr.arp.oper         = ARP_OPER_REPLY;
-        
-        hdr.arp_ipv4.tha     = hdr.arp_ipv4.sha;
-        hdr.arp_ipv4.tpa     = hdr.arp_ipv4.spa;
-        hdr.arp_ipv4.sha     = meta.mac_da;
-        hdr.arp_ipv4.spa     = meta.dst_ipv4;
-
-        standard_metadata.egress_spec = standard_metadata.ingress_port;
-    }
-
-    action send_icmp_reply() {
-        mac_addr_t   tmp_mac;
-        ipv4_addr_t  tmp_ip;
-
-        tmp_mac              = hdr.ethernet.dstAddr;
-        hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
-        hdr.ethernet.srcAddr = tmp_mac;
-
-        tmp_ip               = hdr.ipv4.dstAddr;
-        hdr.ipv4.dstAddr     = hdr.ipv4.srcAddr;
-        hdr.ipv4.srcAddr     = tmp_ip;
-
-        hdr.icmp.type        = ICMP_ECHO_REPLY;
-        hdr.icmp.checksum    = 0; // For now
-
-        standard_metadata.egress_spec = standard_metadata.ingress_port;
-    }
-
-    table forward {
-        key = {
-            hdr.arp.isValid()      : exact;
-            hdr.arp.oper           : ternary;
-            hdr.arp_ipv4.isValid() : exact;
-            hdr.ipv4.isValid()     : exact;
-            hdr.icmp.isValid()     : exact;
-            hdr.icmp.type          : ternary;
-        }
-        actions = {
-            forward_ipv4;
-            send_arp_reply;
-            send_icmp_reply;
-            drop;
-        }
-        const default_action = drop();
-        const entries = {
-            ( true, ARP_OPER_REQUEST, true, false, false, _  ) :
-                                                         send_arp_reply();
-            ( false, _,               false, true, false, _  ) :
-                                                         forward_ipv4();
-            ( false, _,               false, true, true, ICMP_ECHO_REQUEST ) :
-                                                         send_icmp_reply();
-        }
-    }
-    
-    apply {
-        meta.my_mac = 0x000102030405;
-        ipv4_lpm.apply();
-        forward.apply();
-    }
-}
-
-/*************************************************************************
- ****************  E G R E S S   P R O C E S S I N G   *******************
- *************************************************************************/
-control MyEgress(
-    inout my_headers_t        hdr,
-    inout my_metadata_t       meta,
-    inout standard_metadata_t standard_metadata) {
-    apply {    }
-}
-
-/*************************************************************************
- *************   C H E C K S U M    C O M P U T A T I O N   **************
- *************************************************************************/
-control MyComputeChecksum(
-    inout my_headers_t  hdr,
-    inout my_metadata_t meta)
-{
-    apply {   }
-}
-
-/*************************************************************************
- ***********************  D E P A R S E R  *******************************
- *************************************************************************/
-control MyDeparser(
-    packet_out      packet,
-    in my_headers_t hdr)
-{
-    apply {
-        packet.emit(hdr.ethernet);
-        /* ARP Case */
-        packet.emit(hdr.arp);
-        packet.emit(hdr.arp_ipv4);
-        /* IPv4 case */
-        packet.emit(hdr.ipv4);
-        packet.emit(hdr.icmp);
-    }
-}
-
-V1Switch(
-    MyParser(),
-    MyVerifyChecksum(),
-    MyIngress(),
-    MyEgress(),
-    MyComputeChecksum(),
-    MyDeparser()
-) main;
+Package(Parser()) main;
+// FOOTER END

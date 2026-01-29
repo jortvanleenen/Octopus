@@ -1,52 +1,51 @@
-header_type ethernet_t {
-    fields {
-        dstAddr : 48;
-        srcAddr : 48;
-        etherType : 16;
+/* Copyright 2013-present Barefoot Networks, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0
+ */
+
+// HEADER START
+#include <core.p4>
+// HEADER END
+
+header ethernet_t {
+    bit<48> dstAddr;
+    bit<48> srcAddr;
+    bit<16> etherType;
+}
+
+header ipv4_t {
+    bit<4>  version;
+    bit<4>  ihl;
+    bit<8>  diffserv;
+    bit<16> totalLen;
+    bit<16> identification;
+    bit<3>  flags;
+    bit<13> fragOffset;
+    bit<8>  ttl;
+    bit<8>  protocol;
+    bit<16> hdrChecksum;
+    bit<32> srcAddr;
+    bit<32> dstAddr;
+}
+
+struct headers {
+    ethernet_t ethernet;
+    ipv4_t     ipv4;
+}
+
+parser Parser(packet_in packet, out headers hdr)
+{
+    state start {
+        packet.extract(hdr.ethernet);
+        packet.extract(hdr.ipv4);
+        transition accept;
     }
 }
 
-header_type ipv4_t {
-    fields {
-        version : 4;
-        ihl : 4;
-        diffserv : 8;
-        totalLen : 16;
-        identification : 16;
-        flags : 3;
-        fragOffset : 13;
-        ttl : 8;
-        protocol : 8;
-        hdrChecksum : 16;
-        srcAddr : 32;
-        dstAddr: 32;
-    }
-}
+// FOOTER START
+parser Parser_t(packet_in packet, out headers hdr);
 
-header ethernet_t ethernet;
-header ipv4_t ipv4;
+package Package(Parser_t p);
 
-
-header_type intrinsic_metadata_t {
-    fields {
-        ingress_global_timestamp : 32;
-        lf_field_list : 8;
-        mcast_grp : 16;
-        egress_rid : 16;
-        resubmit_flag : 8;
-        recirculate_flag : 8;
-    }
-}
-
-metadata intrinsic_metadata_t intrinsic_metadata;
-
-
-parser start {
-    extract(ethernet);
-    extract(ipv4);
-    return ingress;
-}
-
-
-#define ETHERTYPE_IPV4 0x0800
-#define ETHERTYPE_ARP_IPV4 0x0806
+Package(Parser()) main;
+// FOOTER END

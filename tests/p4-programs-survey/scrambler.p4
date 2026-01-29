@@ -2,8 +2,6 @@
 #include <core.p4>
 // HEADER END
 
-const bit<16> TYPE_IPV4 = 0x800;
-
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
 *************************************************************************/
@@ -52,7 +50,7 @@ parser Parser(packet_in packet,
     state parse_ethernet {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
-            TYPE_IPV4: parse_ipv4;
+            0x800: parse_ipv4;
             default: accept;
         }
     }

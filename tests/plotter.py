@@ -116,6 +116,9 @@ for col, kind in enumerate(["field", "header", "complex"]):
     ax_time.set_yscale("linear")
     ax_mem.set_yscale("linear")
 
+    if kind == "field":
+        ax_time.set_ylim(bottom=0)
+
     ax_time.yaxis.set_major_locator(MaxNLocator(nbins=5))
     ax_mem.yaxis.set_major_locator(MaxNLocator(nbins=5))
 

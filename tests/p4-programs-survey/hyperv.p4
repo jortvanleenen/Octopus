@@ -1,24 +1,28 @@
-/* Copyright 2016-present NetArch Lab, Tsinghua University.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// HEADER START
+#include <core.p4>
+// HEADER END
 
-@pragma header_ordering desc_hdr byte_stack
+// The original parser would always accept, but its syntax was no longer supported by the P4 language.
+// Therefore, we have written an equivalent parser in P4_16.
 
-//--------------------------------parser-------------------------
-parser start {
-	extract(desc_hdr); // Rapid Parsing
-	set_metadata(vdp_metadata.vdp_id, desc_hdr.vdp_id);
-	set_metadata(HDR, desc_hdr.load_header);
-    return ingress;
+header header_t  {
+    bit<128> field;
 }
+
+struct headers_t {
+    header_t head;
+}
+
+parser Parser(packet_in pkt, out headers_t hdr) {
+    state start {
+        pkt.extract(hdr.head);
+        transition accept;
+    }
+}
+
+// FOOTER START
+parser Parser_t(packet_in pkt, out headers_t hdr);
+package Package(Parser_t p);
+
+Package(Parser()) main;
+// FOOTER END

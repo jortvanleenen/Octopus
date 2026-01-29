@@ -78,15 +78,19 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     state parse_ethernet {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
-            TYPE_IPV4: parse_ipv4;
+            0x800: parse_ipv4;
             default: accept;
         }
     }
 
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
-        verify(hdr.ipv4.ihl >= 5, error.IPHeaderTooShort);
         transition select(hdr.ipv4.ihl) {
+            0             : reject;
+            1             : reject;
+            2             : reject;
+            3             : reject;
+            4             : reject;
             5             : accept;
             default       : parse_ipv4_option;
         }
@@ -95,14 +99,13 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     state parse_ipv4_option {
         packet.extract(hdr.ipv4_option);
         transition select(hdr.ipv4_option.option) {
-            IPV4_OPTION_STAG: parse_stag;
+            31: parse_stag;
             default: accept;
         }
     }
 
     state parse_stag {
         packet.extract(hdr.stag);
-        meta.local_md.src_port_color = hdr.stag.source_color;
         transition accept;
     }
 }

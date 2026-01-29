@@ -195,7 +195,7 @@ class ParserProgram(ReprMixin):
             if parameter["direction"] == "out":
                 self._output_name = name
                 self._output_type = parameter["type"]["path"]["name"]
-            else:
+            elif parameter["type"]["path"]["name"] == "packet_in":
                 self._input_name = name
 
         if self._input_name is None or self._output_name is None:

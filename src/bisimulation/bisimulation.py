@@ -83,15 +83,18 @@ def _get_trace(
     )
     model = solver.get_model()
     if model is not None:
-        if not buffer_vars:
-            counterexample = "N/A (divergence caused by initial store)"
+        buffer_vars_smt = [var.to_smt(guarded_form.pf) for var in buffer_vars]
+
+        if len(buffer_vars_smt) == 0:
+            counterexample = "N/A (no buffered input)"
+        elif len(buffer_vars_smt) == 1:
+            val = model.get_value(buffer_vars_smt[0]).constant_value()
+            length = len(buffer_vars[0]) if buffer_vars else 0
+            counterexample = bin(val) + '\n' + f"Length: {length} bits"
         else:
-            buffer_vars_smt = [var.to_smt(guarded_form.pf) for var in buffer_vars]
-            stream = bin(
-                model.get_value(pysmt.BVConcat(*buffer_vars_smt)).constant_value()
-            )
+            val = model.get_value(pysmt.BVConcat(*buffer_vars_smt)).constant_value()
             length = sum(len(var) for var in buffer_vars)
-            counterexample = stream + '\n' + f"Length: {length} bits"
+            counterexample = bin(val) + '\n' + f"Length: {length} bits"
 
         lines.insert(
             0, f"A stream for which both parsers differ is:\n{counterexample}\n"

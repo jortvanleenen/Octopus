@@ -3,6 +3,7 @@
 
 struct routing_metadata_t {
     bit<32> nhop_ipv4;
+    bit<14> ecmp_offset;
 }
 
 header ethernet_t {
@@ -41,53 +42,50 @@ header tcp_t {
 }
 
 struct metadata {
-    @name(".routing_metadata") 
     routing_metadata_t routing_metadata;
 }
 
 struct headers {
-    @name(".ethernet") 
     ethernet_t ethernet;
-    @name(".ipv4") 
     ipv4_t     ipv4;
-    @name(".tcp") 
     tcp_t      tcp;
 }
 
 parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @name(".parse_ethernet") state parse_ethernet {
+    state start {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             16w0x800: parse_ipv4;
             default: accept;
         }
     }
-    @name(".parse_ipv4") state parse_ipv4 {
+    
+    state parse_ipv4 {
         packet.extract(hdr.ipv4);
         transition select(hdr.ipv4.protocol) {
             8w6: parse_tcp;
             default: accept;
         }
     }
-    @name(".parse_tcp") state parse_tcp {
+    
+    state parse_tcp {
         packet.extract(hdr.tcp);
         transition accept;
     }
-    @name(".start") state start {
-        transition parse_ethernet;
-    }
+
 }
 
-@name(".ecmp_action_profile") action_selector(HashAlgorithm.crc16, 32w16384, 32w10) ecmp_action_profile;
-
 control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @name(".rewrite_mac") action rewrite_mac(bit<48> smac) {
+    
+    action rewrite_mac(bit<48> smac) {
         hdr.ethernet.srcAddr = smac;
     }
-    @name("._drop") action _drop() {
+    
+    action _drop() {
         mark_to_drop();
     }
-    @name(".send_frame") table send_frame {
+    
+    table send_frame {
         actions = {
             rewrite_mac;
             _drop;
@@ -103,34 +101,48 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
 }
 
 control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @name("._drop") action _drop() {
+    
+    action _drop() {
         mark_to_drop();
     }
-    @name(".set_nhop") action set_nhop(bit<32> nhop_ipv4, bit<9> port) {
+    
+    action set_ecmp_select(bit<8> ecmp_base, bit<8> ecmp_count) {
+        hash(meta.routing_metadata.ecmp_offset, HashAlgorithm.crc16, (bit<10>)ecmp_base, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, (bit<20>)ecmp_count);
+    }
+    
+    action set_nhop(bit<32> nhop_ipv4, bit<9> port) {
         meta.routing_metadata.nhop_ipv4 = nhop_ipv4;
         standard_metadata.egress_spec = port;
         hdr.ipv4.ttl = hdr.ipv4.ttl + 8w255;
     }
-    @name(".set_dmac") action set_dmac(bit<48> dmac) {
+    
+    action set_dmac(bit<48> dmac) {
         hdr.ethernet.dstAddr = dmac;
     }
-    @name(".ecmp_group") table ecmp_group {
+    
+    table ecmp_group {
+        actions = {
+            _drop;
+            set_ecmp_select;
+        }
+        key = {
+            hdr.ipv4.dstAddr: lpm;
+        }
+        size = 1024;
+    }
+    
+    table ecmp_nhop {
         actions = {
             _drop;
             set_nhop;
         }
         key = {
-            hdr.ipv4.dstAddr : lpm;
-            hdr.ipv4.srcAddr : selector;
-            hdr.ipv4.dstAddr : selector;
-            hdr.ipv4.protocol: selector;
-            hdr.tcp.srcPort  : selector;
-            hdr.tcp.dstPort  : selector;
+            meta.routing_metadata.ecmp_offset: exact;
         }
-        size = 1024;
-        implementation = ecmp_action_profile;
+        size = 16384;
     }
-    @name(".forward") table forward {
+    
+    table forward {
         actions = {
             set_dmac;
             _drop;
@@ -140,9 +152,11 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         }
         size = 512;
     }
+    
     apply {
         if (hdr.ipv4.isValid() && hdr.ipv4.ttl > 8w0) {
             ecmp_group.apply();
+            ecmp_nhop.apply();
             forward.apply();
         }
     }

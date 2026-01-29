@@ -1,21 +1,6 @@
+// HEADER START
 #include <core.p4>
-#include <v1model.p4>
-
-struct ingress_metadata_t {
-    bit<32> flow_ipg;
-    bit<13> flowlet_map_index;
-    bit<16> flowlet_id;
-    bit<32> flowlet_lasttime;
-    bit<14> ecmp_offset;
-    bit<32> nhop_ipv4;
-}
-
-struct intrinsic_metadata_t {
-    bit<48> ingress_global_timestamp;
-    bit<32> lf_field_list;
-    bit<16> mcast_grp;
-    bit<16> egress_rid;
-}
+// HEADER END
 
 header ethernet_t {
     bit<48> dstAddr;
@@ -52,13 +37,6 @@ header tcp_t {
     bit<16> urgentPtr;
 }
 
-struct metadata {
-    @name(".ingress_metadata") 
-    ingress_metadata_t   ingress_metadata;
-    @name(".intrinsic_metadata") 
-    intrinsic_metadata_t intrinsic_metadata;
-}
-
 struct headers {
     @name(".ethernet") 
     ethernet_t ethernet;
@@ -68,8 +46,8 @@ struct headers {
     tcp_t      tcp;
 }
 
-parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @name(".parse_ethernet") state parse_ethernet {
+parser Parser(packet_in packet, out headers hdr) {
+    @name(".start") state start {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             16w0x800: parse_ipv4;
@@ -87,145 +65,11 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
         packet.extract(hdr.tcp);
         transition accept;
     }
-    @name(".start") state start {
-        transition parse_ethernet;
-    }
 }
 
-control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    action rewrite_mac(bit<48> smac) {
-        hdr.ethernet.srcAddr = smac;
-    }
-    
-    action _drop() {
-        mark_to_drop();
-    }
-    
-    table send_frame {
-        actions = {
-            rewrite_mac;
-            _drop;
-        }
-        key = {
-            standard_metadata.egress_port: exact;
-        }
-        size = 256;
-    }
-    apply {
-        send_frame.apply();
-    }
-}
+// FOOTER START
+parser Parser_t(packet_in packet, out headers hdr);
+package Package(Parser_t p);
 
-control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    register<bit<16>>(32w8192) flowlet_id;
-    register<bit<32>>(32w8192) flowlet_lasttime;
-    
-    action _drop() {
-        mark_to_drop();
-    }
-    
-    action set_ecmp_select(bit<8> ecmp_base, bit<8> ecmp_count) {
-        hash(meta.ingress_metadata.ecmp_offset, HashAlgorithm.crc16, (bit<10>)ecmp_base, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort, meta.ingress_metadata.flowlet_id }, (bit<20>)ecmp_count);
-    }
-    
-    action set_nhop(bit<32> nhop_ipv4, bit<9> port) {
-        meta.ingress_metadata.nhop_ipv4 = nhop_ipv4;
-        standard_metadata.egress_spec = port;
-        hdr.ipv4.ttl = hdr.ipv4.ttl + 8w255;
-    }
-    
-    action lookup_flowlet_map() {
-        hash(meta.ingress_metadata.flowlet_map_index, HashAlgorithm.crc16, (bit<13>)0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, (bit<26>)13);
-        flowlet_id.read(meta.ingress_metadata.flowlet_id, (bit<32>)meta.ingress_metadata.flowlet_map_index);
-        meta.ingress_metadata.flow_ipg = (bit<32>)meta.intrinsic_metadata.ingress_global_timestamp;
-        flowlet_lasttime.read(meta.ingress_metadata.flowlet_lasttime, (bit<32>)meta.ingress_metadata.flowlet_map_index);
-        meta.ingress_metadata.flow_ipg = meta.ingress_metadata.flow_ipg - meta.ingress_metadata.flowlet_lasttime;
-        flowlet_lasttime.write((bit<32>)meta.ingress_metadata.flowlet_map_index, (bit<32>)meta.intrinsic_metadata.ingress_global_timestamp);
-    }
-    
-    action set_dmac(bit<48> dmac) {
-        hdr.ethernet.dstAddr = dmac;
-    }
-    
-    action update_flowlet_id() {
-        meta.ingress_metadata.flowlet_id = meta.ingress_metadata.flowlet_id + 16w1;
-        flowlet_id.write((bit<32>)meta.ingress_metadata.flowlet_map_index, (bit<16>)meta.ingress_metadata.flowlet_id);
-    }
-    
-    table ecmp_group {
-        actions = {
-            _drop;
-            set_ecmp_select;
-        }
-        key = {
-            hdr.ipv4.dstAddr: lpm;
-        }
-        size = 1024;
-    }
-    
-    table ecmp_nhop {
-        actions = {
-            _drop;
-            set_nhop;
-        }
-        key = {
-            meta.ingress_metadata.ecmp_offset: exact;
-        }
-        size = 16384;
-    }
-    
-    table flowlet {
-        actions = {
-            lookup_flowlet_map;
-        }
-    }
-    
-    table forward {
-        actions = {
-            set_dmac;
-            _drop;
-        }
-        key = {
-            meta.ingress_metadata.nhop_ipv4: exact;
-        }
-        size = 512;
-    }
-    
-    table new_flowlet {
-        actions = {
-            update_flowlet_id;
-        }
-    }
-    apply {
-        flowlet.apply();
-        if (meta.ingress_metadata.flow_ipg > 32w50000) {
-            new_flowlet.apply();
-        }
-        ecmp_group.apply();
-        ecmp_nhop.apply();
-        forward.apply();
-    }
-}
-
-control DeparserImpl(packet_out packet, in headers hdr) {
-    apply {
-        packet.emit(hdr.ethernet);
-        packet.emit(hdr.ipv4);
-        packet.emit(hdr.tcp);
-    }
-}
-
-control verifyChecksum(inout headers hdr, inout metadata meta) {
-    apply {
-        verify_checksum(true, { hdr.ipv4.version, hdr.ipv4.ihl, hdr.ipv4.diffserv, hdr.ipv4.totalLen, hdr.ipv4.identification, hdr.ipv4.flags, hdr.ipv4.fragOffset, hdr.ipv4.ttl, hdr.ipv4.protocol, hdr.ipv4.srcAddr, hdr.ipv4.dstAddr }, hdr.ipv4.hdrChecksum, HashAlgorithm.csum16);
-    }
-}
-
-control computeChecksum(inout headers hdr, inout metadata meta) {
-    apply {
-        update_checksum(true, { hdr.ipv4.version, hdr.ipv4.ihl, hdr.ipv4.diffserv, hdr.ipv4.totalLen, hdr.ipv4.identification, hdr.ipv4.flags, hdr.ipv4.fragOffset, hdr.ipv4.ttl, hdr.ipv4.protocol, hdr.ipv4.srcAddr, hdr.ipv4.dstAddr }, hdr.ipv4.hdrChecksum, HashAlgorithm.csum16);
-    }
-}
-
-V1Switch(ParserImpl(), verifyChecksum(), ingress(), egress(), computeChecksum(), DeparserImpl()) main;
-
+Package(Parser()) main;
+// FOOTER END

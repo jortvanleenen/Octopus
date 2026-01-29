@@ -79,10 +79,8 @@ error { IPHeaderTooShort }
 *********************** P A R S E R  ***********************************
 *************************************************************************/
 
-parser MyParser(packet_in packet,
-                out headers hdr,
-                inout metadata meta,
-                inout standard_metadata_t standard_metadata) {
+parser Parser(packet_in packet,
+                out headers hdr) {
 
     state start {
         transition parse_ethernet;
@@ -98,8 +96,12 @@ parser MyParser(packet_in packet,
 
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
-        verify(hdr.ipv4.ihl >= 5, error.IPHeaderTooShort);
         transition select(hdr.ipv4.ihl) {
+            0             : reject;
+            1             : reject;
+            2             : reject;
+            3             : reject;
+            4             : reject;
             5             : accept;
             default       : parse_ipv4_option;
         }
@@ -115,8 +117,8 @@ parser MyParser(packet_in packet,
 
     state parse_mri {
         packet.extract(hdr.mri);
-        meta.parser_metadata.remaining = hdr.mri.count;
-        transition select(meta.parser_metadata.remaining) {
+        hdr.parser_metadata.remaining = hdr.mri.count;
+        transition select(hdr.parser_metadata.remaining) {
             0 : accept;
             default: parse_swtrace;
         }
@@ -124,8 +126,7 @@ parser MyParser(packet_in packet,
 
     state parse_swtrace {
         packet.extract(hdr.swtrace);
-        meta.parser_metadata.remaining = meta.parser_metadata.remaining  - 1;
-        transition select(meta.parser_metadata.remaining) {
+        transition select(hdr.parser_metadata.remaining) {
             0 : accept;
             default: parse_swtrace;
         }
@@ -134,7 +135,8 @@ parser MyParser(packet_in packet,
 
 
 // FOOTER START
-parser Parser_t(packet_in pkt, out headers_t hdr);
+parser Parser_t(packet_in packet,
+                out headers hdr);
 package Package(Parser_t p);
 
 Package(Parser()) main;
