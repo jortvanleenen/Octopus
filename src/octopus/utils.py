@@ -6,10 +6,12 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import logging
+import os
 import time
-import tracemalloc
 from contextlib import contextmanager
 from typing import Any, Generator
+
+import psutil
 
 logger = logging.getLogger(__name__)
 
@@ -52,19 +54,22 @@ def stat_block(label: str) -> Generator[None, Any, None]:
     :param label: a label for the block of code that is being measured
     :return: a generator that yields control to the block of code
     """
-    tracemalloc.start()
+    process = psutil.Process(os.getpid())
+
     start_wall = time.perf_counter()
     start_cpu = time.process_time()
+
+    peak = process.memory_info().rss
+
     yield
+
     end_wall = time.perf_counter()
     end_cpu = time.process_time()
-    current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+    peak = max(peak, process.memory_info().rss)
 
-    duration_msg = (
+    print(
         f"{label} completed. Timing and memory results:\n"
         f"  Wall time: {end_wall - start_wall:.4f} s\n"
         f"  CPU time:  {end_cpu - start_cpu:.4f} s\n"
-        f"  Peak memory: {peak / 1024:.2f} KiB"
+        f"  Peak RSS:  {peak / (1024 ** 2):.2f} MiB"
     )
-    print(duration_msg)

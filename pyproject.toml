@@ -30,6 +30,7 @@ classifiers = [
 ]
 dependencies = [
     "pySMT ~= 0.9.6",
+    "psutil ~= 7.2.2",
 ]
 
 [project.optional-dependencies]
