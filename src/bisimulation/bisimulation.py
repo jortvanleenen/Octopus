@@ -5,6 +5,7 @@ Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
+from collections import deque
 import logging
 from typing import Any
 
@@ -159,7 +160,7 @@ def symbolic_bisimulation(
 
     knowledge: set[GuardedFormula] = set()
     manager = FormulaManager()
-    work_queue = [GuardedFormula.initial_guard()]
+    work_queue = deque([GuardedFormula.initial_guard()])
     for parser in [parser1, parser2]:
         left = parser.is_left
         for field in parser.get_all_fields():
@@ -168,7 +169,7 @@ def symbolic_bisimulation(
             work_queue[0].pf.set_header_field_var(field, left, var)
     with solver_portfolio as s:
         while len(work_queue) > 0:
-            guarded_form = work_queue.pop(0)
+            guarded_form = work_queue.popleft()
             current_pf = guarded_form.pf
             relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
 
