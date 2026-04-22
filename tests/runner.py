@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-This module contains a benchmark runner which is used for reporting the findings
-in the paper associated with this codebase.
+This module contains a benchmark runner which is used for reporting the
+Leapfrog and Whippersnapper findings.
 
 Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
@@ -14,13 +14,24 @@ import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
-from io import TextIOWrapper
 from pathlib import Path
 from typing import Any, List
 
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from matplotlib.ticker import MaxNLocator, ScalarFormatter
 from tqdm import tqdm
 
+plt.rcParams.update({
+    "axes.titlesize": 20,
+    "axes.labelsize": 18,
+    "xtick.labelsize": 18,
+    "ytick.labelsize": 18,
+})
+
 RUNS_PER_BENCHMARK = 3
+WARMUP_RUNS = 1
 TIME_CMD = ["/usr/bin/time", "-v"]
 
 
@@ -42,172 +53,182 @@ class BenchmarkRun:
     arguments: dict[str, Any]
 
 
-def get_all_benchmarks() -> List[Benchmark]:
+def get_leapfrog_benchmarks() -> List[Benchmark]:
     """
-    Get all benchmarks that are used in the paper.
+    Get the Leapfrog benchmarks that are used in the paper.
 
     :return: a list of Benchmark objects representing the benchmarks
     """
     return [
-        # Benchmark(
-        #     "datacenter",
-        #     Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
-        #     Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
-        # ),
-        # Benchmark(
-        #     "edge_self",
-        #     Path("tests/leapfrog_benchmarks/edge/plain.p4"),
-        #     Path("tests/leapfrog_benchmarks/edge/plain.p4"),
-        # ),
-        # Benchmark(
-        #     "edge_optimised",
-        #     Path("tests/leapfrog_benchmarks/edge/plain.p4"),
-        #     Path("tests/leapfrog_benchmarks/edge/optimised.p4"),
-        # ),
-        # Benchmark(
-        #     "enterprise",
-        #     Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
-        #     Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
-        # ),
-        # Benchmark(
-        #     "external_filtering",
-        #     Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
-        #     Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
-        #     arguments={
-        #         "filter-disagreeing-string":
-        #             "hdr_r.eth.data[15:0] != '0x8600_16' and hdr_r.eth.data[15:0] != '0x86dd_16'"},
-        # ),
-        # Benchmark(
-        #     "relational_verification",
-        #     Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
-        #     Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
-        #     arguments={
-        #         "filter-accepting-string":
-        #             "((hdr_l.eth.data[15:0] == '0x8600_16' and hdr_l.ipv4.data == hdr_r.ipv4.data) "
-        #             "or (hdr_l.eth.data[15:0] == '0x86dd_16' and hdr_l.ipv6.data == hdr_r.ipv6.data))",
-        #         "filter-disagreeing-string": "True",
-        #     },
-        # ),
-        # Benchmark(
-        #     "header_initialisation",
-        #     Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
-        #     Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
-        # ),
-        # Benchmark(
-        #     "service_provider",
-        #     Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
-        #     Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
-        # ),
-        # Benchmark(
-        #     "speculative_extraction",
-        #     Path("tests/leapfrog_benchmarks/speculative_extraction/mpls.p4"),
-        #     Path("tests/leapfrog_benchmarks/speculative_extraction/mpls_vectorised.p4"),
-        # ),
-        # Benchmark(
-        #     "state_rearrangement",
-        #     Path("tests/leapfrog_benchmarks/state_rearrangement/combined_states.p4"),
-        #     Path("tests/leapfrog_benchmarks/state_rearrangement/separate_states.p4"),
-        # ),
-        # Benchmark(
-        #     "variable_length_formats_2",
-        #     Path("tests/leapfrog_benchmarks/variable_length_formats_2/ipoptions.p4"),
-        #     Path("tests/leapfrog_benchmarks/variable_length_formats_2/timestamp.p4"),
-        # ),
-        # Benchmark(
-        #     "variable_length_formats_3",
-        #     Path("tests/leapfrog_benchmarks/variable_length_formats_3/ipoptions.p4"),
-        #     Path("tests/leapfrog_benchmarks/variable_length_formats_3/timestamp.p4"),
-        # ),
+        Benchmark(
+            "datacenter",
+            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
+            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
+        ),
+        Benchmark(
+            "edge_self",
+            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+        ),
+        Benchmark(
+            "edge_optimised",
+            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+            Path("tests/leapfrog_benchmarks/edge/optimised.p4"),
+        ),
+        Benchmark(
+            "enterprise",
+            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
+            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
+        ),
+        Benchmark(
+            "external_filtering",
+            Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
+            Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
+            arguments={
+                "filter-disagreeing-string":
+                    "hdr_r.eth.data[15:0] != '0x8600_16' and hdr_r.eth.data[15:0] != '0x86dd_16'"},
+        ),
+        Benchmark(
+            "relational_verification",
+            Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
+            Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
+            arguments={
+                "filter-accepting-string":
+                    "((hdr_l.eth.data[15:0] == '0x8600_16' and hdr_l.ipv4.data == hdr_r.ipv4.data) "
+                    "or (hdr_l.eth.data[15:0] == '0x86dd_16' and hdr_l.ipv6.data == hdr_r.ipv6.data))",
+                "filter-disagreeing-string": "True",
+            },
+        ),
+        Benchmark(
+            "header_initialisation",
+            Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
+            Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
+        ),
+        Benchmark(
+            "service_provider",
+            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
+            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
+        ),
+        Benchmark(
+            "speculative_extraction",
+            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls.p4"),
+            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls_vectorised.p4"),
+        ),
+        Benchmark(
+            "state_rearrangement",
+            Path("tests/leapfrog_benchmarks/state_rearrangement/combined_states.p4"),
+            Path("tests/leapfrog_benchmarks/state_rearrangement/separate_states.p4"),
+        ),
+        Benchmark(
+            "variable_length_formats_2",
+            Path("tests/leapfrog_benchmarks/variable_length_formats_2/ipoptions.p4"),
+            Path("tests/leapfrog_benchmarks/variable_length_formats_2/timestamp.p4"),
+        ),
+        Benchmark(
+            "variable_length_formats_3",
+            Path("tests/leapfrog_benchmarks/variable_length_formats_3/ipoptions.p4"),
+            Path("tests/leapfrog_benchmarks/variable_length_formats_3/timestamp.p4"),
+        ),
+    ]
+
+
+def get_whippersnapper_benchmarks() -> List[Benchmark]:
+    """
+    Get the Whippersnapper benchmarks that are used in the paper.
+
+    :return: a list of Benchmark objects representing the benchmarks
+    """
+    return [
         Benchmark(
             "parse_field_1",
             Path("tests/whippersnapper/parse-field/1.p4"),
             Path("tests/whippersnapper/parse-field/1.p4"),
         ),
-        # Benchmark(
-        #     "parse_field_4",
-        #     Path("tests/whippersnapper/parse-field/4.p4"),
-        #     Path("tests/whippersnapper/parse-field/4.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_field_16",
-        #     Path("tests/whippersnapper/parse-field/16.p4"),
-        #     Path("tests/whippersnapper/parse-field/16.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_field_64",
-        #     Path("tests/whippersnapper/parse-field/64.p4"),
-        #     Path("tests/whippersnapper/parse-field/64.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_header_4_1",
-        #     Path("tests/whippersnapper/parse-header/4-1.p4"),
-        #     Path("tests/whippersnapper/parse-header/4-1.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_header_4_4",
-        #     Path("tests/whippersnapper/parse-header/4-4.p4"),
-        #     Path("tests/whippersnapper/parse-header/4-4.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_header_4_16",
-        #     Path("tests/whippersnapper/parse-header/4-16.p4"),
-        #     Path("tests/whippersnapper/parse-header/4-16.p4"),
-        # ),
+        Benchmark(
+            "parse_field_4",
+            Path("tests/whippersnapper/parse-field/4.p4"),
+            Path("tests/whippersnapper/parse-field/4.p4"),
+        ),
+        Benchmark(
+            "parse_field_16",
+            Path("tests/whippersnapper/parse-field/16.p4"),
+            Path("tests/whippersnapper/parse-field/16.p4"),
+        ),
+        Benchmark(
+            "parse_field_64",
+            Path("tests/whippersnapper/parse-field/64.p4"),
+            Path("tests/whippersnapper/parse-field/64.p4"),
+        ),
+        Benchmark(
+            "parse_header_4_1",
+            Path("tests/whippersnapper/parse-header/4-1.p4"),
+            Path("tests/whippersnapper/parse-header/4-1.p4"),
+        ),
+        Benchmark(
+            "parse_header_4_4",
+            Path("tests/whippersnapper/parse-header/4-4.p4"),
+            Path("tests/whippersnapper/parse-header/4-4.p4"),
+        ),
+        Benchmark(
+            "parse_header_4_16",
+            Path("tests/whippersnapper/parse-header/4-16.p4"),
+            Path("tests/whippersnapper/parse-header/4-16.p4"),
+        ),
         Benchmark(
             "parse_header_4_32",
             Path("tests/whippersnapper/parse-header/4-32.p4"),
             Path("tests/whippersnapper/parse-header/4-32.p4"),
         ),
-        # Benchmark(
-        #     "parse_header_1_64",
-        #     Path("tests/whippersnapper/parse-header/1-64.p4"),
-        #     Path("tests/whippersnapper/parse-header/1-64.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_header_1_98",
-        #     Path("tests/whippersnapper/parse-header/1-98.p4"),
-        #     Path("tests/whippersnapper/parse-header/1-98.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_complex_2_2",
-        #     Path("tests/whippersnapper/parse-complex/2-2.p4"),
-        #     Path("tests/whippersnapper/parse-complex/2-2.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_complex_2_4",
-        #     Path("tests/whippersnapper/parse-complex/2-4.p4"),
-        #     Path("tests/whippersnapper/parse-complex/2-4.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_complex_2_6",
-        #     Path("tests/whippersnapper/parse-complex/2-6.p4"),
-        #     Path("tests/whippersnapper/parse-complex/2-6.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_complex_3_3",
-        #     Path("tests/whippersnapper/parse-complex/3-3.p4"),
-        #     Path("tests/whippersnapper/parse-complex/3-3.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_complex_3_4",
-        #     Path("tests/whippersnapper/parse-complex/3-4.p4"),
-        #     Path("tests/whippersnapper/parse-complex/3-4.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_complex_4_2",
-        #     Path("tests/whippersnapper/parse-complex/4-2.p4"),
-        #     Path("tests/whippersnapper/parse-complex/4-2.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_complex_4_3",
-        #     Path("tests/whippersnapper/parse-complex/4-3.p4"),
-        #     Path("tests/whippersnapper/parse-complex/4-3.p4"),
-        # ),
-        # Benchmark(
-        #     "parse_complex_6_2",
-        #     Path("tests/whippersnapper/parse-complex/6-2.p4"),
-        #     Path("tests/whippersnapper/parse-complex/6-2.p4"),
-        # ),
+        Benchmark(
+            "parse_header_1_64",
+            Path("tests/whippersnapper/parse-header/1-64.p4"),
+            Path("tests/whippersnapper/parse-header/1-64.p4"),
+        ),
+        Benchmark(
+            "parse_header_1_98",
+            Path("tests/whippersnapper/parse-header/1-98.p4"),
+            Path("tests/whippersnapper/parse-header/1-98.p4"),
+        ),
+        Benchmark(
+            "parse_complex_2_2",
+            Path("tests/whippersnapper/parse-complex/2-2.p4"),
+            Path("tests/whippersnapper/parse-complex/2-2.p4"),
+        ),
+        Benchmark(
+            "parse_complex_2_4",
+            Path("tests/whippersnapper/parse-complex/2-4.p4"),
+            Path("tests/whippersnapper/parse-complex/2-4.p4"),
+        ),
+        Benchmark(
+            "parse_complex_2_6",
+            Path("tests/whippersnapper/parse-complex/2-6.p4"),
+            Path("tests/whippersnapper/parse-complex/2-6.p4"),
+        ),
+        Benchmark(
+            "parse_complex_3_3",
+            Path("tests/whippersnapper/parse-complex/3-3.p4"),
+            Path("tests/whippersnapper/parse-complex/3-3.p4"),
+        ),
+        Benchmark(
+            "parse_complex_3_4",
+            Path("tests/whippersnapper/parse-complex/3-4.p4"),
+            Path("tests/whippersnapper/parse-complex/3-4.p4"),
+        ),
+        Benchmark(
+            "parse_complex_4_2",
+            Path("tests/whippersnapper/parse-complex/4-2.p4"),
+            Path("tests/whippersnapper/parse-complex/4-2.p4"),
+        ),
+        Benchmark(
+            "parse_complex_4_3",
+            Path("tests/whippersnapper/parse-complex/4-3.p4"),
+            Path("tests/whippersnapper/parse-complex/4-3.p4"),
+        ),
+        Benchmark(
+            "parse_complex_6_2",
+            Path("tests/whippersnapper/parse-complex/6-2.p4"),
+            Path("tests/whippersnapper/parse-complex/6-2.p4"),
+        ),
         # Benchmark(
         #     "equiv_field_4_and_header_4_1",
         #     Path("tests/whippersnapper/parse-field/4.p4"),
@@ -231,11 +252,6 @@ def get_all_benchmarks() -> List[Benchmark]:
         #             "hdr_r.ptp.reserved2 == '1_8'",
         #     }
         # ),
-        Benchmark(
-            "parse_complex_4_4",
-            Path("tests/whippersnapper/parse-complex/4-4.p4"),
-            Path("tests/whippersnapper/parse-complex/4-4.p4"),
-        ),
     ]
 
 
@@ -246,176 +262,260 @@ def get_all_run_variants() -> List[BenchmarkRun]:
     :return: a list of BenchmarkRun objects representing the variants
     """
     return [
-        BenchmarkRun("octopus_default", {}),
+        BenchmarkRun("octopus_default", {"solvers": "['z3', 'cvc5']"})
     ]
 
 
-def run_benchmarks(
-        benchmarks: List[Benchmark],
-        variants: List[BenchmarkRun],
-        output_file: str | None = None,
-) -> None:
-    """
-    Run the benchmarks with the given variants and output the results.
+def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun, tmp_path: str):
+    times = []
+    memory = []
 
-    :param benchmarks: the selected benchmarks to run
-    :param variants: the selected variants to run
-    :param output_file: the file to write the output to, or None for stdout
-    """
-    with tempfile.NamedTemporaryFile(mode="w", delete=True) as tmp_output:
-        tmp_path = tmp_output.name
-
-        output_stream = None
-        if output_file:
-            try:
-                output_stream = open(output_file, "w", encoding="utf-8")
-            except OSError:
-                sys.exit(1)
-
-        for variant in tqdm(variants, desc="Variants"):
-            for benchmark in tqdm(benchmarks, desc="Benchmarks", leave=False):
-                run_benchmark(benchmark, variant, output_stream, tmp_path)
-
-        if output_stream:
-            output_stream.close()
-
-
-def run_benchmark(
-        benchmark: Benchmark,
-        variant: BenchmarkRun,
-        output_stream: TextIOWrapper,
-        tmp_path: str,
-) -> None:
-    """
-    Run a single benchmark with the given variant and output the results.
-
-    :param benchmark: the benchmark to run
-    :param variant: the variant to run the benchmark with
-    :param output_stream: the stream to write the output to
-    :param tmp_path: the temporary file path to write the output to during execution
-    """
-    times: list[float] = []
-    memory_usages: list[float] = []
-    for i in range(RUNS_PER_BENCHMARK + 1):
+    for i in range(WARMUP_RUNS + RUNS_PER_BENCHMARK):
         cmd = TIME_CMD + [
-            "python3",
-            "-m",
-            "octopus.main",
-            "--output",
-            tmp_path,
+            "python3", "-m", "octopus.main",
+            "--output", tmp_path
         ]
 
         if variant.arguments:
-            for arg_name, arg_value in variant.arguments.items():
-                cmd.extend([f"--{arg_name}", str(arg_value)])
+            for k, v in variant.arguments.items():
+                cmd.extend([f"--{k}", str(v)])
 
         if benchmark.arguments:
-            for arg_name, arg_value in benchmark.arguments.items():
-                cmd.extend([f"--{arg_name}", str(arg_value)])
+            for k, v in benchmark.arguments.items():
+                cmd.extend([f"--{k}", str(v)])
 
-        cmd.extend(
-            [
-                str(benchmark.file1),
-                str(benchmark.file2),
-            ]
-        )
+        cmd.extend([str(benchmark.file1), str(benchmark.file2)])
 
         result = subprocess.run(
             cmd,
             stderr=subprocess.PIPE,
-            stdout=sys.stdout,
             text=True,
-            shell=False,
         )
-        if output_stream is None:
-            print(result.stderr)
+
+        if i >= WARMUP_RUNS:
+            t = re.search(r"Elapsed .*?:\s*(?:(\d+):)?(\d+):(\d+(?:\.\d+)?)", result.stderr)
+            m = re.search(r"Maximum resident set size .*?:\s*(\d+)", result.stderr)
+
+            if t:
+                h = int(t.group(1)) if t.group(1) else 0
+                total = h * 3600 + int(t.group(2)) * 60 + float(t.group(3))
+                times.append(total)
+
+            if m:
+                memory.append((int(m.group(1)) * 1000) / (1024 ** 2))
+
+    return statistics.mean(times), statistics.mean(memory)
+
+
+def run_leapfrog(benchmarks, variants):
+    for variant in variants:
+        times, memory = [], []
+
+        with tempfile.NamedTemporaryFile() as tmp:
+            for b in tqdm(benchmarks, desc="Leapfrog"):
+                t, m = run_benchmark(b, variant, tmp.name)
+                times.append(t)
+                memory.append(m)
+
+                tqdm.write(
+                    f"{variant.name} | {b.name}: {t:.2f}s, {m:.2f} MiB"
+                )
+
+
+def run_whippersnapper(benchmarks, variants):
+    results = []
+
+    with tempfile.NamedTemporaryFile() as tmp:
+        for variant in variants:
+            for b in tqdm(benchmarks, desc="Whippersnapper"):
+                t, m = run_benchmark(b, variant, tmp.name)
+                results.append((b.name, t, m))
+
+    plot(results)
+
+
+def plot(results):
+    data = {"field": [], "header": [], "complex": []}
+    pattern = re.compile(r'parse_(field|header|complex)_(\d+)(?:_(\d+))?')
+
+    for name, t, m in results:
+        match = pattern.match(name)
+        if not match:
+            continue
+
+        kind, a, b = match.groups()
+        a = int(a)
+        b = int(b) if b else None
+
+        if kind == "field":
+            x = a
+            label = str(a)
+        elif kind == "header":
+            x = b
+            label = str(b)
         else:
-            output_stream.write(result.stderr + "\n")
-            output_stream.flush()
+            d, f = a, b
+            x = (f ** (d + 1) - 1) / (f - 1)
+            label = f"{d},{f}"
 
-        if i > 0:  # Skip the first run due to cold start effects
-            time_match = re.search(
-                r"Elapsed \(wall clock\) time.*?:\s*(?:(\d+):)?(\d+):(\d+(?:\.\d+)?)",
-                result.stderr,
-            )
-            if time_match:
-                hours = int(time_match.group(1)) if time_match.group(1) else 0
-                minutes = int(time_match.group(2))
-                seconds = float(time_match.group(3))
-                total_time = hours * 3600 + minutes * 60 + seconds
-                times.append(total_time)
+        data[kind].append((x, t, m, label))
 
-            memory_match = re.search(
-                r"Maximum resident set size \(kbytes\):\s*(\d+)",
-                result.stderr,
-            )
-            if memory_match:
-                memory_usage_kb = int(memory_match.group(1))
-                mib = (memory_usage_kb * 1000) / (1024 ** 2)
-                memory_usages.append(mib)
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5.5))
 
-    avg_time = statistics.mean(times)
-    avg_memory_usage = statistics.mean(memory_usages)
-    output = (
-        f"({variant.name}) - benchmark {benchmark.name}: "
-        f"avg. wall time: {avg_time:.2f} seconds, "
-        f"avg. max. memory usage: {avg_memory_usage:.2f} MiB"
+    titles = {
+        "field": "parse-field",
+        "header": "parse-header",
+        "complex": "parse-complex (d,f)",
+    }
+
+    x_axes = {
+        "field": "#Fields",
+        "header": "#Headers",
+        "complex": "#States"
+    }
+
+    TIME_COLOUR = "#0C7BDC"
+    MEM_COLOUR = "#FFC20A"
+
+    for col, kind in enumerate(["field", "header", "complex"]):
+        if not data[kind]:
+            continue
+
+        xs = np.array([e[0] for e in data[kind]])
+        ts = np.array([e[1] for e in data[kind]])
+        ms = np.array([e[2] for e in data[kind]])
+
+        order = np.argsort(xs)
+        xs, ts, ms = xs[order], ts[order], ms[order]
+
+        ax_time = axes[col]
+        ax_mem = ax_time.twinx()
+
+        ax_time.set_zorder(2)
+        ax_mem.set_zorder(1)
+        ax_time.patch.set_visible(False)
+
+        ax_time.plot(xs, ts, linestyle='-', linewidth=2,
+                     color=TIME_COLOUR, zorder=3)
+        ax_time.scatter(xs, ts, marker='o',
+                        color=TIME_COLOUR, zorder=4, s=100)
+
+        ax_mem.plot(xs, ms, linestyle='--', linewidth=2,
+                    color=MEM_COLOUR, zorder=3)
+        ax_mem.scatter(xs, ms, marker='s',
+                       color=MEM_COLOUR, zorder=4, s=100)
+
+        ax_time.set_title(titles[kind], fontweight="bold", pad=10)
+        ax_time.set_xlabel(x_axes[kind], fontweight="bold")
+        ax_time.set_ylabel("Time (s)", fontweight="bold")
+        ax_mem.set_ylabel("Memory (MiB)", fontweight="bold")
+
+        ax_time.set_yscale("linear")
+        ax_mem.set_yscale("linear")
+
+        if kind == "field":
+            ax_time.set_ylim(bottom=0)
+
+        ax_time.yaxis.set_major_locator(MaxNLocator(nbins=5))
+        ax_mem.yaxis.set_major_locator(MaxNLocator(nbins=5))
+
+        formatter = ScalarFormatter()
+        formatter.set_scientific(False)
+        formatter.set_useOffset(False)
+        ax_mem.yaxis.set_major_formatter(formatter)
+
+        ax_time.grid(True, which="both", axis="y", alpha=0.4)
+
+        for x, t, m, lbl in data[kind]:
+            if kind == "complex":
+                if lbl not in {"4,3", "6,2"}:
+                    offset = (-24, 10)
+                else:
+                    offset = (-40, -2)
+
+                ax_time.annotate(
+                    lbl, (x, t),
+                    textcoords="offset points",
+                    xytext=offset,
+                    fontsize=16,
+                    fontweight="bold",
+                    zorder=10
+                )
+
+    legend_elements = [
+        Line2D([0], [0], marker='o', linestyle='-',
+               color=TIME_COLOUR, label='Time', markersize=7),
+        Line2D([0], [0], marker='s', linestyle='--',
+               color=MEM_COLOUR, label='Memory', markersize=7),
+    ]
+
+    fig.legend(
+        handles=legend_elements,
+        loc="upper center",
+        ncol=2,
+        frameon=False,
+        markerscale=1.4,
+        prop={"size": 16, "weight": "bold"}
     )
-    if output_stream is None:
-        print(output)
-    else:
-        output_stream.write(output + "\n")
-        output_stream.flush()
+
+    plt.subplots_adjust(
+        left=0.06,
+        right=0.94,
+        top=0.85,
+        bottom=0.15,
+        wspace=0.5,
+    )
+
+    plt.savefig("whippersnapper_plot.png", dpi=300, bbox_inches="tight")
+    plt.close()
 
 
 def main() -> None:
     """Entry point of the benchmark runner."""
     parser = argparse.ArgumentParser()
 
-    available_benchmark_names = [bench.name for bench in get_all_benchmarks()]
-    parser.add_argument(
-        "--benchmark",
-        nargs="+",
-        help="List of benchmarks to run. If not provided, all benchmarks will be run. Available: "
-             + ", ".join(available_benchmark_names),
-    )
-
-    available_variant_names = [variant.name for variant in get_all_run_variants()]
-    parser.add_argument(
-        "--variant",
-        nargs="+",
-        help="List of variants to run. If not provided, all variants will be run. Available: "
-             + ", ".join(available_variant_names),
-    )
-
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        help="Write the benchmark results to this file. If not provided, stdout is used",
-    )
+    parser.add_argument("--suite", choices=["leapfrog", "whippersnapper"], required=True)
+    parser.add_argument("--benchmark", nargs="+")
+    parser.add_argument("--variant", nargs="+")
 
     args = parser.parse_args()
 
-    all_benchmarks = get_all_benchmarks()
-    selected_benchmarks = (
-        [b for b in all_benchmarks if b.name in args.benchmark]
-        if args.benchmark
-        else all_benchmarks
-    )
+    if args.suite == "leapfrog":
+        all_benchmarks = get_leapfrog_benchmarks()
+    else:
+        all_benchmarks = get_whippersnapper_benchmarks()
+
+    if args.benchmark:
+        selected_benchmarks = [b for b in all_benchmarks if b.name in args.benchmark]
+        invalid = set(args.benchmark) - {b.name for b in all_benchmarks}
+        if invalid:
+            print(f"Unknown benchmarks: {invalid}")
+            sys.exit(1)
+    else:
+        selected_benchmarks = all_benchmarks
 
     all_variants = get_all_run_variants()
-    selected_variants = (
-        [v for v in all_variants if v.name in args.variant]
-        if args.variant
-        else all_variants
-    )
+    if args.variant:
+        selected_variants = [v for v in all_variants if v.name in args.variant]
+        invalid = set(args.variant) - {v.name for v in all_variants}
+        if invalid:
+            print(f"Unknown variants: {invalid}")
+            sys.exit(1)
+    else:
+        selected_variants = all_variants
 
-    if len(selected_benchmarks) == 0 or len(selected_variants) == 0:
-        print("No benchmarks or variants selected. Exiting.")
+    if not selected_benchmarks:
+        print("No benchmarks selected")
         sys.exit(1)
 
-    run_benchmarks(selected_benchmarks, selected_variants, args.output)
+    if not selected_variants:
+        print("No variants selected")
+        sys.exit(1)
+
+    if args.suite == "leapfrog":
+        run_leapfrog(selected_benchmarks, selected_variants)
+    else:
+        run_whippersnapper(selected_benchmarks, selected_variants)
 
 
 if __name__ == "__main__":

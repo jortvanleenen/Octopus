@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""
+This module contains a runner for an experiment on public P4 code.
+
+Author: Jort van Leenen
+License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
+"""
 
 import argparse
 import subprocess
@@ -72,8 +78,6 @@ def run_equivalence_checks(p4_files: list[Path]) -> None:
             break
 
         out = result.stdout
-        print(result.stdout)
-        print(result.stderr)
 
         wall_match = wall_re.search(out)
         mem_match = mem_re.search(out)
@@ -113,8 +117,9 @@ def main() -> None:
         )
     )
     parser.add_argument(
-        "directory",
+        "--directory",
         type=Path,
+        default=Path("p4-programs-survey"),
         help="Directory containing P4 programs",
     )
 
