@@ -13,10 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-## [v1.2.1] - 2026-01-29
+## [v1.3.0] - 2026-04-22
 
-This release represents the version of the codebase that was published alongside its accompanying paper (see the
-README.md file).
+This release marks the codebase version as used with the accompanying paper.
+
+### Added
+
+### Changed
+
+- General improvements and fixes were made.
+
+### Removed
+
+## [v1.2.1] - 2026-01-29
 
 ### Added
 
