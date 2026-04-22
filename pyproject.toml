@@ -36,9 +36,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "matplotlib ~= 3.10.8",
-    "numpy ~= 2.2.6",
-    "pre-commit ~= 4.5.1",
-    "ruff ~= 0.14.14",
+    "numpy ~= 2.4.4",
+    "pre-commit ~= 4.6.0",
+    "ruff ~= 0.15.11",
     "tqdm ~= 4.67.1",
 ]
 
