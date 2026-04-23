@@ -262,7 +262,7 @@ def get_all_run_variants() -> List[BenchmarkRun]:
     :return: a list of BenchmarkRun objects representing the variants
     """
     return [
-        BenchmarkRun("octopus_default", {"solvers": "['z3', 'cvc5']"})
+        BenchmarkRun("octopus_default", {})
     ]
 
 
