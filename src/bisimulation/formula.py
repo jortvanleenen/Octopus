@@ -189,6 +189,43 @@ class FormulaManager(ReprMixin):
         This manager is responsible for generating fresh variable names.
         """
         self._next_free_var_name: int = 0
+        self._header_field_vars = {}
+        self._buf_vars: dict[bool, Variable | None] = {}
+
+    @property
+    def header_field_vars(self) -> dict[tuple[str, bool], Variable | None]:
+        return self._header_field_vars
+
+    @property
+    def buf_vars(self) -> dict[bool, Variable | None]:
+        return self._buf_vars
+
+    def set_header_field_var(self, name: str, left: bool, variable: Variable | None) -> None:
+        """
+        Set the Variable object for the given header field name.
+
+        :param name: name of the header field
+        :param left: whether to set the header field for the left or right parser
+        :param variable: the Variable object to set for the header field
+        """
+        if variable is None:
+            logger.warning(
+                "Setting header field variable to None, this may cause issues"
+            )
+        self.header_field_vars[(name, left)] = variable
+
+    def set_buffer_var(self, left: bool, variable: Variable | None) -> None:
+        """
+        Set the Variable object for the given buffer field name.
+
+        :param left: whether to set the buffer field for the left or right parser
+        :param variable: the Variable object to set for the buffer field
+        """
+        if variable is None:
+            logger.warning(
+                "Setting buffer field variable to None, this may cause issues"
+            )
+        self._buf_vars[left] = variable
 
     def fresh_name(self) -> str:
         """
@@ -217,6 +254,7 @@ class PureFormula(ReprMixin):
             header_field_vars: dict[tuple[str, bool], Variable] = None,
             buf_vars: dict[bool, Variable] = None,
             used_vars: set[Variable] = None,
+            used_buf_vars: set[Variable] = None,
             stream_var: Variable = None,
     ):
         """
@@ -237,6 +275,9 @@ class PureFormula(ReprMixin):
         self._used_vars = (
             used_vars if used_vars is not None else self.root.used_vars(self)
         )
+        self._used_buf_vars = (
+            used_buf_vars if used_buf_vars is not None else set()
+        )
         self.stream_var = stream_var if stream_var is not None else None
 
     @classmethod
@@ -246,6 +287,7 @@ class PureFormula(ReprMixin):
             header_field_vars: dict[tuple[str, bool], Variable],
             buf_vars: dict[bool, Variable],
             stream_var: Variable,
+            used_buf_vars: set[Variable],
     ):
         """
         Create a clone of the PureFormula with deep copies of its components.
@@ -261,6 +303,7 @@ class PureFormula(ReprMixin):
             copy.deepcopy(header_field_vars),
             copy.deepcopy(buf_vars),
             stream_var=stream_var,
+            used_buf_vars=used_buf_vars,
         )
 
     @property
@@ -290,6 +333,14 @@ class PureFormula(ReprMixin):
         """
         return self._used_vars
 
+    @property
+    def used_buf_vars(self) -> set[Variable]:
+        return self._used_buf_vars
+
+    @property
+    def exists_vars(self) -> set[Variable]:
+        return self._used_vars - self._used_buf_vars - set(self._header_field_vars.values())
+
     def deepcopy(self) -> PureFormula:
         """
         Create a deep copy of the PureFormula instance.
@@ -299,6 +350,7 @@ class PureFormula(ReprMixin):
             self.header_field_vars,
             self.buf_vars,
             self.stream_var,
+            self.used_buf_vars
         )
 
     def get_header_field_var(self, name: str, left: bool) -> Variable | None:
@@ -311,21 +363,6 @@ class PureFormula(ReprMixin):
         """
         return self.header_field_vars.get((name, left))
 
-    def set_header_field_var(self, name: str, left: bool, variable: Variable) -> None:
-        """
-        Set the Variable object for the given header field name.
-
-        :param name: name of the header field
-        :param left: whether to set the header field for the left or right parser
-        :param variable: the Variable object to set for the header field
-        """
-        self.header_field_vars[(name, left)] = variable
-        if variable is None:
-            logger.warning(
-                "Setting header field variable to None, this may cause issues"
-            )
-        self.used_vars.add(variable)
-
     def get_buffer_var(self, left: bool) -> Variable | None:
         """
         Get the Variable object for the given buffer field name.
@@ -334,17 +371,6 @@ class PureFormula(ReprMixin):
         :return: the Variable object if found, else None
         """
         return self._buf_vars.get(left)
-
-    def set_buffer_var(self, left: bool, var: Variable | None) -> None:
-        """
-        Set the Variable object for the given buffer field name.
-
-        :param left: whether to set the buffer field for the left or right parser
-        :param var: the Variable object to set for the buffer field
-        """
-        self._buf_vars[left] = var
-        if var is not None:
-            self.used_vars.add(var)
 
     def substitute(self, mapping: dict[Variable, FormulaNode]) -> None:
         """
