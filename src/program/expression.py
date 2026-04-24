@@ -64,12 +64,12 @@ class BinaryExpression(Expression, ABC):
 
 class Concatenate(BinaryExpression):
     def __init__(
-        self,
-        program: ParserProgram,
-        obj: dict | None = None,
-        *,
-        left: Expression | FormulaNode | None = None,
-        right: Expression | FormulaNode | None = None,
+            self,
+            program: ParserProgram,
+            obj: dict | None = None,
+            *,
+            left: Expression | FormulaNode | None = None,
+            right: Expression | FormulaNode | None = None,
     ) -> None:
         self._program = program
         if obj is not None:
@@ -93,7 +93,7 @@ class Concatenate(BinaryExpression):
         return BVConcat(self.left.to_smt(pf), self.right.to_smt(pf))
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> Concatenate:
         self.left = self.left.substitute(pf, mapping)
         self.right = self.right.substitute(pf, mapping)
@@ -137,7 +137,7 @@ class Slice(Expression):
         return self.reference.used_vars(pf)
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         self.reference = self.reference.substitute(pf, mapping)
         return self
@@ -174,7 +174,7 @@ class Constant(Expression):
         return BV(self.numeric_value, len(self))
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return self
 
@@ -204,7 +204,7 @@ class DontCare(Expression):
         return TRUE()
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return self
 
@@ -270,7 +270,7 @@ class Reference(Expression):
         return {self.variable}
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return self.variable.substitute(pf, mapping)
 
@@ -281,14 +281,18 @@ class Reference(Expression):
         return str(self._reference)
 
 
+class MethodCall(Expression):
+    pass
+
+
 class BVAnd(BinaryExpression):
     def __init__(
-        self,
-        program: ParserProgram,
-        obj: dict | None = None,
-        *,
-        left: Expression | None = None,
-        right: Expression | None = None,
+            self,
+            program: ParserProgram,
+            obj: dict | None = None,
+            *,
+            left: Expression | None = None,
+            right: Expression | None = None,
     ) -> None:
         self._program = program
         self.left: Expression | None = None
@@ -315,7 +319,7 @@ class BVAnd(BinaryExpression):
         return pysmt.BVAnd(self.left.to_smt(pf), self.right.to_smt(pf))
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         self.left = self.left.substitute(pf, mapping)
         self.right = self.right.substitute(pf, mapping)
@@ -330,12 +334,12 @@ class BVAnd(BinaryExpression):
 
 class BVLShr(BinaryExpression):
     def __init__(
-        self,
-        program: ParserProgram,
-        obj: dict | None = None,
-        *,
-        left: Expression | None = None,
-        right: Expression | None = None,
+            self,
+            program: ParserProgram,
+            obj: dict | None = None,
+            *,
+            left: Expression | None = None,
+            right: Expression | None = None,
     ) -> None:
         self._program = program
         self.left: Expression | None = None
@@ -362,7 +366,7 @@ class BVLShr(BinaryExpression):
         return pysmt.BVLShr(self.left.to_smt(pf), self.right.to_smt(pf))
 
     def substitute(
-        self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         self.left = self.left.substitute(pf, mapping)
         self.right = self.right.substitute(pf, mapping)
@@ -390,6 +394,9 @@ _EXPRESSION_DISPATCH: dict[
     "Member": lambda program, component, size_context: Reference(
         program=program, obj=component
     ),
+    "MethodCallExpression": lambda program, component, size_context: MethodCall(
+        program=program, obj=component
+    ),
     "PathExpression": lambda program, component, size_context: Reference(
         program=program, obj=component
     ),
@@ -404,7 +411,7 @@ _EXPRESSION_DISPATCH: dict[
 
 
 def parse_expression(
-    program: ParserProgram, component: dict, size_context: int = None
+        program: ParserProgram, component: dict, size_context: int = None
 ) -> Expression:
     """
     Parse a P4 expression component into an Expression object.

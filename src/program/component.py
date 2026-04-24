@@ -101,6 +101,9 @@ class Assignment(Component):
             And(new_pf.root, Equals(new_var, right_copy)),
             new_pf.header_field_vars,
             new_pf.buf_vars,
+            new_pf.used_vars,
+            new_pf.used_buf_vars,
+            new_pf.stream_var,
         )
 
     def __repr__(self):
@@ -176,6 +179,9 @@ class Extract(Component):
             And(pf.root, Equals(buffer_var, new_buffer)),
             pf.header_field_vars,
             pf.buf_vars,
+            pf.used_vars,
+            pf.used_buf_vars,
+            pf.stream_var,
         )
 
         logger.debug(

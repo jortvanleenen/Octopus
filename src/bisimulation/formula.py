@@ -208,9 +208,9 @@ class FormulaManager(ReprMixin):
         :param left: whether to set the header field for the left or right parser
         :param variable: the Variable object to set for the header field
         """
-        if variable is None:
+        if variable is None or (name, left) in self._header_field_vars:
             logger.warning(
-                "Setting header field variable to None, this may cause issues"
+                "Overriding header field variable may cause issues"
             )
         self.header_field_vars[(name, left)] = variable
 
@@ -226,6 +226,25 @@ class FormulaManager(ReprMixin):
                 "Setting buffer field variable to None, this may cause issues"
             )
         self._buf_vars[left] = variable
+
+    def get_header_field_var(self, name: str, left: bool) -> Variable | None:
+        """
+        Get the Variable object for the given header field name.
+
+        :param name: name of the header field
+        :param left: whether to get the header field for the left or right parser
+        :return: the Variable object if found, else None
+        """
+        return self.header_field_vars.get((name, left))
+
+    def get_buffer_var(self, left: bool) -> Variable | None:
+        """
+        Get the Variable object for the given buffer field name.
+
+        :param left: whether to get the buffer field for the left or right parser
+        :return: the Variable object if found, else None
+        """
+        return self._buf_vars.get(left)
 
     def fresh_name(self) -> str:
         """
@@ -353,25 +372,6 @@ class PureFormula(ReprMixin):
             self.used_buf_vars
         )
 
-    def get_header_field_var(self, name: str, left: bool) -> Variable | None:
-        """
-        Get the Variable object for the given header field name.
-
-        :param name: name of the header field
-        :param left: whether to get the header field for the left or right parser
-        :return: the Variable object if found, else None
-        """
-        return self.header_field_vars.get((name, left))
-
-    def get_buffer_var(self, left: bool) -> Variable | None:
-        """
-        Get the Variable object for the given buffer field name.
-
-        :param left: whether to get the buffer field for the left or right parser
-        :return: the Variable object if found, else None
-        """
-        return self._buf_vars.get(left)
-
     def substitute(self, mapping: dict[Variable, FormulaNode]) -> None:
         """
         Substitute variables in the formula with the given mapping.
@@ -390,7 +390,7 @@ class PureFormula(ReprMixin):
         return self.root.to_smt(self)
 
     def __str__(self):
-        return "E " + ", ".join(str(v) for v in self.used_vars) + f". {self.root}"
+        return f"{self.root}"
 
 
 class GuardedFormula:

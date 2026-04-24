@@ -125,10 +125,193 @@ def _has_new_information(
     :param guarded_form: the guarded formula to check
     :return: True if the guarded formula contains new information, False otherwise
     """
-    return not solver.is_valid(
-        pysmt.Implies(
-            guarded_form.pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
+    lhs = pysmt.Exists(
+        [v.to_smt(guarded_form.pf) for v in guarded_form.pf.exists_vars],
+        guarded_form.pf.to_smt(),
+    )
+    rhs = pysmt.Or(*[
+        pysmt.Exists(
+            [v.to_smt(pf) for v in pf.exists_vars],
+            pf.to_smt(),
         )
+        for pf in relevant_pfs
+    ])
+    return not solver.is_valid(pysmt.Implies(lhs, rhs))
+
+
+def check_certificate(
+        knowledge: set[GuardedFormula],
+        parser1: ParserProgram,
+        parser2: ParserProgram,
+        solver: Any,
+        filter_accepting: Any = None,
+        filter_disagreeing: Any = None,
+) -> tuple[bool, str]:
+    """
+    Validate a bisimulation certificate produced by symbolic_bisimulation().
+
+    :param knowledge: the set of TGFs forming the certificate
+    :param parser1: the first P4 parser program
+    :param parser2: the second P4 parser program
+    :param solver: an open solver instance to use for SMT queries
+    :param filter_accepting: an optional filter for accepting pairs
+    :param filter_disagreeing: an optional filter for disagreeing pairs
+    :return: a tuple (valid, message) where valid is True iff the certificate
+             is a valid bisimulation witness, and message describes the outcome
+             or the violation found
+    """
+    # Check 1: the certificate contains the TGF for the initial states of both parsers
+    initial_guard = GuardedFormula.initial_guard()
+    if not any(initial_guard.has_equal_guard(gf) and gf.prev_guarded_formula is None for gf in knowledge):
+        return False, (
+            "Certificate is invalid: no TGF found for the initial configuration "
+            "(state_l='start', state_r='start', buf_len_l=0, buf_len_r=0)."
+        )
+
+    manager = FormulaManager()
+    # manager._next_free_var_name = 10000 # TODO
+
+    for guarded_form in knowledge:
+        current_pf = guarded_form.pf
+        state_l = guarded_form.state_l
+        state_r = guarded_form.state_r
+
+        # Check 3: acceptance consistency
+        if (state_l == "accept") != (state_r == "accept"):
+            if filter_disagreeing is None:
+                relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
+                return False, (
+                        "Certificate is invalid: TGF has inconsistent acceptance.\n"
+                        + _get_trace(solver, relevant_pfs, guarded_form)
+                )
+
+            constraint_smt = constraint_to_smt(filter_disagreeing, current_pf)
+            if not solver.is_sat(constraint_smt):
+                relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
+                return False, (
+                        "Certificate is invalid: TGF violates the disagreement filter.\n"
+                        + _get_trace(solver, relevant_pfs, guarded_form)
+                )
+            continue
+
+        if state_l == "accept" and state_r == "accept" and filter_accepting is not None:
+            relation_smt = constraint_to_smt(filter_accepting, current_pf)
+            if not solver.is_sat(relation_smt):
+                relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
+                return False, (
+                        "Certificate is invalid: TGF violates the acceptance filter.\n"
+                        + _get_trace(solver, relevant_pfs, guarded_form)
+                )
+
+        terminal_l = _is_terminal(state_l)
+        terminal_r = _is_terminal(state_r)
+        if terminal_l and terminal_r:
+            continue
+
+        if not terminal_l:
+            buf_len_l = guarded_form.buf_len_l
+            op_block_l = parser1.states[state_l].operation_block
+            trans_block_l = parser1.states[state_l].transition_block
+            op_size_l = op_block_l.size
+
+        if not terminal_r:
+            buf_len_r = guarded_form.buf_len_r
+            op_block_r = parser2.states[state_r].operation_block
+            trans_block_r = parser2.states[state_r].transition_block
+            op_size_r = op_block_r.size
+
+        if not terminal_l and not terminal_r:
+            leap = min(op_size_l - buf_len_l, op_size_r - buf_len_r)
+        elif not terminal_l:
+            leap = op_size_l - buf_len_l
+        else:
+            leap = op_size_r - buf_len_r
+
+        new_bits_var = manager.fresh_variable(leap)
+        new_pf = current_pf.deepcopy()
+
+        def extend_buffer(parser: ParserProgram, *, left: bool) -> None:
+            nonlocal terminal_l, terminal_r, new_pf
+            if left and terminal_l:
+                return
+            if not left and terminal_r:
+                return
+            old_buf = current_pf.get_buffer_var(left=left)
+            if old_buf is None:
+                new_pf.set_buffer_var(left=left, var=new_bits_var)
+            else:
+                new_buf = manager.fresh_variable(len(old_buf) + leap)
+                new_pf.set_buffer_var(left=left, var=new_buf)
+                new_pf.root = And(
+                    new_pf.root,
+                    Equals(
+                        new_buf,
+                        Concatenate(parser, left=old_buf, right=new_bits_var),
+                    ),
+                )
+
+        extend_buffer(parser1, left=parser1.is_left)
+        extend_buffer(parser2, left=parser2.is_left)
+
+        transition_l = not terminal_l and (buf_len_l + leap == op_size_l)
+        transition_r = not terminal_r and (buf_len_r + leap == op_size_r)
+
+        if transition_l:
+            new_pf = op_block_l.strongest_postcondition(manager, new_pf)
+        if transition_r:
+            new_pf = op_block_r.strongest_postcondition(manager, new_pf)
+
+        true_form = TRUE()
+        left_trans = (
+            trans_block_l.symbolic_transition(new_pf)
+            if transition_l
+            else [(true_form, "reject" if terminal_l else state_l)]
+        )
+        right_trans = (
+            trans_block_r.symbolic_transition(new_pf)
+            if transition_r
+            else [(true_form, "reject" if terminal_r else state_r)]
+        )
+
+        # Check 2: every successor must be covered by the certificate
+        for form_l, to_l in left_trans:
+            for form_r, to_r in right_trans:
+                successor_pf = PureFormula.clone(
+                    And(new_pf.root, And(form_l, form_r)),
+                    new_pf.header_field_vars,
+                    new_pf.buf_vars,
+                    new_bits_var,
+                    new_pf.used_buf_vars
+                )
+                successor_buf_len_l = 0 if transition_l else buf_len_l + leap
+                successor_buf_len_r = 0 if transition_r else buf_len_r + leap
+                successor = GuardedFormula(
+                    to_l, to_r,
+                    successor_buf_len_l, successor_buf_len_r,
+                    successor_pf, guarded_form,
+                )
+                relevant_pfs = _get_relevant_formulas(knowledge, successor)
+                if not relevant_pfs:
+                    return False, (
+                            f"Certificate is invalid: successor "
+                            f"(state_l={to_l!r}, state_r={to_r!r}, "
+                            f"buf_len_l={successor_buf_len_l}, "
+                            f"buf_len_r={successor_buf_len_r}) "
+                            f"has no matching TGF in the certificate.\n"
+                            + _get_trace(solver, set(), successor)
+                    )
+                if _has_new_information(solver, relevant_pfs, successor):
+                    return False, (
+                            f"Certificate is invalid: successor "
+                            f"(state_l={to_l!r}, state_r={to_r!r}, "
+                            f"buf_len_l={successor_buf_len_l}, "
+                            f"buf_len_r={successor_buf_len_r}) "
+                            f"is not covered by the certificate.\n"
+                            + _get_trace(solver, relevant_pfs, successor)
+                    )
+
+    return True, (
+        f"Certificate is valid: all {len(knowledge)} TGF(s) checked successfully."
     )
 
 
@@ -139,6 +322,7 @@ def symbolic_bisimulation(
         filter_accepting: Any = None,
         filter_disagreeing: Any = None,
         enable_leaps: bool = True,
+        validate_certificate: bool = False,
 ) -> tuple[bool, str]:
     """
     Check whether two P4 packet parsers are bisimilar using symbolic execution.
@@ -155,6 +339,9 @@ def symbolic_bisimulation(
     :param filter_accepting: an optional filter for accepting pairs
     :param filter_disagreeing: an optional filter for disagreeing pairs
     :param enable_leaps: whether to enable leaps in the bisimulation
+    :param validate_certificate: if True, validate the generated certificate via
+           check_certificate() before returning; raises AssertionError if the
+           certificate produced by this function is found to be invalid
     :return: a boolean indicating bisimilarity, and seen formulas or a counterexample
     """
 
@@ -294,6 +481,7 @@ def symbolic_bisimulation(
                         new_pf.header_field_vars,
                         new_pf.buf_vars,
                         new_bits_var,
+                        new_pf.used_buf_vars
                     )
                     work_queue.append(
                         GuardedFormula(
@@ -307,5 +495,12 @@ def symbolic_bisimulation(
                     )
 
             knowledge.add(guarded_form)
+
+        if validate_certificate:
+            valid, message = check_certificate(
+                knowledge, parser1, parser2, s,
+                filter_accepting, filter_disagreeing,
+            )
+            assert valid, f"Certificate self-check failed: {message}"
 
     return True, "\n".join(str(f) for f in knowledge)

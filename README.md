@@ -148,12 +148,6 @@ octopus -j parser1.json parser2.json --fail-on-mismatch
 
 _Note: this is useful for scripting or CI/CD pipelines._
 
-Print bisimulation execution time and memory usage:
-
-```shell
-octopus -j parser1.json parser2.json --stat
-```
-
 Customise the SMT solver portfolio and provide (global) options:
 
 ```shell
@@ -196,7 +190,6 @@ Octopus provides a command-line interface (CLI) with the following options:
 | `-L`  | `--disable_leaps`             | Disable leaps; only use single-step bisimulation                            |
 | `-o`  | `--output`                    | Write the bisimulation certificate or counterexample to the specified file  |
 | `-f`  | `--fail-on-mismatch`          | Exit with code 1 if the parsers are not equivalent                          |
-| `-S`  | `--stat`                      | Measure and print bisimulation execution time and memory usage              |
 | `-s`  | `--solvers`                   | Specify which SMT solvers to use along with their options                   |
 |       | `--solvers-global-options`    | Specify global options for all solvers                                      |
 |       | `--filter-accepting-string`   | Define an additional constraint for accepting pairs via a string.           |
