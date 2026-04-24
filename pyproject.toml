@@ -37,7 +37,6 @@ dependencies = [
 dev = [
     "matplotlib ~= 3.10.8",
     "numpy ~= 2.4.4",
-    "psutil ~= 7.2.2",
     "pre-commit ~= 4.6.0",
     "ruff ~= 0.15.11",
     "tqdm ~= 4.67.1",

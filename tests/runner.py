@@ -266,13 +266,20 @@ def get_all_run_variants() -> List[BenchmarkRun]:
     ]
 
 
-def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun, tmp_path: str):
+def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun, tmp_path: str, pbar=None):
     times = []
     memory = []
 
     for i in range(WARMUP_RUNS + RUNS_PER_BENCHMARK):
+        if pbar:
+            if i < WARMUP_RUNS:
+                pbar.set_postfix_str(f"{benchmark.name} (cold_start)")
+            else:
+                run_idx = i - WARMUP_RUNS + 1
+                pbar.set_postfix_str(f"{benchmark.name} ({run_idx}/{RUNS_PER_BENCHMARK})")
         cmd = TIME_CMD + [
             "python3", "-m", "octopus.main",
+            "--no-conclusion",
             "--output", tmp_path
         ]
 
@@ -304,32 +311,40 @@ def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun, tmp_path: str):
             if m:
                 memory.append((int(m.group(1)) * 1000) / (1024 ** 2))
 
+        if pbar:
+            pbar.update(1)
+
     return statistics.mean(times), statistics.mean(memory)
 
 
 def run_leapfrog(benchmarks, variants):
     for variant in variants:
-        times, memory = [], []
+        results = []
+
+        total = len(benchmarks) * (WARMUP_RUNS + RUNS_PER_BENCHMARK)
 
         with tempfile.NamedTemporaryFile() as tmp:
-            for b in tqdm(benchmarks, desc="Leapfrog"):
-                t, m = run_benchmark(b, variant, tmp.name)
-                times.append(t)
-                memory.append(m)
+            with tqdm(total=total, desc="Leapfrog equiv. checks") as pbar:
+                for b in benchmarks:
+                    t, m = run_benchmark(b, variant, tmp.name, pbar)
+                    results.append((b.name, t, m))
 
-                tqdm.write(
-                    f"{variant.name} | {b.name}: {t:.2f}s, {m:.2f} MiB"
-                )
+        print(f"\n=== {variant.name} ===")
+        for name, t, m in results:
+            print(f"{name}: {t:.2f}s, {m:.2f} MiB")
 
 
 def run_whippersnapper(benchmarks, variants):
     results = []
 
+    total = len(benchmarks) * (WARMUP_RUNS + RUNS_PER_BENCHMARK)
+
     with tempfile.NamedTemporaryFile() as tmp:
-        for variant in variants:
-            for b in tqdm(benchmarks, desc="Whippersnapper"):
-                t, m = run_benchmark(b, variant, tmp.name)
-                results.append((b.name, t, m))
+        with tqdm(total=total, desc="Whippersnapper equiv. checks") as pbar:
+            for variant in variants:
+                for b in benchmarks:
+                    t, m = run_benchmark(b, variant, tmp.name, pbar)
+                    results.append((b.name, t, m))
 
     plot(results)
 

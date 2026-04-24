@@ -17,17 +17,32 @@ Justification for the badges:
     - Synthetic benchmarks (Figure 3): point (2)
     - Public code application (as described in the text, Section 5): point (3)
 
+  Not replicated:
+  - The paper also reports performance results for Leapfrog in Table 1. We do not 
+    reproduce these results as part of the artifact evaluation. Re-running 
+    Leapfrog proved to be prohibitively time-consuming and requires substantial 
+    memory resources. Instead, we focus on reproducing the results for Octopus, 
+    which is the primary subject of this artifact. To ensure a fair comparison, 
+    we executed both tools on the same hardware platform. Our measurements for 
+    Leapfrog were generally higher (i.e., slower) than those reported in the 
+    original paper, but remained consistent with their overall findings and 
+    trends. Octopus remains faster than Leapfrog, also when considering their 
+    measurements. The Leapfrog implementation is publicly available at: 
+    https://github.com/verified-network-toolchain/leapfrog.
+
 * Reusable:
   The Octopus tool is open-source and available via a public GitHub repository
-  under the permissive MIT license. The repository supports manual installation
-  and includes full documentation and usage instructions. The codebase is modular,
-  structured, and documented to support reuse and extension. The repository also
-  includes example inputs, as well as both correct and incorrect test cases to
-  facilitate validation and experimentation. It also provides the benchmark
-  infrastructure for systematic evaluation.
+  (https://github.com/jortvanleenen/Octopus) under the permissive MIT license.
+  The repository supports manual installation and includes full documentation
+  and usage instructions. The codebase is modular, structured, and documented to
+  support reuse and extension. The repository also includes example inputs, as
+  well as both correct and incorrect test cases to facilitate validation and
+  experimentation. It also provides the benchmark infrastructure for systematic
+  evaluation.
 
   In addition to the Docker image, a complete version of this repository is
-  included in the artifact archive. Using the repository does require external
+  included in the artifact archive (`Repository.zip`). Using the repository
+  (see its `README.md` for more elaborate instructions) does require external
   connectivity (e.g., to fetch dependencies), but it is not required for
   reproducing the results reported in the paper, which can be done using the
   provided Docker image (which is based on the same Octopus source code).
@@ -106,15 +121,14 @@ should stay the same.
 
 (2) To generate Figure 3, run the following command:
 
-    cd /output
     python3 tests/runner.py --suite whippersnapper
-    cd ..
+    mv whippersnapper_plot.png /output/whippersnapper_plot.png
     
     Once all experiments have ran, a plot will be generated and saved as 
-    `whippersnapper_plot.png` in the `/output` directory. This file will also 
-    be available on the host in `octopus-results/whippersnapper_plot.png`. The 
-    plot should look similar to the one in the paper, with roughly the same 
-    ratios.
+    `whippersnapper_plot.png`. The second command moves the file to the `/output` 
+    directory. This will also make it available on the host in 
+    `octopus-results/whippersnapper_plot.png`. The plot should look similar to 
+    the one in the paper, with roughly the same ratios.
 
 (3) To obtain the results for the public code experiment, run the following command:
 
