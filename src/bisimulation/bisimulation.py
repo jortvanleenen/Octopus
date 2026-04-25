@@ -185,7 +185,7 @@ def check_certificate(
                 )
 
             constraint_smt = constraint_to_smt(filter_disagreeing, current_pf)
-            if not solver.is_sat(constraint_smt):
+            if not solver.is_valid(constraint_smt):
                 relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
                 return False, (
                         "Certificate is invalid: TGF violates the disagreement filter.\n"
@@ -195,7 +195,7 @@ def check_certificate(
 
         if state_l == "accept" and state_r == "accept" and filter_accepting is not None:
             relation_smt = constraint_to_smt(filter_accepting, current_pf)
-            if not solver.is_sat(relation_smt):
+            if not solver.is_valid(relation_smt):
                 relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
                 return False, (
                         "Certificate is invalid: TGF violates the acceptance filter.\n"
@@ -262,12 +262,12 @@ def check_certificate(
 
         true_form = TRUE()
         left_trans = (
-            trans_block_l.symbolic_transition(manager)
+            trans_block_l.symbolic_transition()
             if transition_l
             else [(true_form, "reject" if terminal_l else state_l)]
         )
         right_trans = (
-            trans_block_r.symbolic_transition(manager)
+            trans_block_r.symbolic_transition()
             if transition_r
             else [(true_form, "reject" if terminal_r else state_r)]
         )
@@ -277,7 +277,7 @@ def check_certificate(
             for form_r, to_r in right_trans:
                 successor_pf = PureFormula.clone(
                     And(new_pf.root, And(form_l, form_r)),
-                    new_pf.used_vars,
+                    new_pf.used_vars | form_l.used_vars | form_r.used_vars,
                     new_pf.stream_var,
                 )
                 successor_buf_len_l = 0 if transition_l else buf_len_l + leap
@@ -452,12 +452,12 @@ def symbolic_bisimulation(
 
             true_form = TRUE()
             left_trans = (
-                trans_block_l.symbolic_transition(manager)
+                trans_block_l.symbolic_transition()
                 if transition_l
                 else [(true_form, "reject" if terminal_l else state_l)]
             )
             right_trans = (
-                trans_block_r.symbolic_transition(manager)
+                trans_block_r.symbolic_transition()
                 if transition_r
                 else [(true_form, "reject" if terminal_r else state_r)]
             )
@@ -466,7 +466,7 @@ def symbolic_bisimulation(
                 for form_r, to_r in right_trans:
                     copy_pf = PureFormula.clone(
                         And(new_pf.root, And(form_l, form_r)),
-                        new_pf.used_vars,
+                        new_pf.used_vars | form_l.used_vars | form_r.used_vars,
                         new_bits_var,
                     )
                     work_queue.append(
