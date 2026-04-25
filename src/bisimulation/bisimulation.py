@@ -126,12 +126,12 @@ def _has_new_information(
     :return: True if the guarded formula contains new information, False otherwise
     """
     lhs = pysmt.Exists(
-        [v.to_smt(guarded_form.pf) for v in guarded_form.pf.exists_vars],
+        [v.to_smt(guarded_form.pf) for v in guarded_form.pf.used_vars],
         guarded_form.pf.to_smt(),
     )
     rhs = pysmt.Or(*[
         pysmt.Exists(
-            [v.to_smt(pf) for v in pf.exists_vars],
+            [v.to_smt(pf) for v in pf.used_vars],
             pf.to_smt(),
         )
         for pf in relevant_pfs
