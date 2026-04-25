@@ -93,10 +93,10 @@ class Concatenate(BinaryExpression):
         return BVConcat(self.left.to_smt(pf), self.right.to_smt(pf))
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> Concatenate:
-        self.left = self.left.substitute(pf, mapping)
-        self.right = self.right.substitute(pf, mapping)
+        self.left = self.left.substitute(mapping)
+        self.right = self.right.substitute(mapping)
         return self
 
     def __len__(self) -> int:
@@ -137,9 +137,9 @@ class Slice(Expression):
         return self.reference.used_vars(pf)
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        self.reference = self.reference.substitute(pf, mapping)
+        self.reference = self.reference.substitute(mapping)
         return self
 
     def __len__(self) -> int:
@@ -174,7 +174,7 @@ class Constant(Expression):
         return BV(self.numeric_value, len(self))
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return self
 
@@ -204,7 +204,7 @@ class DontCare(Expression):
         return TRUE()
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return self
 
@@ -270,9 +270,9 @@ class Reference(Expression):
         return {self.variable}
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        return self.variable.substitute(pf, mapping)
+        return self.variable.substitute(mapping)
 
     def __len__(self) -> int:
         return self._size
@@ -319,10 +319,10 @@ class BVAnd(BinaryExpression):
         return pysmt.BVAnd(self.left.to_smt(pf), self.right.to_smt(pf))
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        self.left = self.left.substitute(pf, mapping)
-        self.right = self.right.substitute(pf, mapping)
+        self.left = self.left.substitute(mapping)
+        self.right = self.right.substitute(mapping)
         return self
 
     def __len__(self) -> int:
@@ -366,10 +366,10 @@ class BVLShr(BinaryExpression):
         return pysmt.BVLShr(self.left.to_smt(pf), self.right.to_smt(pf))
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        self.left = self.left.substitute(pf, mapping)
-        self.right = self.right.substitute(pf, mapping)
+        self.left = self.left.substitute(mapping)
+        self.right = self.right.substitute(mapping)
         return self
 
     def __len__(self) -> int:

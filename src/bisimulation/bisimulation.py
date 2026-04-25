@@ -18,7 +18,7 @@ from bisimulation.formula import (
     Equals,
     FormulaManager,
     GuardedFormula,
-    PureFormula,
+    PureFormula, FormulaNode,
 )
 from program.expression import Concatenate
 from program.parser_program import ParserProgram
@@ -169,7 +169,6 @@ def check_certificate(
         )
 
     manager = FormulaManager()
-    # manager._next_free_var_name = 10000 # TODO
 
     for guarded_form in knowledge:
         current_pf = guarded_form.pf
@@ -344,16 +343,16 @@ def symbolic_bisimulation(
            certificate produced by this function is found to be invalid
     :return: a boolean indicating bisimilarity, and seen formulas or a counterexample
     """
-
-    knowledge: set[GuardedFormula] = set()
     manager = FormulaManager()
-    work_queue = deque([GuardedFormula.initial_guard()])
     for parser in [parser1, parser2]:
         left = parser.is_left
         for field in parser.get_all_fields():
             field_size = parser.get_header(field)
             var = manager.fresh_variable(field_size)
-            work_queue[0].pf.set_header_field_var(field, left, var)
+            manager.set_header_field_var(field, left, var)
+
+    knowledge: set[GuardedFormula] = set()
+    work_queue = deque([GuardedFormula.initial_guard()])
     with solver_portfolio as s:
         while len(work_queue) > 0:
             guarded_form = work_queue.popleft()
@@ -384,25 +383,25 @@ def symbolic_bisimulation(
                 if not s.is_sat(relation_smt):
                     return False, _get_trace(s, relevant_pfs, guarded_form)
 
-            if _is_terminal(state_l) and _is_terminal(state_r):
+            terminal_l = _is_terminal(state_l)
+            terminal_r = _is_terminal(state_r)
+
+            if terminal_l and terminal_r:
                 logger.debug("Both states are terminal, skipping further processing")
                 knowledge.add(guarded_form)
                 continue
 
-            terminal_l = _is_terminal(state_l)
-            terminal_r = _is_terminal(state_r)
-
             if not terminal_l:
                 buf_len_l = guarded_form.buf_len_l
                 op_block_l = parser1.states[state_l].operation_block
-                trans_block_l = parser1.states[state_l].transition_block
                 op_size_l = op_block_l.size
+                trans_block_l = parser1.states[state_l].transition_block
 
             if not terminal_r:
                 buf_len_r = guarded_form.buf_len_r
                 op_block_r = parser2.states[state_r].operation_block
-                trans_block_r = parser2.states[state_r].transition_block
                 op_size_r = op_block_r.size
+                trans_block_r = parser2.states[state_r].transition_block
 
             if enable_leaps:
                 if not terminal_l and not terminal_r:
@@ -417,36 +416,33 @@ def symbolic_bisimulation(
             new_bits_var = manager.fresh_variable(leap)
             new_pf = current_pf.deepcopy()
 
-            def extend_buffer(parser: ParserProgram, *, left: bool) -> None:
+            def extend_buffer(
+                    parser: ParserProgram, is_left: bool, buf_size: int, leap: int, pf: PureFormula
+            ) -> None:
                 """
                 Extend the buffer variable in the current pure formula.
 
                 :param parser: the parser program to use for the extension
-                :param left: whether to extend the left or right buffer
+                :param is_left: whether to extend the left or right buffer
+                :param buf_size: the size of the buffer
                 """
-                nonlocal terminal_l
-                if left and terminal_l:
-                    return
-                nonlocal terminal_r
-                if not left and terminal_r:
-                    return
-                nonlocal new_pf
-                old_buf = current_pf.get_buffer_var(left=left)
-                if old_buf is None:
-                    new_pf.set_buffer_var(left=left, var=new_bits_var)
-                else:
-                    new_buf = manager.fresh_variable(len(old_buf) + leap)
-                    new_pf.set_buffer_var(left=left, var=new_buf)
-                    new_pf.root = And(
-                        new_pf.root,
+                if buf_size > 0:
+                    new_buf_var = manager.get_buffer_var(is_left, buf_size + leap)
+                    fresh_var = manager.fresh_variable(buf_size)
+                    buf_var = manager.get_buffer_var(is_left, buf_size)
+                    pf.root = pf.root.substitute({buf_var: fresh_var})
+                    pf.root = And(
+                        pf.root,
                         Equals(
-                            new_buf,
-                            Concatenate(parser, left=old_buf, right=new_bits_var),
+                            new_buf_var,
+                            Concatenate(parser, left=fresh_var, right=new_bits_var),
                         ),
                     )
 
-            extend_buffer(parser1, left=parser1.is_left)
-            extend_buffer(parser2, left=parser2.is_left)
+            if not terminal_l:
+                extend_buffer(parser1, parser1.is_left, buf_len_l, leap, new_pf)
+            if not terminal_r:
+                extend_buffer(parser2, parser2.is_left, buf_len_r, leap, new_pf)
 
             transition_l = not terminal_l and (buf_len_l + leap == op_size_l)
             transition_r = not terminal_r and (buf_len_r + leap == op_size_r)
@@ -454,8 +450,8 @@ def symbolic_bisimulation(
                 f"Equivalence checking loop status\n"
                 f"Left - state: {state_l}, op. size: {op_size_l}, transitioning: {transition_l}\n"
                 f"Right - state: {state_r}, op. size: {op_size_r}, transitioning: {transition_r}\n"
+                f"Leap size: {leap}\n"
             )
-            logger.debug(f"Buffers: {new_pf.buf_vars}")
 
             if transition_l:
                 new_pf = op_block_l.strongest_postcondition(manager, new_pf)
@@ -478,10 +474,8 @@ def symbolic_bisimulation(
                 for form_r, to_r in right_trans:
                     copy_pf = PureFormula.clone(
                         And(new_pf.root, And(form_l, form_r)),
-                        new_pf.header_field_vars,
-                        new_pf.buf_vars,
+                        new_pf.used_vars,
                         new_bits_var,
-                        new_pf.used_buf_vars
                     )
                     work_queue.append(
                         GuardedFormula(
