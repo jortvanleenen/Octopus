@@ -28,7 +28,7 @@ class FormulaNode(ABC, ReprMixin):
     """An abstract base class for formula nodes in symbolic execution."""
 
     @abstractmethod
-    def to_smt(self, pf: PureFormula) -> Any:
+    def to_smt(self, manager: FormulaManager) -> Any:
         """
         Get the SMT representation of the formula.
 
@@ -72,7 +72,7 @@ class Variable(FormulaNode):
         self.name = name
         self._size = size
 
-    def to_smt(self, pf: PureFormula) -> Any:
+    def to_smt(self, manager: FormulaManager) -> Any:
         return pysmt.Symbol(self.name, pysmt.BVType(self._size))
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
@@ -108,8 +108,8 @@ class Not(FormulaNode):
     def __init__(self, subformula: FormulaNode):
         self.subformula = subformula
 
-    def to_smt(self, pf: PureFormula) -> Any:
-        return pysmt.Not(self.subformula.to_smt(pf))
+    def to_smt(self, manager: FormulaManager) -> Any:
+        return pysmt.Not(self.subformula.to_smt(manager))
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
         return self.subformula.used_vars(pf)
@@ -128,8 +128,8 @@ class And(FormulaNode):
         self.left = left
         self.right = right
 
-    def to_smt(self, pf) -> Any:
-        return pysmt.And(self.left.to_smt(pf), self.right.to_smt(pf))
+    def to_smt(self, manager) -> Any:
+        return pysmt.And(self.left.to_smt(manager), self.right.to_smt(manager))
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
         return self.left.used_vars(pf) | self.right.used_vars(pf)
@@ -147,7 +147,7 @@ class And(FormulaNode):
 
 
 class TRUE(FormulaNode):
-    def to_smt(self, pf) -> Any:
+    def to_smt(self, manager: FormulaManager) -> Any:
         return pysmt.TRUE()
 
     def used_vars(self, pf) -> set[Variable]:
@@ -170,8 +170,8 @@ class Equals(FormulaNode):
     def __str__(self):
         return f"({self.left}) == ({self.right})"
 
-    def to_smt(self, pf: PureFormula) -> Any:
-        return pysmt.Equals(self.left.to_smt(pf), self.right.to_smt(pf))
+    def to_smt(self, manager: FormulaManager) -> Any:
+        return pysmt.Equals(self.left.to_smt(manager), self.right.to_smt(manager))
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
         return self.left.used_vars(pf) | self.right.used_vars(pf)
@@ -307,7 +307,7 @@ class PureFormula(ReprMixin):
         return self._used_vars
 
     def add_used_vars(self, vars: set[Variable]) -> None:
-        self._used_vars += vars
+        self._used_vars |= vars
 
     def deepcopy(self) -> PureFormula:
         """
@@ -328,13 +328,13 @@ class PureFormula(ReprMixin):
         self.root = self.root.substitute(self, mapping)
         self._used_vars -= set(mapping.keys())
 
-    def to_smt(self):
+    def to_smt(self, manager: FormulaManager):
         """
         Convert the formula to an SMT representation (without quantification).
 
         :return: an SMT object representing the formula
         """
-        return self.root.to_smt(self)
+        return self.root.to_smt(manager)
 
     def __str__(self):
         return f"{self.root}"

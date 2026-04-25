@@ -115,7 +115,7 @@ def _is_terminal(state_name: str) -> bool:
 
 
 def _has_new_information(
-        solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
+        solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula, manager: FormulaManager
 ) -> bool:
     """
     Check if the guarded formula contains new information.
@@ -127,12 +127,12 @@ def _has_new_information(
     """
     lhs = pysmt.Exists(
         [v.to_smt(guarded_form.pf) for v in guarded_form.pf.used_vars],
-        guarded_form.pf.to_smt(),
+        guarded_form.pf.to_smt(manager),
     )
     rhs = pysmt.Or(*[
         pysmt.Exists(
             [v.to_smt(pf) for v in pf.used_vars],
-            pf.to_smt(),
+            pf.to_smt(manager),
         )
         for pf in relevant_pfs
     ])
@@ -237,7 +237,7 @@ def check_certificate(
                 new_buf_var = manager.get_buffer_var(is_left, buf_size + leap)
                 fresh_var = manager.fresh_variable(buf_size)
                 buf_var = manager.get_buffer_var(is_left, buf_size)
-                pf.root = pf.root.substitute({buf_var: fresh_var})
+                pf.substitute({buf_var: fresh_var})
                 pf.root = And(
                     pf.root,
                     Equals(
@@ -255,18 +255,18 @@ def check_certificate(
         transition_r = not terminal_r and (buf_len_r + leap == op_size_r)
 
         if transition_l:
-            new_pf = op_block_l.strongest_postcondition(manager, new_pf)
+            new_pf = op_block_l.strongest_postcondition(manager, new_pf, buf_len_l + leap)
         if transition_r:
-            new_pf = op_block_r.strongest_postcondition(manager, new_pf)
+            new_pf = op_block_r.strongest_postcondition(manager, new_pf, buf_len_r + leap)
 
         true_form = TRUE()
         left_trans = (
-            trans_block_l.symbolic_transition(new_pf)
+            trans_block_l.symbolic_transition(manager)
             if transition_l
             else [(true_form, "reject" if terminal_l else state_l)]
         )
         right_trans = (
-            trans_block_r.symbolic_transition(new_pf)
+            trans_block_r.symbolic_transition(manager)
             if transition_r
             else [(true_form, "reject" if terminal_r else state_r)]
         )
@@ -296,7 +296,7 @@ def check_certificate(
                             f"has no matching TGF in the certificate.\n"
                             + _get_trace(solver, set(), successor)
                     )
-                if _has_new_information(solver, relevant_pfs, successor):
+                if _has_new_information(solver, relevant_pfs, successor, manager):
                     return False, (
                             f"Certificate is invalid: successor "
                             f"(state_l={to_l!r}, state_r={to_r!r}, "
@@ -356,7 +356,7 @@ def symbolic_bisimulation(
             current_pf = guarded_form.pf
             relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
 
-            if not _has_new_information(s, relevant_pfs, guarded_form):
+            if not _has_new_information(s, relevant_pfs, guarded_form, manager):
                 logger.debug(
                     f"Considered guarded formula information known: {guarded_form}"
                 )
@@ -427,7 +427,7 @@ def symbolic_bisimulation(
                     new_buf_var = manager.get_buffer_var(is_left, buf_size + leap)
                     fresh_var = manager.fresh_variable(buf_size)
                     buf_var = manager.get_buffer_var(is_left, buf_size)
-                    pf.root = pf.root.substitute({buf_var: fresh_var})
+                    pf.substitute({buf_var: fresh_var})
                     pf.root = And(
                         pf.root,
                         Equals(
@@ -451,18 +451,18 @@ def symbolic_bisimulation(
             )
 
             if transition_l:
-                new_pf = op_block_l.strongest_postcondition(manager, new_pf)
+                new_pf = op_block_l.strongest_postcondition(manager, new_pf, buf_len_l + leap)
             if transition_r:
-                new_pf = op_block_r.strongest_postcondition(manager, new_pf)
+                new_pf = op_block_r.strongest_postcondition(manager, new_pf, buf_len_r + leap)
 
             true_form = TRUE()
             left_trans = (
-                trans_block_l.symbolic_transition(new_pf)
+                trans_block_l.symbolic_transition(manager)
                 if transition_l
                 else [(true_form, "reject" if terminal_l else state_l)]
             )
             right_trans = (
-                trans_block_r.symbolic_transition(new_pf)
+                trans_block_r.symbolic_transition(manager)
                 if transition_r
                 else [(true_form, "reject" if terminal_r else state_r)]
             )

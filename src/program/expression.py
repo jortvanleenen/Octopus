@@ -17,7 +17,7 @@ from pysmt.shortcuts import BV, TRUE, BVConcat, BVExtract
 from bisimulation.formula import (
     FormulaNode,
     PureFormula,
-    Variable,
+    Variable, FormulaManager,
 )
 
 if TYPE_CHECKING:
@@ -28,17 +28,6 @@ logger = logging.getLogger(__name__)
 
 class Expression(FormulaNode):
     """An abstract base class representing an expression in a P4 parser state."""
-
-    def to_formula(self, pf) -> None:
-        """
-        Convert the expression to a representation that can be used in a formula.
-
-        This method is used to convert the reference to a header field in an
-        expression to the corresponding Variable in the PureFormula.
-
-        :param pf: the PureFormula in which the expression occurs
-        """
-        pass
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
         return set()
@@ -53,10 +42,6 @@ class BinaryExpression(Expression, ABC):
 
     left: Expression
     right: Expression
-
-    def to_formula(self, pf):
-        self.left.to_formula(pf)
-        self.right.to_formula(pf)
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
         return self.left.used_vars(pf) | self.right.used_vars(pf)
@@ -75,8 +60,10 @@ class Concatenate(BinaryExpression):
         if obj is not None:
             self.parse(obj)
         else:
-            if left is None or right is None:
-                raise ValueError("Both left and right operands are required")
+            if left is None:
+                raise ValueError(f"Left operand is required.")
+            if right is None:
+                raise ValueError(f"Right operand is required.")
             self.left = left
             self.right = right
 
@@ -89,8 +76,8 @@ class Concatenate(BinaryExpression):
         self.left = parse_expression(self._program, obj["left"])
         self.right = parse_expression(self._program, obj["right"])
 
-    def to_smt(self, pf: PureFormula):
-        return BVConcat(self.left.to_smt(pf), self.right.to_smt(pf))
+    def to_smt(self, manager: FormulaManager):
+        return BVConcat(self.left.to_smt(manager), self.right.to_smt(manager))
 
     def substitute(
             self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
@@ -125,13 +112,10 @@ class Slice(Expression):
         self.msb = obj["e1"]["value"]
         self.lsb = obj["e2"]["value"]
 
-    def to_smt(self, pf: PureFormula) -> Any:
+    def to_smt(self, manager: FormulaManager) -> Any:
         return BVExtract(
-            self.reference.to_smt(pf), self.lsb, self.msb
+            self.reference.to_smt(manager), self.lsb, self.msb
         )  # BVExtract has both ends inclusive; start=msb, end=lsb
-
-    def to_formula(self, pf):
-        self.reference.to_formula(pf)
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
         return self.reference.used_vars(pf)
@@ -168,7 +152,7 @@ class Constant(Expression):
         if self._size is not None:
             self.value = self.value.zfill(self._size)
 
-    def to_smt(self, pf: PureFormula) -> Any:
+    def to_smt(self, manager: FormulaManager) -> Any:
         if self._size is None:
             logger.warning("No size for constant of value %s", self.numeric_value)
         return BV(self.numeric_value, len(self))
@@ -203,7 +187,7 @@ class DontCare(Expression):
     def __init__(self) -> None:
         pass
 
-    def to_smt(self, pf: PureFormula) -> Any:
+    def to_smt(self, manager: FormulaManager) -> Any:
         return TRUE()
 
     def substitute(
@@ -261,11 +245,12 @@ class Reference(Expression):
 
         self._size = self._program.get_header(self._reference)
 
-    def to_formula(self, pf):
-        self.variable = pf.get_header_field_var(self._reference, self._program.is_left)
-
-    def to_smt(self, pf: PureFormula) -> Any:
-        return self.variable.to_smt(pf)
+    def to_smt(self, manager: FormulaManager) -> Any:
+        is_left = self._program.is_left
+        smt_var = manager.get_header_field_var(self._reference, is_left)
+        if smt_var is None:
+            smt_var = self._reference.to_smt(manager)
+        return smt_var
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
         if self.variable is None:
@@ -275,7 +260,7 @@ class Reference(Expression):
     def substitute(
             self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        return self.variable.substitute(mapping)
+        return self.variable.substitute(pf, mapping)
 
     def __len__(self) -> int:
         return self._size
@@ -318,8 +303,8 @@ class BVAnd(BinaryExpression):
         self.left = parse_expression(self._program, obj["left"])
         self.right = parse_expression(self._program, obj["right"], len(self.left))
 
-    def to_smt(self, pf: PureFormula) -> Any:
-        return pysmt.BVAnd(self.left.to_smt(pf), self.right.to_smt(pf))
+    def to_smt(self, manager: FormulaManager) -> Any:
+        return pysmt.BVAnd(self.left.to_smt(manager), self.right.to_smt(manager))
 
     def substitute(
             self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
@@ -365,8 +350,8 @@ class BVLShr(BinaryExpression):
         self.left = parse_expression(self._program, obj["left"])
         self.right = parse_expression(self._program, obj["right"], len(self.left))
 
-    def to_smt(self, pf: PureFormula) -> Any:
-        return pysmt.BVLShr(self.left.to_smt(pf), self.right.to_smt(pf))
+    def to_smt(self, manager: FormulaManager) -> Any:
+        return pysmt.BVLShr(self.left.to_smt(manager), self.right.to_smt(manager))
 
     def substitute(
             self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
