@@ -71,7 +71,7 @@ class Variable(FormulaNode):
         self._size = size
 
     def to_smt(self) -> Any:
-        return pysmt.Symbol(self.name, pysmt.BVType(self._size))
+        return pysmt.Symbol(f'{self.name}_{self._size}', pysmt.BVType(self._size))
 
     def used_vars(self) -> set[Variable]:
         return {self}
