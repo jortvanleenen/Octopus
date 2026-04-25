@@ -289,6 +289,9 @@ def check_certificate(
         # Check 2: every successor must be covered by the certificate
         for form_l, to_l in left_trans:
             for form_r, to_r in right_trans:
+                if to_l == "reject" and to_r == "reject":
+                    continue
+
                 successor_pf = PureFormula.clone(
                     And(new_pf.root, And(form_l, form_r)),
                     new_pf.used_vars,
