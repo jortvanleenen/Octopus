@@ -18,7 +18,7 @@ from bisimulation.formula import (
     Equals,
     FormulaManager,
     GuardedFormula,
-    PureFormula, FormulaNode,
+    PureFormula,
 )
 from program.expression import Concatenate
 from program.parser_program import ParserProgram
@@ -204,6 +204,7 @@ def check_certificate(
 
         terminal_l = _is_terminal(state_l)
         terminal_r = _is_terminal(state_r)
+
         if terminal_l and terminal_r:
             continue
 
@@ -229,28 +230,26 @@ def check_certificate(
         new_bits_var = manager.fresh_variable(leap)
         new_pf = current_pf.deepcopy()
 
-        def extend_buffer(parser: ParserProgram, *, left: bool) -> None:
-            nonlocal terminal_l, terminal_r, new_pf
-            if left and terminal_l:
-                return
-            if not left and terminal_r:
-                return
-            old_buf = current_pf.get_buffer_var(left=left)
-            if old_buf is None:
-                new_pf.set_buffer_var(left=left, var=new_bits_var)
-            else:
-                new_buf = manager.fresh_variable(len(old_buf) + leap)
-                new_pf.set_buffer_var(left=left, var=new_buf)
-                new_pf.root = And(
-                    new_pf.root,
+        def extend_buffer(
+                parser: ParserProgram, is_left: bool, buf_size: int, leap: int, pf: PureFormula
+        ) -> None:
+            if buf_size > 0:
+                new_buf_var = manager.get_buffer_var(is_left, buf_size + leap)
+                fresh_var = manager.fresh_variable(buf_size)
+                buf_var = manager.get_buffer_var(is_left, buf_size)
+                pf.root = pf.root.substitute({buf_var: fresh_var})
+                pf.root = And(
+                    pf.root,
                     Equals(
-                        new_buf,
-                        Concatenate(parser, left=old_buf, right=new_bits_var),
+                        new_buf_var,
+                        Concatenate(parser, left=fresh_var, right=new_bits_var),
                     ),
                 )
 
-        extend_buffer(parser1, left=parser1.is_left)
-        extend_buffer(parser2, left=parser2.is_left)
+        if not terminal_l:
+            extend_buffer(parser1, parser1.is_left, buf_len_l, leap, new_pf)
+        if not terminal_r:
+            extend_buffer(parser2, parser2.is_left, buf_len_r, leap, new_pf)
 
         transition_l = not terminal_l and (buf_len_l + leap == op_size_l)
         transition_r = not terminal_r and (buf_len_r + leap == op_size_r)
@@ -277,10 +276,8 @@ def check_certificate(
             for form_r, to_r in right_trans:
                 successor_pf = PureFormula.clone(
                     And(new_pf.root, And(form_l, form_r)),
-                    new_pf.header_field_vars,
-                    new_pf.buf_vars,
-                    new_bits_var,
-                    new_pf.used_buf_vars
+                    new_pf.used_vars,
+                    new_pf.stream_var,
                 )
                 successor_buf_len_l = 0 if transition_l else buf_len_l + leap
                 successor_buf_len_r = 0 if transition_r else buf_len_r + leap
