@@ -229,6 +229,13 @@ def check_certificate(
         def extend_buffer(
                 parser: ParserProgram, buf_size: int, leap: int, pf: PureFormula
         ) -> None:
+            """
+            Extend the buffer variable in the current pure formula.
+
+            :param parser: the parser program to use for the extension
+            :param is_left: whether to extend the left or right buffer
+            :param buf_size: the size of the buffer
+            """
             if buf_size > 0:
                 buf_var = parser.get_buffer_var(buf_size)
                 fresh_var = manager.fresh_variable(buf_size)
@@ -240,6 +247,15 @@ def check_certificate(
                     Equals(
                         new_buf_var,
                         Concatenate(parser, left=fresh_var, right=new_bits_var),
+                    ),
+                )
+            else:
+                new_buf_var = parser.get_buffer_var(buf_size + leap)
+                pf.root = And(
+                    pf.root,
+                    Equals(
+                        new_buf_var,
+                        new_bits_var,
                     ),
                 )
 
@@ -425,6 +441,15 @@ def symbolic_bisimulation(
                         Equals(
                             new_buf_var,
                             Concatenate(parser, left=fresh_var, right=new_bits_var),
+                        ),
+                    )
+                else:
+                    new_buf_var = parser.get_buffer_var(buf_size + leap)
+                    pf.root = And(
+                        pf.root,
+                        Equals(
+                            new_buf_var,
+                            new_bits_var,
                         ),
                     )
 
