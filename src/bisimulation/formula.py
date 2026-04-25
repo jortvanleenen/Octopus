@@ -37,11 +37,10 @@ class FormulaNode(ABC, ReprMixin):
         pass
 
     @abstractmethod
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
+    def used_vars(self) -> set[Variable]:
         """
         Get the set of variables used in this formula node.
 
-        :param pf: the PureFormula in which the expression occurs
         :return: a set of Variable instances used in this formula node
         """
         pass
@@ -74,7 +73,7 @@ class Variable(FormulaNode):
     def to_smt(self) -> Any:
         return pysmt.Symbol(self.name, pysmt.BVType(self._size))
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
+    def used_vars(self) -> set[Variable]:
         return {self}
 
     def substitute(
@@ -82,7 +81,7 @@ class Variable(FormulaNode):
     ) -> FormulaNode:
         if self in mapping:
             replacement = mapping[self]
-            pf.add_used_vars(replacement.used_vars(pf))
+            pf.add_used_vars(replacement.used_vars())
             return replacement
         return self
 
@@ -110,8 +109,8 @@ class Not(FormulaNode):
     def to_smt(self) -> Any:
         return pysmt.Not(self.subformula.to_smt())
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return self.subformula.used_vars(pf)
+    def used_vars(self) -> set[Variable]:
+        return self.subformula.used_vars()
 
     def substitute(
             self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
@@ -130,8 +129,8 @@ class And(FormulaNode):
     def to_smt(self) -> Any:
         return pysmt.And(self.left.to_smt(), self.right.to_smt())
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return self.left.used_vars(pf) | self.right.used_vars(pf)
+    def used_vars(self) -> set[Variable]:
+        return self.left.used_vars() | self.right.used_vars()
 
     def substitute(
             self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
@@ -149,7 +148,7 @@ class TRUE(FormulaNode):
     def to_smt(self) -> Any:
         return pysmt.TRUE()
 
-    def used_vars(self, pf) -> set[Variable]:
+    def used_vars(self) -> set[Variable]:
         return set()
 
     def substitute(
@@ -172,8 +171,8 @@ class Equals(FormulaNode):
     def to_smt(self) -> Any:
         return pysmt.Equals(self.left.to_smt(), self.right.to_smt())
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return self.left.used_vars(pf) | self.right.used_vars(pf)
+    def used_vars(self) -> set[Variable]:
+        return self.left.used_vars() | self.right.used_vars()
 
     def substitute(
             self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
@@ -229,7 +228,7 @@ class PureFormula(ReprMixin):
         """
         self.root = root
         self._used_vars = (
-            used_vars if used_vars is not None else self.root.used_vars(self)
+            used_vars if used_vars is not None else self.root.used_vars()
         )
         self.stream_var = stream_var if stream_var is not None else None
 

@@ -86,13 +86,13 @@ class Assignment(Component):
         hdr_size = len(hdr_var)
 
         fresh_var = manager.fresh_variable(hdr_size)
-        pf = pf.substitute({hdr_var: fresh_var})
+        pf.substitute({hdr_var: fresh_var})
         right_copy = copy.deepcopy(self.right)
         right_copy = right_copy.substitute(pf, {hdr_var: fresh_var})
 
         return PureFormula(
             And(pf.root, Equals(hdr_var, right_copy)),
-            pf.used_vars | right_copy.used_vars(pf),
+            pf.used_vars | right_copy.used_vars(),
             pf.stream_var,
         ), buf_size
 

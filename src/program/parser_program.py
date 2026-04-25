@@ -268,7 +268,7 @@ class ParserProgram(ReprMixin):
                 # If found, then it is a reference to a type and not a field
                 type_content = self._types[type_content]
 
-        logger.info(f"Obtained header fields for '{reference}': {type_content}")
+        logger.debug(f"Obtained header fields for '{reference}': {type_content}")
         return type_content
 
     def get_header_var(self, name: str):

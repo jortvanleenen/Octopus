@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 class Expression(FormulaNode):
     """An abstract base class representing an expression in a P4 parser state."""
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
+    def used_vars(self) -> set[Variable]:
         return set()
 
     @abstractmethod
@@ -43,8 +43,8 @@ class BinaryExpression(Expression, ABC):
     left: Expression
     right: Expression
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return self.left.used_vars(pf) | self.right.used_vars(pf)
+    def used_vars(self) -> set[Variable]:
+        return self.left.used_vars() | self.right.used_vars()
 
 
 class Concatenate(BinaryExpression):
@@ -117,8 +117,8 @@ class Slice(Expression):
             self.reference.to_smt(), self.lsb, self.msb
         )  # BVExtract has both ends inclusive; start=msb, end=lsb
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return self.reference.used_vars(pf)
+    def used_vars(self) -> set[Variable]:
+        return self.reference.used_vars()
 
     def substitute(
             self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
@@ -211,13 +211,13 @@ class DontCare(Expression):
 class Reference(Expression):
     def __init__(self, program: ParserProgram, obj: dict) -> None:
         self._program = program
-        self._reference: str | None = None
+        self._reference: str | Variable | None = None
         self._size: int = 0
         if obj is not None:
             self.parse(obj)
 
     @property
-    def reference(self) -> str | None:
+    def reference(self) -> str | Variable | None:
         """Get the reference of the expression."""
         return self._reference
 
@@ -250,13 +250,19 @@ class Reference(Expression):
         else:
             return self._reference.to_smt()
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return {self.variable}
+    def used_vars(self) -> set[Variable]:
+        if isinstance(self._reference, str):
+            return self._program.get_header_var(self._reference).used_vars()
+        else:
+            return self._reference.used_vars()
 
     def substitute(
             self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        return self.variable.substitute(pf, mapping)
+        if isinstance(self._reference, str):
+            return self._program.get_header_var(self._reference).substitute(pf, mapping)
+        else:
+            return self._reference.substitute(pf, mapping)
 
     def __len__(self) -> int:
         return self._size

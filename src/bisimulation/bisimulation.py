@@ -68,13 +68,8 @@ def _get_trace(
             buffer_vars.append(g_form.pf.stream_var)
 
         lines.append(f"Step {step} (left, right):")
-        lines.append("  At start:")
         lines.append(f"  - State:   {g_form.state_l}, {g_form.state_r}")
         lines.append(f"  - Buffer:  {g_form.buf_len_l}, {g_form.buf_len_r}")
-        lines.append("  After operation(s):")
-        buf_l = len(g_form.pf.buf_vars[True] or "")
-        buf_r = len(g_form.pf.buf_vars[False] or "")
-        lines.append(f"  - Buffer:  {buf_l}, {buf_r}")
         lines.append("")
 
     solver.is_sat(
@@ -84,7 +79,7 @@ def _get_trace(
     )
     model = solver.get_model()
     if model is not None:
-        buffer_vars_smt = [var.to_smt(guarded_form.pf) for var in buffer_vars]
+        buffer_vars_smt = [v.to_smt() for v in buffer_vars]
 
         if len(buffer_vars_smt) == 0:
             counterexample = "N/A (no buffered input)"
@@ -277,7 +272,7 @@ def check_certificate(
             for form_r, to_r in right_trans:
                 successor_pf = PureFormula.clone(
                     And(new_pf.root, And(form_l, form_r)),
-                    new_pf.used_vars | form_l.used_vars | form_r.used_vars,
+                    new_pf.used_vars | form_l.used_vars() | form_r.used_vars(),
                     new_pf.stream_var,
                 )
                 successor_buf_len_l = 0 if transition_l else buf_len_l + leap
@@ -466,7 +461,7 @@ def symbolic_bisimulation(
                 for form_r, to_r in right_trans:
                     copy_pf = PureFormula.clone(
                         And(new_pf.root, And(form_l, form_r)),
-                        new_pf.used_vars | form_l.used_vars | form_r.used_vars,
+                        new_pf.used_vars | form_l.used_vars() | form_r.used_vars(),
                         new_bits_var,
                     )
                     work_queue.append(
