@@ -164,6 +164,8 @@ def check_certificate(
         )
 
     manager = FormulaManager()
+    # HACK: Probably ensures that fresh variables do not overlap with already used variables.
+    manager._next_free_var_name = 1000
 
     for guarded_form in knowledge:
         current_pf = guarded_form.pf
