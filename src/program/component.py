@@ -159,7 +159,7 @@ class Extract(Component):
 
         if len_after > 0:
             new_buf_expr = Concatenate(self._program, left=new_buf_expr, right=new_buf_var)
-            substitution[buf_var] = new_buf_expr
+        substitution[buf_var] = new_buf_expr
 
         pf.substitute(substitution)
         return pf, len_after
