@@ -179,6 +179,9 @@ class Constant(Expression):
         return self
 
     def __len__(self) -> int:
+        if self._size is None:
+            logger.warning("No size for constant of value %s", self.numeric_value)
+            return 0
         return self._size
 
     def __hash__(self) -> int:
