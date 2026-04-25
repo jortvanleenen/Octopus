@@ -300,15 +300,6 @@ def check_certificate(
                     successor_pf, guarded_form,
                 )
                 relevant_pfs = _get_relevant_formulas(knowledge, successor)
-                if not relevant_pfs:
-                    return False, (
-                            f"Certificate is invalid: successor "
-                            f"(state_l={to_l!r}, state_r={to_r!r}, "
-                            f"buf_len_l={successor_buf_len_l}, "
-                            f"buf_len_r={successor_buf_len_r}) "
-                            f"has no matching TGF in the certificate.\n"
-                            + _get_trace(solver, set(), successor)
-                    )
                 if _has_new_information(solver, relevant_pfs, successor, manager):
                     return False, (
                             f"Certificate is invalid: successor "
