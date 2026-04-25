@@ -224,6 +224,7 @@ def check_certificate(
 
         new_bits_var = manager.fresh_variable(leap)
         new_pf = current_pf.deepcopy()
+        new_pf.add_used_vars({new_bits_var})
 
         def extend_buffer(
                 parser: ParserProgram, buf_size: int, leap: int, pf: PureFormula
@@ -401,6 +402,7 @@ def symbolic_bisimulation(
 
             new_bits_var = manager.fresh_variable(leap)
             new_pf = current_pf.deepcopy()
+            new_pf.add_used_vars({new_bits_var})
 
             def extend_buffer(
                     parser: ParserProgram, buf_size: int, leap: int, pf: PureFormula
