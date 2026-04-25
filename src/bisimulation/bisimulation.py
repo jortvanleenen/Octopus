@@ -289,7 +289,7 @@ def check_certificate(
             for form_r, to_r in right_trans:
                 successor_pf = PureFormula.clone(
                     And(new_pf.root, And(form_l, form_r)),
-                    new_pf.used_vars | form_l.used_vars() | form_r.used_vars(),
+                    new_pf.used_vars,
                     new_pf.stream_var,
                 )
                 successor_buf_len_l = 0 if transition_l else buf_len_l + leap
@@ -479,7 +479,7 @@ def symbolic_bisimulation(
                 for form_r, to_r in right_trans:
                     copy_pf = PureFormula.clone(
                         And(new_pf.root, And(form_l, form_r)),
-                        new_pf.used_vars | form_l.used_vars() | form_r.used_vars(),
+                        new_pf.used_vars,
                         new_bits_var,
                     )
                     work_queue.append(
