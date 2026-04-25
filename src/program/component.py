@@ -42,14 +42,14 @@ class Component(ABC):
     @abstractmethod
     def strongest_postcondition(
             self, manager: FormulaManager, pf: PureFormula, buf_size: int
-    ) -> PureFormula:
+    ) -> tuple[PureFormula, int]:
         """
         Generate the strongest postcondition for this component.
 
         :param manager: the FormulaManager to use for generating the postcondition
         :param pf: the PureFormula representing what we currently know
         :param buf_size: the size of the parser's buffer
-        :return: a PureFormula representing the strongest postcondition
+        :return: a PureFormula representing the SP, and remaining buffer size
         """
         pass
 
@@ -68,7 +68,7 @@ class Assignment(Component):
 
     def strongest_postcondition(
             self, manager: FormulaManager, pf: PureFormula, buf_size: int
-    ) -> PureFormula:
+    ) -> tuple[PureFormula, int]:
         if isinstance(self.left, Slice):
             raise NotImplementedError(
                 "Assignment with left-hand slice is not yet supported"
@@ -82,41 +82,19 @@ class Assignment(Component):
                 f"but got {type(self.left).__name__}"
             )
 
-        is_left = self._program.is_left
-
-        hdr_var = manager.get_header_field_var(reference.reference, is_left)
+        hdr_var = self._program.get_header_var(reference.reference)
         hdr_size = len(hdr_var)
 
         fresh_var = manager.fresh_variable(hdr_size)
         pf = pf.substitute({hdr_var: fresh_var})
         right_copy = copy.deepcopy(self.right)
-        right_copy = self.right.substitute(pf, {hdr_var: fresh_var})
+        right_copy = right_copy.substitute(pf, {hdr_var: fresh_var})
 
         return PureFormula(
             And(pf.root, Equals(hdr_var, right_copy)),
             pf.used_vars | right_copy.used_vars(pf),
             pf.stream_var,
-        )
-
-        new_var = manager.fresh_variable(len(reference))
-        new_pf = pf.deepcopy()
-        new_pf.set_header_field_var(reference.reference, self._program.is_left, new_var)
-
-        right_copy = copy.deepcopy(self.right)
-        right_copy.to_formula(pf)
-
-        logger.debug(
-            f"Header variables at end of assignment SP (left: {left}): {new_pf.header_field_vars}"
-        )
-
-        return PureFormula(
-            And(new_pf.root, Equals(new_var, right_copy)),
-            new_pf.header_field_vars,
-            new_pf.buf_vars,
-            new_pf.used_vars,
-            new_pf.used_buf_vars,
-            new_pf.stream_var,
-        )
+        ), buf_size
 
     def __repr__(self):
         return f"Assignment(left={self.left!r}, right={self.right!r})"
@@ -155,10 +133,8 @@ class Extract(Component):
 
     def strongest_postcondition(
             self, manager: FormulaManager, pf: PureFormula, buf_size: int
-    ) -> PureFormula:
-        is_left = self._program.is_left
-
-        buf_var = manager.get_buffer_var(is_left, buf_size)
+    ) -> tuple[PureFormula, int]:
+        buf_var = self._program.get_buffer_var(buf_size)
 
         len_after = len(buf_var) - self.size
         if len_after < 0:
@@ -166,12 +142,12 @@ class Extract(Component):
         elif len_after == 0:
             new_buf_var = None
         else:
-            new_buf_var = manager.get_buffer_var(is_left, len_after)
+            new_buf_var = self._program.get_buffer_var(len_after)
 
         new_buf_expr = None
         substitution: dict[Variable, FormulaNode] = {}
         for field, field_size in self.header_content.items():
-            field_var = manager.get_header_field_var(self.header_reference + '.' + field, is_left)
+            field_var = self._program.get_header_var(self.header_reference + '.' + field)
             if isinstance(field_size, str):
                 field_size = self._program.typedefs[field_size]
             fresh_var = manager.fresh_variable(field_size)
@@ -186,42 +162,7 @@ class Extract(Component):
             substitution[buf_var] = new_buf_expr
 
         pf.substitute(substitution)
-        return pf
-
-        buf_var = manager.get_buffer_var(is_left, buf_size)
-
-        len_after = len(buf_var) - self.size
-        if len_after < 0:
-            raise ValueError("Invalid buffer length")
-        elif len_after == 0:
-            new_buffer = None
-        else:
-            new_buffer = manager.fresh_variable(len(buffer_var) - self.size)
-            pf.set_buffer_var(left, new_buffer)
-
-        for field, field_size in self.header_content.items():
-            if isinstance(field_size, str):
-                field_size = self.program.typedefs[field_size]
-            variable = manager.fresh_variable(field_size)
-
-            store_name = self.header_reference + "." + field
-            pf.set_header_field_var(store_name, left, variable)
-
-            if new_buffer is None:
-                new_buffer = variable
-            else:
-                new_buffer = Concatenate(self.program, left=variable, right=new_buffer)
-
-        new_pf = PureFormula(
-            And(pf.root, Equals(buffer_var, new_buffer)),
-            pf.header_field_vars,
-            pf.buf_vars,
-            pf.used_vars,
-            pf.used_buf_vars,
-            pf.stream_var,
-        )
-
-        return new_pf
+        return pf, len_after
 
     def __repr__(self):
         return f"Extract(header_reference={self.header_reference!r}, header_content={self.header_content!r}, size={self.size!r})"

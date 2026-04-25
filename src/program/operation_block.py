@@ -88,10 +88,10 @@ class OperationBlock(Component):
 
     def strongest_postcondition(
             self, manager: FormulaManager, pf: PureFormula, buf_size: int
-    ) -> PureFormula:
+    ) -> tuple[PureFormula, int]:
         for component in self._components:
-            pf = component.strongest_postcondition(manager, pf, buf_size)
-        return pf
+            pf, buf_size = component.strongest_postcondition(manager, pf, buf_size)
+        return pf, buf_size
 
     def __len__(self):
         return self._size

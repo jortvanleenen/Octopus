@@ -28,11 +28,10 @@ class FormulaNode(ABC, ReprMixin):
     """An abstract base class for formula nodes in symbolic execution."""
 
     @abstractmethod
-    def to_smt(self, manager: FormulaManager) -> Any:
+    def to_smt(self) -> Any:
         """
         Get the SMT representation of the formula.
 
-        :param pf: the PureFormula in which the expression occurs
         :return: the SMT representation of the expression
         """
         pass
@@ -72,7 +71,7 @@ class Variable(FormulaNode):
         self.name = name
         self._size = size
 
-    def to_smt(self, manager: FormulaManager) -> Any:
+    def to_smt(self) -> Any:
         return pysmt.Symbol(self.name, pysmt.BVType(self._size))
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
@@ -108,8 +107,8 @@ class Not(FormulaNode):
     def __init__(self, subformula: FormulaNode):
         self.subformula = subformula
 
-    def to_smt(self, manager: FormulaManager) -> Any:
-        return pysmt.Not(self.subformula.to_smt(manager))
+    def to_smt(self) -> Any:
+        return pysmt.Not(self.subformula.to_smt())
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
         return self.subformula.used_vars(pf)
@@ -128,8 +127,8 @@ class And(FormulaNode):
         self.left = left
         self.right = right
 
-    def to_smt(self, manager) -> Any:
-        return pysmt.And(self.left.to_smt(manager), self.right.to_smt(manager))
+    def to_smt(self) -> Any:
+        return pysmt.And(self.left.to_smt(), self.right.to_smt())
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
         return self.left.used_vars(pf) | self.right.used_vars(pf)
@@ -147,7 +146,7 @@ class And(FormulaNode):
 
 
 class TRUE(FormulaNode):
-    def to_smt(self, manager: FormulaManager) -> Any:
+    def to_smt(self) -> Any:
         return pysmt.TRUE()
 
     def used_vars(self, pf) -> set[Variable]:
@@ -170,8 +169,8 @@ class Equals(FormulaNode):
     def __str__(self):
         return f"({self.left}) == ({self.right})"
 
-    def to_smt(self, manager: FormulaManager) -> Any:
-        return pysmt.Equals(self.left.to_smt(manager), self.right.to_smt(manager))
+    def to_smt(self) -> Any:
+        return pysmt.Equals(self.left.to_smt(), self.right.to_smt())
 
     def used_vars(self, pf: PureFormula) -> set[Variable]:
         return self.left.used_vars(pf) | self.right.used_vars(pf)
@@ -192,49 +191,7 @@ class FormulaManager(ReprMixin):
 
         This manager is responsible for generating fresh variable names.
         """
-        self._next_free_var_name: int = 2  # 0 and 1 are reserved for buffers
-        self._header_field_vars = {}
-
-    @property
-    def header_field_vars(self) -> dict[tuple[str, bool], Variable | None]:
-        return self._header_field_vars
-
-    def set_header_field_var(self, name: str, left: bool, variable: Variable | None) -> None:
-        """
-        Set the Variable object for the given header field name.
-
-        :param name: name of the header field
-        :param left: whether to set the header field for the left or right parser
-        :param variable: the Variable object to set for the header field
-        """
-        if variable is None or (name, left) in self._header_field_vars:
-            logger.warning(
-                "Overriding header field variable may cause issues"
-            )
-        self.header_field_vars[(name, left)] = variable
-
-    def get_header_field_var(self, name: str, left: bool) -> Variable | None:
-        """
-        Get the Variable object for the given header field name.
-
-        :param name: name of the header field
-        :param left: whether to get the header field for the left or right parser
-        :return: the Variable object if found, else None
-        """
-        return self.header_field_vars.get((name, left))
-
-    @staticmethod
-    def get_buffer_var(left: bool, size: int) -> Variable | None:
-        """
-        Get the Variable object for the given buffer name.
-
-        :param left: whether to get the buffer field for the left or right parser
-        :param size: size of the buffer
-        :return: the Variable object if size > 0, else None
-        """
-        if size == 0:
-            return None
-        return Variable(str(0 if left else 1), size)
+        self._next_free_var_name: int = 0
 
     def fresh_name(self) -> str:
         """
@@ -328,13 +285,13 @@ class PureFormula(ReprMixin):
         self.root = self.root.substitute(self, mapping)
         self._used_vars -= set(mapping.keys())
 
-    def to_smt(self, manager: FormulaManager):
+    def to_smt(self):
         """
         Convert the formula to an SMT representation (without quantification).
 
         :return: an SMT object representing the formula
         """
-        return self.root.to_smt(manager)
+        return self.root.to_smt()
 
     def __str__(self):
         return f"{self.root}"

@@ -8,6 +8,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 
+from bisimulation.formula import Variable
 from octopus.utils import ReprMixin
 from program.parser_state import ParserState
 
@@ -269,6 +270,15 @@ class ParserProgram(ReprMixin):
 
         logger.info(f"Obtained header fields for '{reference}': {type_content}")
         return type_content
+
+    def get_header_var(self, name: str):
+        prefix = "hdr_l." if self._is_left else "hdr_r."
+        return Variable(prefix + name, self.get_header(name))
+
+    def get_buffer_var(self, size: int):
+        name = "buf_l" if self._is_left else "buf_r"
+        return Variable(name, size)
+
 
     def get_all_fields(self) -> list[str]:
         """
