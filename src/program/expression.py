@@ -17,7 +17,7 @@ from pysmt.shortcuts import BV, TRUE, BVConcat, BVExtract
 from bisimulation.formula import (
     FormulaNode,
     PureFormula,
-    Variable, FormulaManager,
+    Variable,
 )
 
 if TYPE_CHECKING:

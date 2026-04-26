@@ -5,8 +5,8 @@ Author: Jort van Leenen
 License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for details)
 """
 
-from collections import deque
 import logging
+from collections import deque
 from typing import Any
 
 import pysmt.shortcuts as pysmt
@@ -179,8 +179,8 @@ def check_certificate(
                         + _get_trace(solver, relevant_pfs, guarded_form)
                 )
 
-            constraint_smt = constraint_to_smt(filter_disagreeing, current_pf)
-            if not solver.is_valid(constraint_smt):
+            filter_smt = constraint_to_smt(filter_disagreeing, parser1, parser2)
+            if not solver.is_valid(pysmt.Implies(current_pf.to_smt(), filter_smt)):
                 relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
                 return False, (
                         "Certificate is invalid: TGF violates the disagreement filter.\n"
@@ -189,8 +189,8 @@ def check_certificate(
             continue
 
         if state_l == "accept" and state_r == "accept" and filter_accepting is not None:
-            relation_smt = constraint_to_smt(filter_accepting, current_pf)
-            if not solver.is_valid(relation_smt):
+            filter_smt = constraint_to_smt(filter_accepting, parser1, parser2)
+            if not solver.is_valid(pysmt.Implies(current_pf.to_smt(), filter_smt)):
                 relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
                 return False, (
                         "Certificate is invalid: TGF violates the acceptance filter.\n"
@@ -370,16 +370,22 @@ def symbolic_bisimulation(
                 if filter_disagreeing is None:
                     return False, _get_trace(s, relevant_pfs, guarded_form)
 
-                constraint_smt = constraint_to_smt(filter_disagreeing, current_pf)
-                if not s.is_valid(constraint_smt):
+                filter_smt = constraint_to_smt(filter_disagreeing, parser1, parser2)
+                if not s.is_valid(pysmt.Implies(current_pf.to_smt(), filter_smt)):
+                    logger.debug(
+                        f"Guarded formula violates disagreement filter: {guarded_form}"
+                    )
                     return False, _get_trace(s, relevant_pfs, guarded_form)
                 else:
                     knowledge.add(guarded_form)
                     continue
 
             if state_l == "accept" and state_r == "accept" and filter_accepting is not None:
-                relation_smt = constraint_to_smt(filter_accepting, current_pf)
-                if not s.is_valid(relation_smt):
+                filter_smt = constraint_to_smt(filter_accepting, parser1, parser2)
+                if not s.is_valid(pysmt.Implies(current_pf.to_smt(), filter_smt)):
+                    logger.debug(
+                        f"Guarded formula violates accepting filter: {guarded_form}"
+                    )
                     return False, _get_trace(s, relevant_pfs, guarded_form)
 
             terminal_l = _is_terminal(state_l)

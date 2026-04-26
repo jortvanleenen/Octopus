@@ -12,7 +12,14 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable
 
-from bisimulation.formula import And, Equals, FormulaManager, PureFormula, Variable, FormulaNode
+from bisimulation.formula import (
+    And,
+    Equals,
+    FormulaManager,
+    FormulaNode,
+    PureFormula,
+    Variable,
+)
 from program.expression import (
     Concatenate,
     Expression,

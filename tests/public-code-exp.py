@@ -7,10 +7,10 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import argparse
-import subprocess
-import sys
 import re
 import statistics
+import subprocess
+import sys
 from itertools import combinations
 from pathlib import Path
 

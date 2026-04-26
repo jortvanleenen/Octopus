@@ -8,19 +8,23 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import ast
+import logging
 from typing import Any
 
 import pysmt.shortcuts as pysmt
 
-from bisimulation.formula import PureFormula
+from program.parser_program import ParserProgram
+
+logger = logging.getLogger(__name__)
 
 
-def constraint_to_smt(constraint: Any, pf: PureFormula) -> Any:
+def constraint_to_smt(constraint: Any, parser1: ParserProgram, parser2: ParserProgram) -> Any:
     """
     Convert a relational constraint into an SMT formula.
 
     :param constraint: a string representing a Python expression for the constraint
-    :param pf: a PureFormula object representing the current state of variables
+    :param parser1: the left parser program
+    :param parser2: the right parser program
     :return: an SMT formula representing the constraint combined with the PureFormula
 
     Semantics:
@@ -45,13 +49,13 @@ def constraint_to_smt(constraint: Any, pf: PureFormula) -> Any:
                 return None
 
             header = _get_hdr_str(node)
-            left = header[4] == "l"
-            header = "hdr" + header[5:]
+            is_left = header[4] == "l"
+            parser = parser1 if is_left else parser2
 
-            var = pf.get_header_field_var(header, left=left)
+            var = parser.get_header_var(header[6:])
             if var is None:
                 return UNINIT
-            return var.to_smt(pf)
+            return var.to_smt()
 
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
             l = _eval(node.left)
@@ -138,6 +142,11 @@ def constraint_to_smt(constraint: Any, pf: PureFormula) -> Any:
     else:
         expr = UNINIT
 
+    logger.debug(
+        "\n"
+        f"Constraint: {constraint}\n"
+        f"SMT: {expr}"
+    )
     if expr is UNINIT:
-        return pf.to_smt()
-    return pysmt.And(expr, pf.to_smt())
+        return pysmt.TRUE()
+    return expr
