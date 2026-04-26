@@ -129,25 +129,25 @@ provide the `-j` option to Octopus in the latter case.
 
 Octopus provides a command-line interface (CLI) with the following options:
 
-| Short | Long                          | Description                                                                |
-|-------|-------------------------------|----------------------------------------------------------------------------|
-| `-h`  | `--help`                      | Show a help message and exit                                               |
-|       | `--version`                   | Show the version of Octopus and exit                                       |
-| `-j`  | `--json`                      | Specify that both inputs are in IR (p4c) JSON format                       |
-|       | `file1`                       | Path to the first P4 program                                               |
-|       | `file2`                       | Path to the second P4 program                                              |
-| `-v`  | `--verbosity`                 | Increase output verbosity (`-v`, `-vv`, `-vvv`)                            |
-| `-L`  | `--disable_leaps`             | Disable leaps; only use single-step bisimulation                           |
-| `-o`  | `--output`                    | Write the bisimulation certificate or counterexample to the specified file |
-|       | `--no-conclusion`             | Do not print the final conclusion (equivalent or not) in the CLI output    |
-|       | `--no-validation`             | Do not validate that the generated certificate represents a bisimulation   |
-| `-f`  | `--fail-on-mismatch`          | Exit with code 1 if the parsers are not equivalent                         |
-| `-s`  | `--solvers`                   | Specify which SMT solvers to use along with their options                  |
-|       | `--solvers-global-options`    | Specify global options for all solvers                                     |
-|       | `--filter-accepting-string`   | Define an additional constraint for accepting pairs via a string           |
-|       | `--filter-accepting-file `    | Define an additional constraint for accepting pairs via an external file   |
-|       | `--filter-disagreeing-string` | Define an additional constraint for disagreeing pairs via a string         |
-|       | `--filter-disagreeing-file`   | Define an additional constraint for disagreeing pairs via an external file |
+| Short | Long                          | Description                                                                                |
+|-------|-------------------------------|--------------------------------------------------------------------------------------------|
+| `-h`  | `--help`                      | Show a help message and exit                                                               |
+|       | `--version`                   | Show the version of Octopus and exit                                                       |
+| `-j`  | `--json`                      | Specify that both inputs are in IR (p4c) JSON format                                       |
+|       | `file1`                       | Path to the first P4 program                                                               |
+|       | `file2`                       | Path to the second P4 program                                                              |
+| `-v`  | `--verbosity`                 | Increase output verbosity (`-v`, `-vv`, `-vvv`)                                            |
+| `-t`  | `--time`                      | Time how long certificate generation and validation take, and print the results in the CLI |
+| `-o`  | `--output`                    | Write the bisimulation certificate or counterexample to the specified file                 |
+|       | `--no-conclusion`             | Do not print the final conclusion (equivalent or not) in the CLI output                    |
+|       | `--no-validation`             | Do not validate that the generated certificate represents a bisimulation                   |
+| `-f`  | `--fail-on-mismatch`          | Exit with code 1 if the parsers are not equivalent                                         |
+| `-s`  | `--solvers`                   | Specify which SMT solvers to use along with their options                                  |
+|       | `--solvers-global-options`    | Specify global options for all solvers                                                     |
+|       | `--filter-accepting-string`   | Define an additional constraint for accepting pairs via a string                           |
+|       | `--filter-accepting-file `    | Define an additional constraint for accepting pairs via an external file                   |
+|       | `--filter-disagreeing-string` | Define an additional constraint for disagreeing pairs via a string                         |
+|       | `--filter-disagreeing-file`   | Define an additional constraint for disagreeing pairs via an external file                 |
 
 ### Examples
 
@@ -219,10 +219,10 @@ To verify the claims made in the paper, you can run the benchmark scripts, which
 are also included in the Docker image.
 
 If you performed manual installation, note that the benchmark runners require
-`user/bin/time` to be available on your system. On many Linux distributions,
+`usr/bin/time` to be available on your system. On many Linux distributions,
 this can be achieved by installing the `time` package (e.g.,
 `sudo apt install time` on Debian-based systems). After installation, ensure
-that `user/bin/time` is accessible in your environment.
+that `usr/bin/time` is accessible in your environment.
 
 A brief overview of the runners and benchmarks follows below. More
 detailed information and steps can be found in the `artifact/README.md` file.
@@ -262,14 +262,14 @@ their benchmark filenames.
 > **Notes**
 >
 > - Full filenames in Leapfrog are `<name-in-table>Proof.v`, except for
-    > `SloppyStrictStores` and `SloppyStrictFilter`, which are as is.
+    `SloppyStrictStores` and `SloppyStrictFilter`, which are as is.
 > - The Leapfrog GitHub repository incorrectly lists `EthernetProof.v` as the
-    > benchmark file for *state rearrangement*.
+    benchmark file for *state rearrangement*.
 > - The number of branched and total bits have been corrected for most
-    > benchmarks, as these were incorrect in the Leapfrog paper.
+    benchmarks, as these were incorrect in the Leapfrog paper.
 > - In Leapfrog's Enterprise benchmark, the size of the IPv4 header was
-    > incorrectly specified. We were able to adjust this to the correct value by
-    > looking at the original code in
+    incorrectly specified. We were able to adjust this to the correct value by
+    looking at the original code in
     the [parser-gen repository](https://github.com/grg/parser-gen/blob/master/examples/headers-enterprise.txt).
 
 ## License
