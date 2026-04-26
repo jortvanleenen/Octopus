@@ -216,7 +216,15 @@ octopus p1.p4 p2.p4 \
 ## Verifying Claims and Benchmarking
 
 To verify the claims made in the paper, you can run the benchmark scripts, which
-are also included in the Docker image. A brief overview follows below. More
+are also included in the Docker image.
+
+If you performed manual installation, note that the benchmark runners require
+`user/bin/time` to be available on your system. On many Linux distributions,
+this can be achieved by installing the `time` package (e.g.,
+`sudo apt install time` on Debian-based systems). After installation, ensure
+that `user/bin/time` is accessible in your environment.
+
+A brief overview of the runners and benchmarks follows below. More
 detailed information and steps can be found in the `artifact/README.md` file.
 
 - `tests/runner.py` automates the running of benchmarks, including the
