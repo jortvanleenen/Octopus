@@ -329,7 +329,6 @@ def symbolic_bisimulation(
         solver_portfolio: Any,
         filter_accepting: Any = None,
         filter_disagreeing: Any = None,
-        enable_leaps: bool = True,
         validate_certificate: bool = False,
 ) -> tuple[bool, str]:
     """
@@ -346,7 +345,6 @@ def symbolic_bisimulation(
     :param solver_portfolio: the solver portfolio to use for symbolic execution
     :param filter_accepting: an optional filter for accepting pairs
     :param filter_disagreeing: an optional filter for disagreeing pairs
-    :param enable_leaps: whether to enable leaps in the bisimulation
     :param validate_certificate: if True, validate the generated certificate via
            check_certificate() before returning; raises AssertionError if the
            certificate produced by this function is found to be invalid
@@ -411,15 +409,12 @@ def symbolic_bisimulation(
                 op_size_r = op_block_r.size
                 trans_block_r = parser2.states[state_r].transition_block
 
-            if enable_leaps:
-                if not terminal_l and not terminal_r:
-                    leap = min(op_size_l - buf_len_l, op_size_r - buf_len_r)
-                elif not terminal_l:
-                    leap = op_size_l - buf_len_l
-                elif not terminal_r:
-                    leap = op_size_r - buf_len_r
-            else:
-                leap = 1
+            if not terminal_l and not terminal_r:
+                leap = min(op_size_l - buf_len_l, op_size_r - buf_len_r)
+            elif not terminal_l:
+                leap = op_size_l - buf_len_l
+            elif not terminal_r:
+                leap = op_size_r - buf_len_r
 
             new_bits_var = manager.fresh_variable(leap)
             new_pf = current_pf.deepcopy()

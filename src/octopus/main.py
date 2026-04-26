@@ -57,12 +57,6 @@ def parse_arguments() -> argparse.Namespace:
         help="increase output verbosity (-v, -vv, -vvv)",
     )
     parser.add_argument(
-        "-L",
-        "--disable-leaps",
-        action="store_true",
-        help="disable leaps; only use single-step bisimulation",
-    )
-    parser.add_argument(
         "-o",
         "--output",
         type=str,
@@ -312,7 +306,6 @@ def main(args: Any = None) -> None:
 
     portfolio = create_portfolio(args)
     filter_accepting, filter_disagreeing = parse_filters(args)
-    logger.info(f"Leaps are {'disabled' if args.disable_leaps else 'enabled'}")
 
     logger.info("Reading P4 files...")
     ir_jsons = read_p4_files([args.file1, args.file2], args.json)
@@ -334,7 +327,6 @@ def main(args: Any = None) -> None:
         parsers[1],
         filter_accepting=filter_accepting,
         filter_disagreeing=filter_disagreeing,
-        enable_leaps=not args.disable_leaps,
         solver_portfolio=portfolio,
         validate_certificate=not args.no_validation,
     )
