@@ -276,14 +276,14 @@ def check_certificate(
         true_form = TRUE()
 
         if terminal_l:
-            left_trans = []
+            left_trans = [(true_form, "reject")]
         elif transition_l:
             left_trans = trans_block_l.symbolic_transition()
         else:
             left_trans = [(true_form, state_l)]
 
         if terminal_r:
-            right_trans = []
+            right_trans = [(true_form, "reject")]
         elif transition_r:
             right_trans = trans_block_r.symbolic_transition()
         else:
@@ -472,14 +472,14 @@ def symbolic_bisimulation(
             true_form = TRUE()
 
             if terminal_l:
-                left_trans = []
+                left_trans = [(true_form, "reject")]
             elif transition_l:
                 left_trans = trans_block_l.symbolic_transition()
             else:
                 left_trans = [(true_form, state_l)]
 
             if terminal_r:
-                right_trans = []
+                right_trans = [(true_form, "reject")]
             elif transition_r:
                 right_trans = trans_block_r.symbolic_transition()
             else:
