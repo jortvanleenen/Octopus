@@ -52,10 +52,10 @@ documented in the FULL REVIEW section.
 
 Requirements:
 
-* RAM: 16 GiB
+* RAM: 16 GiB (free memory) TODO: check na Latinum run
 * CPU cores: 4
 * Time (smoke test): 15 minutes
-* Time (full review): 4 hours
+* Time (full review): 4 hours TODO: afhankelijk van var length form 3
 
 external connectivity: NO
 
