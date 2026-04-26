@@ -273,7 +273,10 @@ class ParserProgram(ReprMixin):
 
     def get_header_var(self, name: str):
         prefix = "hdr_l." if self._is_left else "hdr_r."
-        return Variable(prefix + name, self.get_header(name))
+        size = self.get_header(name)
+        if isinstance(size, str):
+            size = self.typedefs[size]
+        return Variable(prefix + name, size)
 
     def get_buffer_var(self, size: int):
         name = "buf_l" if self._is_left else "buf_r"
