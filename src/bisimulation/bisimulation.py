@@ -6,8 +6,8 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import logging
-from collections import deque
 import time
+from collections import deque
 from typing import Any
 
 import pysmt.shortcuts as pysmt
@@ -19,7 +19,8 @@ from bisimulation.formula import (
     Equals,
     FormulaManager,
     GuardedFormula,
-    PureFormula, Variable,
+    PureFormula,
+    Variable,
 )
 from program.expression import Concatenate
 from program.parser_program import ParserProgram

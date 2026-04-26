@@ -1,6 +1,7 @@
-import pytest
 import pysmt.shortcuts as pysmt
+import pytest
 
+from bisimulation.bisimulation import extend_buffer
 from bisimulation.formula import (
     TRUE,
     And,
@@ -8,7 +9,6 @@ from bisimulation.formula import (
     FormulaManager,
     PureFormula,
 )
-from bisimulation.bisimulation import extend_buffer
 from program.expression import Concatenate
 from program.parser_program import ParserProgram
 
