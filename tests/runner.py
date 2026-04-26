@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.ticker import MaxNLocator, ScalarFormatter
 from tqdm import tqdm
@@ -86,7 +86,7 @@ def get_leapfrog_benchmarks() -> List[Benchmark]:
             Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
             arguments={
                 "filter-disagreeing-string":
-                    "hdr_r.eth.data[15:0] != '0x8600_16' and hdr_r.eth.data[15:0] != '0x86dd_16'"},
+                    "hdr_r.hdr.eth.data[15:0] != '0x8600_16' and hdr_r.hdr.eth.data[15:0] != '0x86dd_16'"},
         ),
         Benchmark(
             "relational_verification",
@@ -94,8 +94,8 @@ def get_leapfrog_benchmarks() -> List[Benchmark]:
             Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
             arguments={
                 "filter-accepting-string":
-                    "((hdr_l.eth.data[15:0] == '0x8600_16' and hdr_l.ipv4.data == hdr_r.ipv4.data) "
-                    "or (hdr_l.eth.data[15:0] == '0x86dd_16' and hdr_l.ipv6.data == hdr_r.ipv6.data))",
+                    "((hdr_l.hdr.eth.data[15:0] == '0x8600_16' and hdr_l.hdr.ipv4.data == hdr_r.hdr.ipv4.data) "
+                    "or (hdr_l.hdr.eth.data[15:0] == '0x86dd_16' and hdr_l.hdr.ipv6.data == hdr_r.hdr.ipv6.data))",
                 "filter-disagreeing-string": "True",
             },
         ),
@@ -229,29 +229,40 @@ def get_whippersnapper_benchmarks() -> List[Benchmark]:
             Path("tests/whippersnapper/parse-complex/6-2.p4"),
             Path("tests/whippersnapper/parse-complex/6-2.p4"),
         ),
-        # Benchmark(
-        #     "equiv_field_4_and_header_4_1",
-        #     Path("tests/whippersnapper/parse-field/4.p4"),
-        #     Path("tests/whippersnapper/parse-header/4-1.p4"),
-        # ),
-        # Benchmark(
-        #     "subset_field_4_and_header_4_4",
-        #     Path("tests/whippersnapper/parse-field/4.p4"),
-        #     Path("tests/whippersnapper/parse-header/4-4.p4"),
-        #     arguments={
-        #         "filter-disagreeing-string":
-        #             "hdr_r.header_0.field_0 != '0_16'",
-        #     }
-        # ),
-        # Benchmark(
-        #     "subset_field_1_and_complex_3_1",
-        #     Path("tests/whippersnapper/parse-field/1.p4"),
-        #     Path("tests/whippersnapper/parse-complex/3-1.p4"),
-        #     arguments={
-        #         "filter-disagreeing-string":
-        #             "hdr_r.ptp.reserved2 == '1_8'",
-        #     }
-        # ),
+    ]
+
+
+def get_whippersnapper_equiv_benchmarks() -> List[Benchmark]:
+    """
+    Get the Whippersnapper benchmarks that check for non-trivial equivalences
+    among the generated parsers.
+
+    :return: a list of Benchmark objects representing the equivalence checks
+    """
+    return [
+        Benchmark(
+            "equiv_field_4_and_header_4_1",
+            Path("tests/whippersnapper/parse-field/4.p4"),
+            Path("tests/whippersnapper/parse-header/4-1.p4"),
+        ),
+        Benchmark(
+            "subset_field_4_and_header_4_4",
+            Path("tests/whippersnapper/parse-field/4.p4"),
+            Path("tests/whippersnapper/parse-header/4-4.p4"),
+            arguments={
+                "filter-disagreeing-string":
+                    "hdr_r.hdr.header_0.field_0 != '0_16'",
+            }
+        ),
+        Benchmark(
+            "subset_field_1_and_complex_3_1",
+            Path("tests/whippersnapper/parse-field/1.p4"),
+            Path("tests/whippersnapper/parse-complex/3-1.p4"),
+            arguments={
+                "filter-disagreeing-string":
+                    "hdr_r.hdr.ptp.reserved2 == '1_8'",
+            }
+        ),
     ]
 
 
@@ -262,7 +273,8 @@ def get_all_run_variants() -> List[BenchmarkRun]:
     :return: a list of BenchmarkRun objects representing the variants
     """
     return [
-        BenchmarkRun("octopus_default", {})
+        BenchmarkRun("octopus_default", {}),
+        BenchmarkRun("octopus_no_validation", {"no-validation": ""})
     ]
 
 
@@ -347,6 +359,49 @@ def run_whippersnapper(benchmarks, variants):
                     results.append((b.name, t, m))
 
     plot(results)
+
+
+def run_whippersnapper_equiv(benchmarks, variants):
+    for variant in variants:
+        results = []
+
+        with tempfile.NamedTemporaryFile() as tmp:
+            with tqdm(total=len(benchmarks), desc="Whippersnapper equiv. checks") as pbar:
+                for b in benchmarks:
+                    pbar.set_postfix_str(b.name)
+
+                    cmd = [
+                        "python3", "-m", "octopus.main",
+                        "--no-conclusion",
+                        "--output", tmp.name
+                    ]
+
+                    if variant.arguments:
+                        for k, v in variant.arguments.items():
+                            cmd.extend([f"--{k}", str(v)])
+
+                    if b.arguments:
+                        for k, v in b.arguments.items():
+                            cmd.extend([f"--{k}", str(v)])
+
+                    cmd.extend([str(b.file1), str(b.file2)])
+
+                    result = subprocess.run(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+
+                    success = (result.returncode == 0)
+                    results.append((b.name, success))
+
+                    pbar.update(1)
+
+        print(f"\n=== {variant.name} ===")
+        for name, success in results:
+            status = "found equivalent" if success else "NOT found equivalent"
+            print(f"{name}: {status}")
 
 
 def plot(results):
@@ -489,7 +544,11 @@ def main() -> None:
     """Entry point of the benchmark runner."""
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--suite", choices=["leapfrog", "whippersnapper"], required=True)
+    parser.add_argument(
+        "--suite",
+        choices=["leapfrog", "whippersnapper", "whippersnapper_equiv"],
+        required=True,
+    )
     parser.add_argument("--benchmark", nargs="+")
     parser.add_argument("--variant", nargs="+")
 
@@ -497,8 +556,12 @@ def main() -> None:
 
     if args.suite == "leapfrog":
         all_benchmarks = get_leapfrog_benchmarks()
-    else:
+    elif args.suite == "whippersnapper":
         all_benchmarks = get_whippersnapper_benchmarks()
+    elif args.suite == "whippersnapper_equiv":
+        all_benchmarks = get_whippersnapper_equiv_benchmarks()
+    else:
+        raise ValueError(f"Unknown suite: {args.suite}")
 
     if args.benchmark:
         selected_benchmarks = [b for b in all_benchmarks if b.name in args.benchmark]
@@ -529,8 +592,10 @@ def main() -> None:
 
     if args.suite == "leapfrog":
         run_leapfrog(selected_benchmarks, selected_variants)
-    else:
+    elif args.suite == "whippersnapper":
         run_whippersnapper(selected_benchmarks, selected_variants)
+    elif args.suite == "whippersnapper_equiv":
+        run_whippersnapper_equiv(selected_benchmarks, selected_variants)
 
 
 if __name__ == "__main__":

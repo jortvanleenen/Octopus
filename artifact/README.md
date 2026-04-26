@@ -14,8 +14,8 @@ Justification for the badges:
 
   Replicated:
     - Comparison with Leapfrog (Table 1): point (1)
-    - Synthetic benchmarks (Figure 3): point (2)
-    - Public code application (as described in the text, Section 5): point (3)
+    - Synthetic benchmarks (Figure 3 + equivalence claims, Section 5): point (2)
+    - Public code (statistics, Section 5): point (3)
 
   Not replicated:
     - Obtained performance results for Leapfrog in Table 1. We do not reproduce
@@ -52,10 +52,10 @@ documented in the FULL REVIEW section.
 
 Requirements:
 
-* RAM: 16 GiB (free memory) TODO: check na Latinum run
+* RAM: 16 GiB
 * CPU cores: 4
 * Time (smoke test): 15 minutes
-* Time (full review): 4 hours TODO: afhankelijk van var length form 3
+* Time (full review): 4 hours
 
 external connectivity: NO
 
@@ -147,15 +147,20 @@ should stay the same.
 
     The experiment run averages will be printed out in the CLI.
 
-(2) To generate Figure 3, run the following command:
+(2) To obtain the results for the synthetic benchmarks experiment, run:
 
     python3 tests/runner.py --suite whippersnapper
     mv whippersnapper_plot.png /output/whippersnapper_plot.png
-    
+
     Once all experiments have ran, a plot will be generated and saved as 
     `whippersnapper_plot.png`. The second command moves the file to the `/output` 
     directory. This will also make it available on the host in 
     `octopus-results/` (or wherever you chose to bind the output directory).
+
+    python3 tests/runner.py --suite whippersnapper_equiv --variant octopus_default
+
+    The CLI output should confirm that the three pairs of parsers are indeed 
+    equivalent, as claimed in the paper.
 
 (3) To obtain the results for the public code experiment, run the following command:
 
