@@ -38,6 +38,7 @@ dev = [
     "matplotlib ~= 3.10.8",
     "numpy ~= 2.4.4",
     "pre-commit ~= 4.6.0",
+    "pytest~=9.0.3",
     "ruff ~= 0.15.11",
     "tqdm ~= 4.67.1",
 ]
