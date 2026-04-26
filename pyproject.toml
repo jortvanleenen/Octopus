@@ -62,4 +62,4 @@ path = "src/octopus/__about__.py"
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["I"]
+select = ["I", "F401"]
