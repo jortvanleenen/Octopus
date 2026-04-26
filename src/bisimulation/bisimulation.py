@@ -121,12 +121,12 @@ def _has_new_information(
     :return: True if the guarded formula contains new information, False otherwise
     """
     lhs = pysmt.Exists(
-        [v.to_smt() for v in guarded_form.pf.used_vars],
+        [v.to_smt() for v in guarded_form.pf.exists_vars()],
         guarded_form.pf.to_smt(),
     )
     rhs = pysmt.Or(*[
         pysmt.Exists(
-            [v.to_smt() for v in pf.used_vars],
+            [v.to_smt() for v in pf.exists_vars()],
             pf.to_smt(),
         )
         for pf in relevant_pfs
@@ -163,9 +163,7 @@ def check_certificate(
             "(state_l='start', state_r='start', buf_len_l=0, buf_len_r=0)."
         )
 
-    manager = FormulaManager()
-    # HACK: Probably ensures that fresh variables do not overlap with already used variables.
-    manager._next_free_var_name = 1000
+    manager = FormulaManager(count_up=False)
 
     for guarded_form in knowledge:
         current_pf = guarded_form.pf
@@ -229,35 +227,36 @@ def check_certificate(
         new_pf.add_used_vars({new_bits_var})
 
         def extend_buffer(
-                parser: ParserProgram, buf_size: int, leap: int, pf: PureFormula
+                parser: ParserProgram, buf_size: int, leap_size: int, pf: PureFormula
         ) -> None:
             """
             Extend the buffer variable in the current pure formula.
 
             :param parser: the parser program to use for the extension
-            :param is_left: whether to extend the left or right buffer
             :param buf_size: the size of the buffer
+            :param leap_size: the number of bits to add to the buffer
+            :param pf: the pure formula to capture the extension in buffer size
             """
-            if buf_size > 0:
-                buf_var = parser.get_buffer_var(buf_size)
-                fresh_var = manager.fresh_variable(buf_size)
-                pf.substitute({buf_var: fresh_var})
-
-                new_buf_var = parser.get_buffer_var(buf_size + leap)
-                pf.root = And(
-                    pf.root,
-                    Equals(
-                        new_buf_var,
-                        Concatenate(parser, left=fresh_var, right=new_bits_var),
-                    ),
-                )
-            else:
-                new_buf_var = parser.get_buffer_var(buf_size + leap)
+            if buf_size == 0:
+                new_buf_var = parser.get_buffer_var(leap_size)
                 pf.root = And(
                     pf.root,
                     Equals(
                         new_buf_var,
                         new_bits_var,
+                    ),
+                )
+            else:
+                buf_var = parser.get_buffer_var(buf_size)
+                fresh_var = manager.fresh_variable(buf_size)
+                pf.substitute({buf_var: fresh_var})
+
+                new_buf_var = parser.get_buffer_var(buf_size + leap_size)
+                pf.root = And(
+                    pf.root,
+                    Equals(
+                        new_buf_var,
+                        Concatenate(parser, left=fresh_var, right=new_bits_var),
                     ),
                 )
 
@@ -294,7 +293,7 @@ def check_certificate(
 
                 successor_pf = PureFormula.clone(
                     And(new_pf.root, And(form_l, form_r)),
-                    new_pf.used_vars,
+                    new_pf.used_vars | form_l.used_vars() | form_r.used_vars(),
                     new_pf.stream_var,
                 )
                 successor_buf_len_l = 0 if transition_l else buf_len_l + leap
@@ -417,35 +416,36 @@ def symbolic_bisimulation(
             new_pf.add_used_vars({new_bits_var})
 
             def extend_buffer(
-                    parser: ParserProgram, buf_size: int, leap: int, pf: PureFormula
+                    parser: ParserProgram, buf_size: int, leap_size: int, pf: PureFormula
             ) -> None:
                 """
                 Extend the buffer variable in the current pure formula.
 
                 :param parser: the parser program to use for the extension
-                :param is_left: whether to extend the left or right buffer
                 :param buf_size: the size of the buffer
+                :param leap_size: the number of bits to add to the buffer
+                :param pf: the pure formula to capture the extension in buffer size
                 """
-                if buf_size > 0:
-                    buf_var = parser.get_buffer_var(buf_size)
-                    fresh_var = manager.fresh_variable(buf_size)
-                    pf.substitute({buf_var: fresh_var})
-
-                    new_buf_var = parser.get_buffer_var(buf_size + leap)
-                    pf.root = And(
-                        pf.root,
-                        Equals(
-                            new_buf_var,
-                            Concatenate(parser, left=fresh_var, right=new_bits_var),
-                        ),
-                    )
-                else:
-                    new_buf_var = parser.get_buffer_var(buf_size + leap)
+                if buf_size == 0:
+                    new_buf_var = parser.get_buffer_var(leap_size)
                     pf.root = And(
                         pf.root,
                         Equals(
                             new_buf_var,
                             new_bits_var,
+                        ),
+                    )
+                else:
+                    buf_var = parser.get_buffer_var(buf_size)
+                    fresh_var = manager.fresh_variable(buf_size)
+                    pf.substitute({buf_var: fresh_var})
+
+                    new_buf_var = parser.get_buffer_var(buf_size + leap_size)
+                    pf.root = And(
+                        pf.root,
+                        Equals(
+                            new_buf_var,
+                            Concatenate(parser, left=fresh_var, right=new_bits_var),
                         ),
                     )
 
@@ -484,7 +484,7 @@ def symbolic_bisimulation(
                 for form_r, to_r in right_trans:
                     copy_pf = PureFormula.clone(
                         And(new_pf.root, And(form_l, form_r)),
-                        new_pf.used_vars,
+                        new_pf.used_vars | form_l.used_vars() | form_r.used_vars(),
                         new_bits_var,
                     )
                     work_queue.append(

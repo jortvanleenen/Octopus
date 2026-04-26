@@ -139,10 +139,6 @@ class Extract(Component):
         len_after = len(buf_var) - self.size
         if len_after < 0:
             raise ValueError("Invalid buffer length")
-        elif len_after == 0:
-            new_buf_var = None
-        else:
-            new_buf_var = self._program.get_buffer_var(len_after)
 
         new_buf_expr = None
         substitution: dict[Variable, FormulaNode] = {}
@@ -158,6 +154,7 @@ class Extract(Component):
                 new_buf_expr = Concatenate(self._program, left=field_var, right=new_buf_expr)
 
         if len_after > 0:
+            new_buf_var = self._program.get_buffer_var(len_after)
             new_buf_expr = Concatenate(self._program, left=new_buf_expr, right=new_buf_var)
         substitution[buf_var] = new_buf_expr
 

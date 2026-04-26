@@ -184,13 +184,14 @@ class Equals(FormulaNode):
 
 
 class FormulaManager(ReprMixin):
-    def __init__(self):
+    def __init__(self, *, count_up=True):
         """
         Initialise a FormulaManager instance.
 
         This manager is responsible for generating fresh variable names.
         """
-        self._next_free_var_name: int = 0
+        self._count_up = count_up
+        self._next_free_var_name: int = 1 if self._count_up else -1
 
     def fresh_name(self) -> str:
         """
@@ -199,7 +200,7 @@ class FormulaManager(ReprMixin):
         :return: a unique variable name as a string
         """
         name = str(self._next_free_var_name)
-        self._next_free_var_name += 1
+        self._next_free_var_name += 1 if self._count_up else -1
         return name
 
     def fresh_variable(self, size: int) -> Variable:
@@ -261,6 +262,14 @@ class PureFormula(ReprMixin):
         :return: set of Variable instances used in this formula
         """
         return self._used_vars
+
+    def exists_vars(self) -> set[Variable]:
+        """
+        Get the set of variables that should be existentially quantified out.
+
+        :return: set of such Variable instances
+        """
+        return {var for var in self._used_vars if var.name.lstrip("+-").isdigit()}
 
     def add_used_vars(self, vars: set[Variable]) -> None:
         self._used_vars |= vars
