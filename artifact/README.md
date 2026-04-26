@@ -103,7 +103,7 @@ remains the same.
 
 To ensure a fair comparison, we re-executed all experiments on the same
 hardware configuration as used in the paper. The updated results are
-included under `/our_output` and cover all three evaluation components:
+included under `/our_results` and cover all three evaluation components:
 (1) updated Octopus averages for Table 1, (2) an updated version of Figure 3, 
 and (3) updated summary statistics for the public code experiment.
 
