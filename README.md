@@ -129,25 +129,25 @@ provide the `-j` option to Octopus in the latter case.
 
 Octopus provides a command-line interface (CLI) with the following options:
 
-| Short | Long                          | Description                                                                                |
-|-------|-------------------------------|--------------------------------------------------------------------------------------------|
-| `-h`  | `--help`                      | Show a help message and exit                                                               |
-|       | `--version`                   | Show the version of Octopus and exit                                                       |
-| `-j`  | `--json`                      | Specify that both inputs are in IR (p4c) JSON format                                       |
-|       | `file1`                       | Path to the first P4 program                                                               |
-|       | `file2`                       | Path to the second P4 program                                                              |
-| `-v`  | `--verbosity`                 | Increase output verbosity (`-v`, `-vv`, `-vvv`)                                            |
-| `-t`  | `--time`                      | Time how long certificate generation and validation take, and print the results in the CLI |
-| `-o`  | `--output`                    | Write the bisimulation certificate or counterexample to the specified file                 |
-|       | `--no-conclusion`             | Do not print the final conclusion (equivalent or not) in the CLI output                    |
-|       | `--no-validation`             | Do not validate that the generated certificate represents a bisimulation                   |
-| `-f`  | `--fail-on-mismatch`          | Exit with code 1 if the parsers are not equivalent                                         |
-| `-s`  | `--solvers`                   | Specify which SMT solvers to use along with their options                                  |
-|       | `--solvers-global-options`    | Specify global options for all solvers                                                     |
-|       | `--filter-accepting-string`   | Define an additional constraint for accepting pairs via a string                           |
-|       | `--filter-accepting-file `    | Define an additional constraint for accepting pairs via an external file                   |
-|       | `--filter-disagreeing-string` | Define an additional constraint for disagreeing pairs via a string                         |
-|       | `--filter-disagreeing-file`   | Define an additional constraint for disagreeing pairs via an external file                 |
+| Short | Long                          | Description                                                                |
+|-------|-------------------------------|----------------------------------------------------------------------------|
+| `-h`  | `--help`                      | Show a help message and exit                                               |
+|       | `--version`                   | Show the version of Octopus and exit                                       |
+| `-j`  | `--json`                      | Specify that both inputs are in IR (p4c) JSON format                       |
+|       | `file1`                       | Path to the first P4 program                                               |
+|       | `file2`                       | Path to the second P4 program                                              |
+| `-v`  | `--verbosity`                 | Increase output verbosity (`-v`, `-vv`, `-vvv`)                            |
+| `-t`  | `--time`                      | Measure and print the time taken for certificate generation and validation |
+| `-o`  | `--output`                    | Write the bisimulation certificate or counterexample to the specified file |
+|       | `--no-conclusion`             | Do not print the final conclusion (equivalent or not) in the CLI output    |
+|       | `--no-validation`             | Do not validate that the generated certificate represents a bisimulation   |
+| `-f`  | `--fail-on-mismatch`          | Exit with code 1 if the parsers are not equivalent                         |
+| `-s`  | `--solvers`                   | Specify which SMT solvers to use along with their options                  |
+|       | `--solvers-global-options`    | Specify global options for all solvers                                     |
+|       | `--filter-accepting-string`   | Define an additional constraint for accepting pairs via a string           |
+|       | `--filter-accepting-file `    | Define an additional constraint for accepting pairs via an external file   |
+|       | `--filter-disagreeing-string` | Define an additional constraint for disagreeing pairs via a string         |
+|       | `--filter-disagreeing-file`   | Define an additional constraint for disagreeing pairs via an external file |
 
 ### Examples
 

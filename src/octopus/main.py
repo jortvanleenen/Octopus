@@ -57,6 +57,12 @@ def parse_arguments() -> argparse.Namespace:
         help="increase output verbosity (-v, -vv, -vvv)",
     )
     parser.add_argument(
+        "-t",
+        "--time",
+        action="store_true",
+        help="measure and print the time taken for certificate generation and validation",
+    )
+    parser.add_argument(
         "-o",
         "--output",
         type=str,
@@ -329,6 +335,7 @@ def main(args: Any = None) -> None:
         filter_disagreeing=filter_disagreeing,
         solver_portfolio=portfolio,
         validate_certificate=not args.no_validation,
+        to_time=args.time
     )
 
     if are_equal:

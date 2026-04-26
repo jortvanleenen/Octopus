@@ -7,6 +7,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 from collections import deque
+import time
 from typing import Any
 
 import pysmt.shortcuts as pysmt
@@ -330,6 +331,7 @@ def symbolic_bisimulation(
         filter_accepting: Any = None,
         filter_disagreeing: Any = None,
         validate_certificate: bool = False,
+        to_time: bool = False,
 ) -> tuple[bool, str]:
     """
     Check whether two P4 packet parsers are bisimilar using symbolic execution.
@@ -348,11 +350,13 @@ def symbolic_bisimulation(
     :param validate_certificate: if True, validate the generated certificate via
            check_certificate() before returning; raises AssertionError if the
            certificate produced by this function is found to be invalid
+    :param to_time: whether to time certificate generation and validation
     :return: a boolean indicating bisimilarity, and seen formulas or a counterexample
     """
     manager = FormulaManager()
     knowledge: set[GuardedFormula] = set()
     work_queue = deque([GuardedFormula.initial_guard()])
+    gen_start = time.perf_counter() if to_time else None
     with solver_portfolio as s:
         while len(work_queue) > 0:
             guarded_form = work_queue.popleft()
@@ -475,11 +479,24 @@ def symbolic_bisimulation(
 
             knowledge.add(guarded_form)
 
+        gen_time = (time.perf_counter() - gen_start) if to_time else None
+        val_time = None
         if validate_certificate:
+            if to_time:
+                val_start = time.perf_counter()
+
             valid, message = check_certificate(
                 knowledge, parser1, parser2, s,
                 filter_accepting, filter_disagreeing,
             )
+
+            val_time = (time.perf_counter() - val_start) if to_time else None
+
             assert valid, f"Certificate self-check failed: {message}"
+
+    if to_time:
+        print(f"[TIMING] generation={gen_time:.6f}")
+        if validate_certificate:
+            print(f"[TIMING] validation={val_time:.6f}")
 
     return True, "\n".join(str(f) for f in knowledge)

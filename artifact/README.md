@@ -47,7 +47,7 @@ Justification for the badges:
   reproducing the results reported in the paper, which can be done using the
   provided Docker image (which is based on the same Octopus source code).
 
-Differences to the paper's results due to required post-rebuttal changes are 
+Differences to the paper's results due to required post-rebuttal changes are
 documented in the FULL REVIEW section.
 
 Requirements:
@@ -104,7 +104,7 @@ remains the same.
 To ensure a fair comparison, we re-executed all experiments on the same
 hardware configuration as used in the paper. The updated results are
 included under `/our_results` and cover all three evaluation components:
-(1) updated Octopus averages for Table 1, (2) an updated version of Figure 3, 
+(1) updated Octopus averages for Table 1, (2) an updated version of Figure 3,
 and (3) updated summary statistics for the public code experiment.
 
 While measurements differ from those reported in the paper, the overall
@@ -157,7 +157,7 @@ should stay the same.
     directory. This will also make it available on the host in 
     `octopus-results/` (or wherever you chose to bind the output directory).
 
-    python3 tests/runner.py --suite whippersnapper_equiv --variant octopus_default
+    python3 tests/runner.py --suite whippersnapper_equiv
 
     The CLI output should confirm that the three pairs of parsers are indeed 
     equivalent, as claimed in the paper.

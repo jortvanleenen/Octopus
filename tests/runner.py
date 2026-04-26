@@ -34,6 +34,10 @@ RUNS_PER_BENCHMARK = 3
 WARMUP_RUNS = 1
 TIME_CMD = ["/usr/bin/time", "-v"]
 
+GEN_RE = re.compile(r"\[TIMING]\s*generation=(\d+\.\d+)")
+VAL_RE = re.compile(r"\[TIMING]\s*validation=(\d+\.\d+)")
+MEM_RE = re.compile(r"Maximum resident set size .*?:\s*(\d+)")
+
 
 @dataclass(frozen=True)
 class Benchmark:
@@ -274,12 +278,12 @@ def get_all_run_variants() -> List[BenchmarkRun]:
     """
     return [
         BenchmarkRun("octopus_default", {}),
-        BenchmarkRun("octopus_no_validation", {"no-validation": ""})
     ]
 
 
 def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun, tmp_path: str, pbar=None):
-    times = []
+    gen_times = []
+    val_times = []
     memory = []
 
     for i in range(WARMUP_RUNS + RUNS_PER_BENCHMARK):
@@ -289,9 +293,11 @@ def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun, tmp_path: str, pb
             else:
                 run_idx = i - WARMUP_RUNS + 1
                 pbar.set_postfix_str(f"{benchmark.name} ({run_idx}/{RUNS_PER_BENCHMARK})")
+
         cmd = TIME_CMD + [
             "python3", "-m", "octopus.main",
             "--no-conclusion",
+            "--time",
             "--output", tmp_path
         ]
 
@@ -307,26 +313,33 @@ def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun, tmp_path: str, pb
 
         result = subprocess.run(
             cmd,
+            stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
 
         if i >= WARMUP_RUNS:
-            t = re.search(r"Elapsed .*?:\s*(?:(\d+):)?(\d+):(\d+(?:\.\d+)?)", result.stderr)
-            m = re.search(r"Maximum resident set size .*?:\s*(\d+)", result.stderr)
+            out = result.stdout
+            err = result.stderr
 
-            if t:
-                h = int(t.group(1)) if t.group(1) else 0
-                total = h * 3600 + int(t.group(2)) * 60 + float(t.group(3))
-                times.append(total)
-
+            g = GEN_RE.search(out)
+            if g:
+                gen_times.append(float(g.group(1)))
+            v = VAL_RE.search(out)
+            if v:
+                val_times.append(float(v.group(1)))
+            m = MEM_RE.search(err)
             if m:
                 memory.append((int(m.group(1)) * 1000) / (1024 ** 2))
 
         if pbar:
             pbar.update(1)
 
-    return statistics.mean(times), statistics.mean(memory)
+    return (
+        statistics.mean(gen_times),
+        statistics.mean(val_times),
+        statistics.mean(memory),
+    )
 
 
 def run_leapfrog(benchmarks, variants):
@@ -338,12 +351,14 @@ def run_leapfrog(benchmarks, variants):
         with tempfile.NamedTemporaryFile() as tmp:
             with tqdm(total=total, desc="Leapfrog equiv. checks") as pbar:
                 for b in benchmarks:
-                    t, m = run_benchmark(b, variant, tmp.name, pbar)
-                    results.append((b.name, t, m))
+                    gen, val, mem = run_benchmark(b, variant, tmp.name, pbar)
+                    results.append((b.name, gen, val, mem))
 
         print(f"\n=== {variant.name} ===")
-        for name, t, m in results:
-            print(f"{name}: {t:.2f}s, {m:.2f} MiB")
+        print(f"{'Benchmark':<35} {'Gen (s)':>10} {'Val (s)':>10} {'Mem (MiB)':>12}")
+        print("-" * 70)
+        for name, gen, val, mem in results:
+            print(f"{name:<35} {gen:>10.4f} {val:>10.4f} {mem:>12.2f}")
 
 
 def run_whippersnapper(benchmarks, variants):
@@ -355,8 +370,9 @@ def run_whippersnapper(benchmarks, variants):
         with tqdm(total=total, desc="Whippersnapper equiv. checks") as pbar:
             for variant in variants:
                 for b in benchmarks:
-                    t, m = run_benchmark(b, variant, tmp.name, pbar)
-                    results.append((b.name, t, m))
+                    gen, val, mem = run_benchmark(b, variant, tmp.name, pbar)
+                    total_time = gen + val
+                    results.append((b.name, gen, total_time, mem))
 
     plot(results)
 
@@ -408,7 +424,7 @@ def plot(results):
     data = {"field": [], "header": [], "complex": []}
     pattern = re.compile(r'parse_(field|header|complex)_(\d+)(?:_(\d+))?')
 
-    for name, t, m in results:
+    for name, gen, total, m in results:
         match = pattern.match(name)
         if not match:
             continue
@@ -428,7 +444,7 @@ def plot(results):
             x = (f ** (d + 1) - 1) / (f - 1)
             label = f"{d},{f}"
 
-        data[kind].append((x, t, m, label))
+        data[kind].append((x, gen, total, m, label))
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 5.5))
 
@@ -452,11 +468,12 @@ def plot(results):
             continue
 
         xs = np.array([e[0] for e in data[kind]])
-        ts = np.array([e[1] for e in data[kind]])
-        ms = np.array([e[2] for e in data[kind]])
+        gen_ts = np.array([e[1] for e in data[kind]])
+        total_ts = np.array([e[2] for e in data[kind]])
+        ms = np.array([e[3] for e in data[kind]])
 
         order = np.argsort(xs)
-        xs, ts, ms = xs[order], ts[order], ms[order]
+        xs, gen_ts, total_ts, ms = xs[order], gen_ts[order], total_ts[order], ms[order]
 
         ax_time = axes[col]
         ax_mem = ax_time.twinx()
@@ -465,9 +482,14 @@ def plot(results):
         ax_mem.set_zorder(1)
         ax_time.patch.set_visible(False)
 
-        ax_time.plot(xs, ts, linestyle='-', linewidth=2,
+        ax_time.plot(xs, gen_ts, linestyle='-', linewidth=2,
                      color=TIME_COLOUR, zorder=3)
-        ax_time.scatter(xs, ts, marker='o',
+        ax_time.scatter(xs, gen_ts, marker='o',
+                        color=TIME_COLOUR, zorder=4, s=100)
+
+        ax_time.plot(xs, total_ts, linestyle='--', linewidth=2,
+                     color=TIME_COLOUR, alpha=0.7, zorder=3)
+        ax_time.scatter(xs, total_ts, marker='x',
                         color=TIME_COLOUR, zorder=4, s=100)
 
         ax_mem.plot(xs, ms, linestyle='--', linewidth=2,
@@ -496,7 +518,7 @@ def plot(results):
 
         ax_time.grid(True, which="both", axis="y", alpha=0.4)
 
-        for x, t, m, lbl in data[kind]:
+        for x, gen, total, m, lbl in data[kind]:
             if kind == "complex":
                 if lbl not in {"4,3", "6,2"}:
                     offset = (-24, 10)
@@ -504,7 +526,7 @@ def plot(results):
                     offset = (-40, -2)
 
                 ax_time.annotate(
-                    lbl, (x, t),
+                    lbl, (x, total),
                     textcoords="offset points",
                     xytext=offset,
                     fontsize=16,
@@ -514,7 +536,9 @@ def plot(results):
 
     legend_elements = [
         Line2D([0], [0], marker='o', linestyle='-',
-               color=TIME_COLOUR, label='Time', markersize=7),
+               color=TIME_COLOUR, label='Generation time', markersize=7),
+        Line2D([0], [0], marker='x', linestyle='--',
+               color=TIME_COLOUR, label='Total time (gen+val)', markersize=7),
         Line2D([0], [0], marker='s', linestyle='--',
                color=MEM_COLOUR, label='Memory', markersize=7),
     ]
