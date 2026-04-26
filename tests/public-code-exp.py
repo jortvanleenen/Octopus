@@ -40,7 +40,7 @@ class UnionFind:
         for x in self.parent:
             root = self.find(x)
             result.setdefault(root, []).append(x)
-        return result.values()
+        return list(result.values())
 
 
 def find_p4_files(root: Path) -> list[Path]:
@@ -72,11 +72,30 @@ def describe(values: list[float]) -> dict[str, float]:
     }
 
 
+def validate_equivalence(
+        groups: list[list[str]],
+        results: dict[tuple[str, str], bool],
+) -> list[tuple[str, str]]:
+    """
+    Check that each group is a clique under the equivalence relation.
+    """
+    violations = []
+
+    for group in groups:
+        for a, b in combinations(group, 2):
+            key = tuple(sorted((a, b)))
+            if not results.get(key, False):
+                violations.append((a, b))
+
+    return violations
+
+
 def run_equivalence_checks(p4_files: list[Path]) -> None:
     wall_times: list[float] = []
     peak_mems: list[float] = []
 
     uf = UnionFind()
+    results: dict[tuple[str, str], bool] = {}
 
     total = len(p4_files) * (len(p4_files) - 1) // 2
     completed = 0
@@ -130,14 +149,17 @@ def run_equivalence_checks(p4_files: list[Path]) -> None:
             output = out + err
 
             if "NOT equivalent" in output:
-                verdict = "NOT equivalent"
+                is_equiv = False
             elif "equivalent" in output:
-                verdict = "Equivalent"
+                is_equiv = True
             else:
-                verdict = "Unknown"
+                is_equiv = False
                 tqdm.write(f"Unknown: {file1.name} <-> {file2.name}")
 
-            if verdict == "Equivalent":
+            key = tuple(sorted((file1.name, file2.name)))
+            results[key] = is_equiv
+
+            if is_equiv:
                 uf.union(file1.name, file2.name)
 
             if t_match or m_match:
@@ -173,6 +195,17 @@ def run_equivalence_checks(p4_files: list[Path]) -> None:
     else:
         for i, group in enumerate(multi_groups, 1):
             print(f"Group {i}: {', '.join(sorted(group))}")
+
+    print("\n=== Equivalence class validation ===")
+
+    violations = validate_equivalence(groups, results)
+
+    if not violations:
+        print("All groups satisfy equivalence (transitivity holds).")
+    else:
+        print("Violations found (non-transitive equivalence):")
+        for a, b in violations:
+            print(f"  {a} !~ {b}")
 
 
 def main() -> None:
