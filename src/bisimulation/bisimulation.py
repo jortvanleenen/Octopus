@@ -297,8 +297,8 @@ def check_certificate(
                     new_pf.used_vars | form_l.used_vars() | form_r.used_vars(),
                     new_pf.stream_var,
                 )
-                successor_buf_len_l = 0 if transition_l else buf_len_l + leap
-                successor_buf_len_r = 0 if transition_r else buf_len_r + leap
+                successor_buf_len_l = 0 if transition_l or terminal_l else buf_len_l + leap
+                successor_buf_len_r = 0 if transition_r or terminal_r else buf_len_r + leap
                 successor = GuardedFormula(
                     to_l, to_r,
                     successor_buf_len_l, successor_buf_len_r,
@@ -496,8 +496,8 @@ def symbolic_bisimulation(
                         GuardedFormula(
                             to_l,
                             to_r,
-                            0 if transition_l else buf_len_l + leap,
-                            0 if transition_r else buf_len_r + leap,
+                            0 if transition_l or terminal_l else buf_len_l + leap,
+                            0 if transition_r or terminal_r else buf_len_r + leap,
                             copy_pf,
                             guarded_form,
                         )
