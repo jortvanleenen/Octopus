@@ -274,23 +274,24 @@ def check_certificate(
             new_pf, _ = op_block_r.strongest_postcondition(manager, new_pf, buf_len_r + leap)
 
         true_form = TRUE()
-        left_trans = (
-            trans_block_l.symbolic_transition()
-            if transition_l
-            else [(true_form, "reject" if terminal_l else state_l)]
-        )
-        right_trans = (
-            trans_block_r.symbolic_transition()
-            if transition_r
-            else [(true_form, "reject" if terminal_r else state_r)]
-        )
+
+        if terminal_l:
+            left_trans = []
+        elif transition_l:
+            left_trans = trans_block_l.symbolic_transition()
+        else:
+            left_trans = [(true_form, state_l)]
+
+        if terminal_r:
+            right_trans = []
+        elif transition_r:
+            right_trans = trans_block_r.symbolic_transition()
+        else:
+            right_trans = [(true_form, state_r)]
 
         # Check 2: every successor must be covered by the certificate
         for form_l, to_l in left_trans:
             for form_r, to_r in right_trans:
-                if to_l == "reject" and to_r == "reject":
-                    continue
-
                 successor_pf = PureFormula.clone(
                     And(new_pf.root, And(form_l, form_r)),
                     new_pf.used_vars | form_l.used_vars() | form_r.used_vars(),
@@ -469,16 +470,20 @@ def symbolic_bisimulation(
                 new_pf, _ = op_block_r.strongest_postcondition(manager, new_pf, buf_len_r + leap)
 
             true_form = TRUE()
-            left_trans = (
-                trans_block_l.symbolic_transition()
-                if transition_l
-                else [(true_form, "reject" if terminal_l else state_l)]
-            )
-            right_trans = (
-                trans_block_r.symbolic_transition()
-                if transition_r
-                else [(true_form, "reject" if terminal_r else state_r)]
-            )
+
+            if terminal_l:
+                left_trans = []
+            elif transition_l:
+                left_trans = trans_block_l.symbolic_transition()
+            else:
+                left_trans = [(true_form, state_l)]
+
+            if terminal_r:
+                right_trans = []
+            elif transition_r:
+                right_trans = trans_block_r.symbolic_transition()
+            else:
+                right_trans = [(true_form, state_r)]
 
             for form_l, to_l in left_trans:
                 for form_r, to_r in right_trans:
