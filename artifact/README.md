@@ -18,17 +18,17 @@ Justification for the badges:
     - Public code application (as described in the text, Section 5): point (3)
 
   Not replicated:
-  - The paper also reports performance results for Leapfrog in Table 1. We do not 
-    reproduce these results as part of the artifact evaluation. Re-running 
-    Leapfrog proved to be prohibitively time-consuming and requires substantial 
-    memory resources. Instead, we focus on reproducing the results for Octopus, 
-    which is the primary subject of this artifact. To ensure a fair comparison, 
-    we executed both tools on the same hardware platform. Our measurements for 
-    Leapfrog were generally higher (i.e., slower) than those reported in the 
-    original paper, but remained consistent with their overall findings and 
-    trends. Octopus remains faster than Leapfrog, also when considering their 
-    measurements. The Leapfrog implementation is publicly available at: 
-    https://github.com/verified-network-toolchain/leapfrog.
+    - Obtained performance results for Leapfrog in Table 1. We do not reproduce
+      these results as part of the artifact evaluation. Re-running Leapfrog proved
+      to be prohibitively time-consuming (runtime of multiple days) and requires
+      substantial memory resources (~500 GB). Instead, we focus on reproducing the
+      results for Octopus, which is the primary subject of this artifact. To
+      ensure a fair comparison, we executed both tools on the same hardware
+      platform. Our measurements for Leapfrog were generally higher (i.e., slower)
+      than those reported in the original paper, but remained consistent with
+      their overall findings and trends. Octopus remains faster than Leapfrog,
+      also when considering their measurements. The Leapfrog implementation is
+      publicly available at: https://github.com/verified-network-toolchain/leapfrog.
 
 * Reusable:
   The Octopus tool is open-source and available via a public GitHub repository
@@ -47,11 +47,14 @@ Justification for the badges:
   reproducing the results reported in the paper, which can be done using the
   provided Docker image (which is based on the same Octopus source code).
 
+Differences to the paper's results due to required post-rebuttal changes are 
+documented in the FULL REVIEW section.
+
 Requirements:
 
 * RAM: 16 GiB
 * CPU cores: 4
-* Time (smoke test): 30 minutes
+* Time (smoke test): 15 minutes
 * Time (full review): 4 hours
 
 external connectivity: NO
@@ -80,7 +83,7 @@ successful run produces output of the form:
     GuardedFormula(...)
     GuardedFormula(...)
 
-where "..." denotes the full guarded formula output.
+where "..." denotes the full content of each guarded formula.
 
 Successful execution confirms that both the P4 parsing pipeline and SMT-based
 reasoning are functioning correctly. You can then proceed to the full
@@ -90,24 +93,49 @@ experimental evaluation.
 **                               FULL REVIEW                                 **
 -------------------------------------------------------------------------------
 
+It should be noted that, following the rebuttal phase, we were explicitly
+requested to extend Octopus with certificate validation. This addition
+required modest changes to the core algorithm and its implementation, which
+in turn affect performance characteristics such as runtime and memory usage.
+As a result, the reported averages for these metrics may differ from those
+presented in the original paper, even though the underlying methodology
+remains the same.
+
+To ensure a fair comparison, we re-executed all experiments on the same
+hardware configuration as used in the paper. The updated results are
+included under `/our_output` and cover all three evaluation components:
+(1) updated Octopus averages for Table 1, (2) an updated version of Figure 3, 
+and (3) updated summary statistics for the public code experiment.
+
+While measurements differ from those reported in the paper, the overall
+trends and conclusions remain unchanged.
+
 Assuming the smoke test passed, run the following commands to reproduce the
-results. Running the full benchmark suite can take around 4 hours on a standard,
-modern laptop.
+results.
 
 First, create a directory on your host to store results:
 
     mkdir octopus-results
 
 Then, start an interactive container (that will be removed when exiting the
-session (optional `--rm` again)) with a bind mount to persist results:
+session (optional `--rm` again)) with a bind mount to the created directory to
+persist results:
 
     docker run -it --rm -v $(pwd)/octopus-results:/output --entrypoint /bin/bash jortvanleenen/octopus:latest
+
+> **Note**
+>
+> The local results directory is represented as `$(pwd)/octopus-results`.
+>
+> If you are using a different shell, adjust the syntax for resolving the current
+> working directory accordingly. Likewise, update the path if you chose a
+> different directory for storing results.
 
 You are now in a bash environment within the container, where you can run the
 experiments and inspect the source code. Source code is located in the `/src`
 directory. The experiments can be found in the `/tests` directory. Any files
 written to `/output` will be available on the host in the `octopus-results`
-directory.
+directory (or wherever you chose to bind the output directory).
 
 The following commands will print out progress as they execute the benchmarks.
 While concrete output values may differ, the overall trends (e.g., ratios)
@@ -127,12 +155,11 @@ should stay the same.
     Once all experiments have ran, a plot will be generated and saved as 
     `whippersnapper_plot.png`. The second command moves the file to the `/output` 
     directory. This will also make it available on the host in 
-    `octopus-results/whippersnapper_plot.png`. The plot should look similar to 
-    the one in the paper, with roughly the same ratios.
+    `octopus-results/` (or wherever you chose to bind the output directory).
 
 (3) To obtain the results for the public code experiment, run the following command:
 
     python3 tests/public-code-exp.py --directory tests/p4-programs-survey
 
     Once all comparisons have been performed, the final CLI output will consist 
-    of a summary of the statistical results, which are reported in the paper.
+    of a summary of statistical results, some of which are reported in the paper.
