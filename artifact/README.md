@@ -55,7 +55,7 @@ Requirements:
 * RAM: 16 GiB
 * CPU cores: 4
 * Time (smoke test): 15 minutes
-* Time (full review): 4 hours
+* Time (full review): 7-8 hours (depending on hardware)
 
 external connectivity: NO
 
