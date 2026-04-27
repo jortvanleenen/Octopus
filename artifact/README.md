@@ -118,6 +118,9 @@ To ensure a fair comparison, we re-executed all experiments on the same
 hardware configuration as used in the paper. We also removed the previously used 
 cold start for each run. In retrospect, this provided only marginal benefit for 
 very short runs while significantly increasing total experimental runtime.
+Finally, we switched from using the cvc5 SMT solver to z3. Both were found to be 
+near equally performant (+/- 10%), as we also stated in our rebuttal, however, 
+we found that cvc5 produces a race condition within PySMT, our SMT interface.
 
 Although specific measurements differ from those reported in the paper, the
 overall trends and conclusions remain unchanged.

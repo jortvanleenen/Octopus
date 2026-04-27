@@ -88,7 +88,7 @@ def parse_arguments() -> argparse.Namespace:
         "-s",
         "--solvers",
         type=str,
-        default="['cvc5', 'z3']",
+        default="['z3']",
         help="list of solvers, possibly with options, to use for bisimulation",
     )
     parser.add_argument(
