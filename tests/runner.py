@@ -318,14 +318,17 @@ def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun, tmp_path: str, pb
         err = result.stderr
 
         g = GEN_RE.search(out)
-        if g:
-            gen_times.append(float(g.group(1)))
         v = VAL_RE.search(out)
+        m = MEM_RE.search(err)
+        if not g or not m or (not v and "no-validation" not in variant.arguments.keys()):
+            raise RuntimeError(
+                f"Failed to parse timing/memory output for benchmark {benchmark.name} (variant {variant.name}):\n"
+                f"stdout:\n{out}\nstderr:\n{err}"
+            )
+        gen_times.append(float(g.group(1)))
+        memory.append((int(m.group(1)) * 1000) / (1024 ** 2))
         if v:
             val_times.append(float(v.group(1)))
-        m = MEM_RE.search(err)
-        if m:
-            memory.append((int(m.group(1)) * 1000) / (1024 ** 2))
 
         if pbar:
             pbar.update(1)
@@ -341,7 +344,7 @@ def run_leapfrog(benchmarks, variants):
     for variant in variants:
         results = []
 
-        total = len(benchmarks) * (RUNS_PER_BENCHMARK)
+        total = len(benchmarks) * RUNS_PER_BENCHMARK
 
         with tempfile.NamedTemporaryFile() as tmp:
             with tqdm(total=total, desc="Leapfrog equiv. checks") as pbar:
@@ -359,7 +362,7 @@ def run_leapfrog(benchmarks, variants):
 def run_whippersnapper(benchmarks, variants):
     results = []
 
-    total = len(benchmarks) * (RUNS_PER_BENCHMARK)
+    total = len(benchmarks) * RUNS_PER_BENCHMARK
 
     with tempfile.NamedTemporaryFile() as tmp:
         with tqdm(total=total, desc="Whippersnapper equiv. checks") as pbar:
@@ -473,8 +476,8 @@ def plot(results):
         ax_time = axes[col]
         ax_mem = ax_time.twinx()
 
-        ax_time.set_zorder(2)
-        ax_mem.set_zorder(1)
+        ax_time.set_zorder(1)
+        ax_mem.set_zorder(0)
         ax_time.patch.set_visible(False)
 
         ax_time.plot(xs, gen_ts, linestyle='-', linewidth=2,
@@ -483,7 +486,7 @@ def plot(results):
                         color=TIME_COLOUR, zorder=4, s=100)
 
         ax_time.plot(xs, total_ts, linestyle='--', linewidth=2,
-                     color=TIME_COLOUR, alpha=0.7, zorder=3)
+                     color=TIME_COLOUR, zorder=3)
         ax_time.scatter(xs, total_ts, marker='x',
                         color=TIME_COLOUR, zorder=4, s=100)
 
@@ -511,8 +514,9 @@ def plot(results):
         formatter.set_useOffset(False)
         ax_mem.yaxis.set_major_formatter(formatter)
 
-        ax_time.grid(True, which="both", axis="y", alpha=0.4)
-
+        ax_time.set_axisbelow(True)
+        ax_time.grid(True, which="both", axis="y",
+                     linewidth=0.3, color="#CCCCCC", zorder=0)
         for x, gen, total, m, lbl in data[kind]:
             if kind == "complex":
                 if lbl not in {"4,3", "6,2"}:
