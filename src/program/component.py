@@ -7,7 +7,6 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 from __future__ import annotations
 
-import copy
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable
@@ -70,8 +69,14 @@ class Assignment(Component):
             self.parse(component)
 
     def parse(self, component: dict) -> None:
-        self.left = parse_expression(self._program, component["left"])
-        self.right = parse_expression(self._program, component["right"], len(self.left))
+        left = parse_expression(self._program, component["left"])
+        if not isinstance(left, (Slice, Reference)):
+            raise ValueError(
+                "Assignment left-hand side must be a Slice or Reference, "
+                f"but got {type(left).__name__}"
+            )
+        self.left = left
+        self.right = parse_expression(self._program, component["right"], len(left))
 
     def strongest_postcondition(
             self, manager: FormulaManager, pf: PureFormula, buf_size: int
@@ -89,17 +94,15 @@ class Assignment(Component):
                 f"but got {type(self.left).__name__}"
             )
 
-        hdr_var = self._program.get_header_var(reference.reference)
-        hdr_size = len(hdr_var)
-
-        fresh_var = manager.fresh_variable(hdr_size)
-        pf.substitute({hdr_var: fresh_var})
-        right_copy = copy.deepcopy(self.right)
-        right_copy = right_copy.substitute(pf, {hdr_var: fresh_var})
+        fresh_var = manager.fresh_variable(len(reference))
+        right_subst = self.right.substitute({reference.reference: fresh_var})
 
         return PureFormula(
-            And(pf.root, Equals(hdr_var, right_copy)),
-            pf.used_vars | right_copy.used_vars(),
+            And(
+                pf.root.substitute({reference.reference: fresh_var}),
+                Equals(reference.reference, right_subst)
+            ),
+            pf.used_vars | right_subst.used_vars() | {fresh_var},
             pf.stream_var,
         ), buf_size
 
@@ -149,24 +152,31 @@ class Extract(Component):
 
         new_buf_expr = None
         substitution: dict[Variable, FormulaNode] = {}
+        new_vars: set = set()
         for field, field_size in self.header_content.items():
             field_var = self._program.get_header_var(self.header_reference + '.' + field)
             if isinstance(field_size, str):
                 field_size = self._program.typedefs[field_size]
             fresh_var = manager.fresh_variable(field_size)
             substitution[field_var] = fresh_var
+            new_vars |= {fresh_var}
             if new_buf_expr is None:
                 new_buf_expr = field_var
             else:
-                new_buf_expr = Concatenate(self._program, left=field_var, right=new_buf_expr)
+                new_buf_expr = Concatenate(left=field_var, right=new_buf_expr)
+
+        pf.add_used_vars(set(substitution.values()))
 
         if len_after > 0:
             new_buf_var = self._program.get_buffer_var(len_after)
-            new_buf_expr = Concatenate(self._program, left=new_buf_expr, right=new_buf_var)
+            new_buf_expr = Concatenate(left=new_buf_expr, right=new_buf_var)
         substitution[buf_var] = new_buf_expr
 
-        pf.substitute(substitution)
-        return pf, len_after
+        return PureFormula(
+            pf.root.substitute(substitution),
+            pf.used_vars | new_vars,
+            pf.stream_var
+        ), len_after
 
     def __repr__(self):
         return f"Extract(header_reference={self.header_reference!r}, header_content={self.header_content!r}, size={self.size!r})"

@@ -138,7 +138,7 @@ def _has_new_information(
 
 def extend_buffer(
         parser: ParserProgram, buf_size: int, pf: PureFormula, manager: FormulaManager, new_bits_var: Variable
-) -> None:
+) -> PureFormula:
     """
     Extend the buffer variable in the current pure formula.
 
@@ -151,25 +151,32 @@ def extend_buffer(
     leap_size = len(new_bits_var)
     if buf_size == 0:
         new_buf_var = parser.get_buffer_var(leap_size)
-        pf.root = And(
-            pf.root,
-            Equals(
-                new_buf_var,
-                new_bits_var,
+        return PureFormula(
+            And(
+                pf.root,
+                Equals(
+                    new_buf_var,
+                    new_bits_var,
+                ),
             ),
+            pf.used_vars,
+            pf.stream_var
         )
     else:
         buf_var = parser.get_buffer_var(buf_size)
         fresh_var = manager.fresh_variable(buf_size)
-        pf.substitute({buf_var: fresh_var})
-
         new_buf_var = parser.get_buffer_var(buf_size + leap_size)
-        pf.root = And(
-            pf.root,
-            Equals(
-                new_buf_var,
-                Concatenate(parser, left=fresh_var, right=new_bits_var),
+
+        return PureFormula(
+            And(
+                pf.root.substitute({buf_var: fresh_var}),
+                Equals(
+                    new_buf_var,
+                    Concatenate(left=fresh_var, right=new_bits_var),
+                ),
             ),
+            pf.used_vars | {fresh_var},
+            pf.stream_var
         )
 
 
@@ -262,13 +269,16 @@ def check_certificate(
             leap = op_size_r - buf_len_r
 
         new_bits_var = manager.fresh_variable(leap)
-        new_pf = current_pf.deepcopy()
-        new_pf.add_used_vars({new_bits_var})
+        new_pf = PureFormula(
+            current_pf.root,
+            current_pf.used_vars | {new_bits_var},
+            current_pf.stream_var
+        )
 
         if not terminal_l:
-            extend_buffer(parser1, buf_len_l, new_pf, manager, new_bits_var)
+            new_pf = extend_buffer(parser1, buf_len_l, new_pf, manager, new_bits_var)
         if not terminal_r:
-            extend_buffer(parser2, buf_len_r, new_pf, manager, new_bits_var)
+            new_pf = extend_buffer(parser2, buf_len_r, new_pf, manager, new_bits_var)
 
         transition_l = not terminal_l and (buf_len_l + leap == op_size_l)
         transition_r = not terminal_r and (buf_len_r + leap == op_size_r)
@@ -297,9 +307,9 @@ def check_certificate(
         # Check 2: every successor must be covered by the certificate
         for form_l, to_l in left_trans:
             for form_r, to_r in right_trans:
-                successor_pf = PureFormula.clone(
+                successor_pf = PureFormula(
                     And(new_pf.root, And(form_l, form_r)),
-                    new_pf.used_vars | form_l.used_vars() | form_r.used_vars(),
+                    new_pf.used_vars,
                     new_pf.stream_var,
                 )
                 successor_buf_len_l = 0 if transition_l or terminal_l else buf_len_l + leap
@@ -422,13 +432,16 @@ def symbolic_bisimulation(
                 leap = op_size_r - buf_len_r
 
             new_bits_var = manager.fresh_variable(leap)
-            new_pf = current_pf.deepcopy()
-            new_pf.add_used_vars({new_bits_var})
+            new_pf = PureFormula(
+                current_pf.root,
+                current_pf.used_vars | {new_bits_var},
+                current_pf.stream_var
+            )
 
             if not terminal_l:
-                extend_buffer(parser1, buf_len_l, new_pf, manager, new_bits_var)
+                new_pf = extend_buffer(parser1, buf_len_l, new_pf, manager, new_bits_var)
             if not terminal_r:
-                extend_buffer(parser2, buf_len_r, new_pf, manager, new_bits_var)
+                new_pf = extend_buffer(parser2, buf_len_r, new_pf, manager, new_bits_var)
 
             transition_l = not terminal_l and (buf_len_l + leap == op_size_l)
             transition_r = not terminal_r and (buf_len_r + leap == op_size_r)
@@ -462,9 +475,9 @@ def symbolic_bisimulation(
 
             for form_l, to_l in left_trans:
                 for form_r, to_r in right_trans:
-                    copy_pf = PureFormula.clone(
+                    copy_pf = PureFormula(
                         And(new_pf.root, And(form_l, form_r)),
-                        new_pf.used_vars | form_l.used_vars() | form_r.used_vars(),
+                        new_pf.used_vars,
                         new_bits_var,
                     )
                     work_queue.append(
