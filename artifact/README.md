@@ -53,7 +53,7 @@ documented in the FULL REVIEW section.
 
 Requirements:
 
-* RAM: 16 GiB, we recommend 4 GB of swap space to avoid out-of-memory errors
+* RAM: 16 GiB
 * CPU cores: 4
 * Time (smoke test): 15 minutes
 * Time (full review): 7-8 hours (depending on hardware)
