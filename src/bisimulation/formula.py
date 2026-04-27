@@ -9,7 +9,6 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 from __future__ import annotations
 
-import copy
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
@@ -47,7 +46,7 @@ class FormulaNode(ABC, ReprMixin):
 
     @abstractmethod
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         """
         Substitute variables in the formula with the given mapping.
@@ -77,12 +76,10 @@ class Variable(FormulaNode):
         return {self}
 
     def substitute(
-            self, pf, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         if self in mapping:
-            replacement = mapping[self]
-            pf.add_used_vars(replacement.used_vars())
-            return replacement
+            return mapping[self]
         return self
 
     def __len__(self):
@@ -113,9 +110,9 @@ class Not(FormulaNode):
         return self.subformula.used_vars()
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        return Not(self.subformula.substitute(pf, mapping))
+        return Not(self.subformula.substitute(mapping))
 
     def __str__(self):
         return f"~({self.subformula})"
@@ -133,11 +130,11 @@ class And(FormulaNode):
         return self.left.used_vars() | self.right.used_vars()
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return And(
-            self.left.substitute(pf, mapping),
-            self.right.substitute(pf, mapping),
+            self.left.substitute(mapping),
+            self.right.substitute(mapping),
         )
 
     def __str__(self):
@@ -152,7 +149,7 @@ class TRUE(FormulaNode):
         return set()
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return TRUE()
 
@@ -175,11 +172,11 @@ class Equals(FormulaNode):
         return self.left.used_vars() | self.right.used_vars()
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return Equals(
-            self.left.substitute(pf, mapping),
-            self.right.substitute(pf, mapping),
+            self.left.substitute(mapping),
+            self.right.substitute(mapping),
         )
 
 
@@ -233,27 +230,6 @@ class PureFormula(ReprMixin):
         )
         self.stream_var = stream_var if stream_var is not None else None
 
-    @classmethod
-    def clone(
-            cls,
-            root: FormulaNode,
-            used_vars: set[Variable],
-            stream_var: Variable,
-    ):
-        """
-        Create a clone of the PureFormula with deep copies of its components.
-
-        :param root: the root formula node
-        :param used_vars: the set of variables used in this formula
-        :param stream_var: the variable representing input stream slice
-        :return: PureFormula instance with deep copies of the components
-        """
-        return cls(
-            copy.deepcopy(root),
-            copy.deepcopy(used_vars),
-            copy.deepcopy(stream_var),
-        )
-
     @property
     def used_vars(self) -> set[Variable]:
         """
@@ -273,25 +249,6 @@ class PureFormula(ReprMixin):
 
     def add_used_vars(self, vars: set[Variable]) -> None:
         self._used_vars |= vars
-
-    def deepcopy(self) -> PureFormula:
-        """
-        Create a deep copy of the PureFormula instance.
-        """
-        return PureFormula.clone(
-            self.root,
-            self.used_vars,
-            self.stream_var,
-        )
-
-    def substitute(self, mapping: dict[Variable, FormulaNode]) -> None:
-        """
-        Substitute variables in the formula with the given mapping.
-
-        :param mapping: a dictionary mapping Variable to FormulaNode
-        """
-        self.root = self.root.substitute(self, mapping)
-        self._used_vars -= set(mapping.keys())
 
     def to_smt(self):
         """
