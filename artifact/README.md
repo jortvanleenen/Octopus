@@ -7,28 +7,29 @@ Claimed badges: Available + Reusable
 Justification for the badges:
 
 * Functional:
-  The artifact is provided as a self-contained Docker image that replicates all
-  the experimental results presented in the paper. It includes the full Octopus
-  implementation, all required dependencies (Python and system packages),
+  The artifact is provided as a self-contained Docker image that replicates most
+  of the experimental results presented in the paper. It includes the full
+  Octopus implementation, all required dependencies (Python and system packages),
   benchmark P4 programs, and the relevant evaluation scripts.
 
   Replicated:
     - Comparison with Leapfrog (Table 1): point (1)
-    - Synthetic benchmarks (Figure 3 + equivalence claims, Section 5): point (2)
-    - Public code (statistics, Section 5): point (3)
+    - Synthetic benchmarks (Figure 3 + equivalence claims in Section 5, page 9): point (2)
+    - Public code (statistics in Section 5, page 9): point (3)
 
   Not replicated:
     - Obtained performance results for Leapfrog in Table 1. We do not reproduce
-      these results as part of the artifact evaluation. Re-running Leapfrog proved
-      to be prohibitively time-consuming (runtime of multiple days) and requires
-      substantial memory resources (~500 GB). Instead, we focus on reproducing the
-      results for Octopus, which is the primary subject of this artifact. To
-      ensure a fair comparison, we executed both tools on the same hardware
-      platform. Our measurements for Leapfrog were generally higher (i.e., slower)
-      than those reported in the original paper, but remained consistent with
-      their overall findings and trends. Octopus remains faster than Leapfrog,
-      also when considering their measurements. The Leapfrog implementation is
-      publicly available at: https://github.com/verified-network-toolchain/leapfrog.
+      these results as part of the artifact evaluation. Re-running Leapfrog
+      proved to be prohibitively time-consuming (runtime of multiple days) and
+      requires substantial memory resources (~500 GB). Instead, we focus on
+      reproducing the results for Octopus, which is the primary subject of this
+      artifact. To ensure a fair comparison, we executed both tools on the same
+      hardware platform. Our measurements for Leapfrog were generally higher
+      (i.e., slower) than those reported in the original paper, but remained
+      consistent with their overall findings and trends. Octopus remains faster
+      than Leapfrog, also when considering their measurements. The Leapfrog
+      implementation is publicly available at:
+      https://github.com/verified-network-toolchain/leapfrog.
 
 * Reusable:
   The Octopus tool is open-source and available via a public GitHub repository
@@ -52,7 +53,7 @@ documented in the FULL REVIEW section.
 
 Requirements:
 
-* RAM: 16 GiB
+* RAM: 16 GiB, we recommend 4 GB of swap space to avoid out-of-memory errors
 * CPU cores: 4
 * Time (smoke test): 15 minutes
 * Time (full review): 7-8 hours (depending on hardware)
@@ -94,21 +95,32 @@ experimental evaluation.
 -------------------------------------------------------------------------------
 
 It should be noted that, following the rebuttal phase, we were explicitly
-requested to extend Octopus with certificate validation. This addition
-required modest changes to the core algorithm and its implementation, which
-in turn affect performance characteristics such as runtime and memory usage.
-As a result, the reported averages for these metrics may differ from those
-presented in the original paper, even though the underlying methodology
-remains the same.
+requested to extend Octopus with certificate validation. This addition required 
+modest changes to the core algorithm and implementation, which in turn affect 
+performance characteristics such as runtime and memory usage. As a result, the 
+reported averages differ from those in the accepted paper, although the 
+underlying methodology remains unchanged. We have submitted the original version 
+of the accepted paper to the AE, as requested, but will use the updated results 
+in the camera-ready version.
+
+The updated results are available under `/our_results` and cover all three 
+evaluation components:
+- (1) updated Octopus averages for Table 1,
+- (2) an updated version of Figure 3, and
+- (3) updated summary statistics for the public code experiment.
+
+For (1), we now report generation and validation times separately, whose sum is 
+comparable to the previously reported total execution time. For (2), we plot the 
+certificate generation time as well as the combined generation and validation 
+time.
 
 To ensure a fair comparison, we re-executed all experiments on the same
-hardware configuration as used in the paper. The updated results are
-included under `/our_results` and cover all three evaluation components:
-(1) updated Octopus averages for Table 1, (2) an updated version of Figure 3,
-and (3) updated summary statistics for the public code experiment.
+hardware configuration as used in the paper. We also removed the previously used 
+cold start for each run. In retrospect, this provided only marginal benefit for 
+very short runs while significantly increasing total experimental runtime.
 
-While measurements differ from those reported in the paper, the overall
-trends and conclusions remain unchanged.
+Although specific measurements differ from those reported in the paper, the
+overall trends and conclusions remain unchanged.
 
 Assuming the smoke test passed, run the following commands to reproduce the
 results.
@@ -141,30 +153,34 @@ The following commands will print out progress as they execute the benchmarks.
 While concrete output values may differ, the overall trends (e.g., ratios)
 should stay the same.
 
-(1) To obtain the results in Table 1, run the following command:
+(1) To obtain the results in Table 1, run the following command: [~6 hours]
 
     python3 tests/runner.py --suite leapfrog
 
-    The experiment run averages will be printed out in the CLI.
+The experiment run averages will be printed out in the CLI. These should be
+consistent with those in `our_results/1_Table_1_Octopus_averages.txt`.
 
-(2) To obtain the results for the synthetic benchmarks experiment, run:
+(2) To obtain the results for the synthetic benchmarks experiment, run: [~2 hours]
 
     python3 tests/runner.py --suite whippersnapper
     mv whippersnapper_plot.png /output/whippersnapper_plot.png
 
-    Once all experiments have ran, a plot will be generated and saved as 
-    `whippersnapper_plot.png`. The second command moves the file to the `/output` 
-    directory. This will also make it available on the host in 
-    `octopus-results/` (or wherever you chose to bind the output directory).
+Once all experiments have ran, a plot will be generated and saved as
+`whippersnapper_plot.png`. The second command moves the file to the `/output`
+directory. This will also make it available on the host in
+`octopus-results/` (or wherever you chose to bind the output directory). The
+plot should align with ours in `our_results/`2_Figure_3_Whippersnapper_plot.png`.
 
     python3 tests/runner.py --suite whippersnapper_equiv
 
-    The CLI output should confirm that the three pairs of parsers are indeed 
-    equivalent, as claimed in the paper.
+The CLI output should confirm that the three pairs of parsers are indeed
+equivalent, as claimed in the paper (Section 5, page 9, final paragraph of the
+'Synthetic benchmarks' subsection).
 
-(3) To obtain the results for the public code experiment, run the following command:
+(3) To obtain the results for the public code experiment, run the following command: [~20 minutes]
 
     python3 tests/public-code-exp.py --directory tests/p4-programs-survey
 
-    Once all comparisons have been performed, the final CLI output will consist 
-    of a summary of statistical results, some of which are reported in the paper.
+Once all comparisons have been performed, the final CLI output will consist of
+statistical results, some of which are reported in the paper. These should be
+consistent with those in `our_results/3_public_code__statistics.txt`.

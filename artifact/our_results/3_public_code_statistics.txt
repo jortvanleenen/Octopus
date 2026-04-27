@@ -1,1 +1,33 @@
-TODO
+Found 30 P4 files
+Total comparisons: 435
+
+... (progress bar) ...
+
+Completed runs: 435 / 435
+
+--- Wall time (seconds) ---
+   count: 435.0000
+     min: 0.2800
+      q1: 0.4750
+  median: 0.6100
+      q3: 0.7900
+     max: 1.7200
+    mean: 0.6577
+   stdev: 0.2676
+
+--- Peak memory (MiB) ---
+   count: 435.00
+     min: 39.00
+      q1: 43.82
+  median: 46.19
+      q3: 49.18
+     max: 68.04
+    mean: 47.63
+   stdev: 6.15
+
+=== Equivalent parser groups (size > 1) ===
+Group 1: basic_forward.p4, ecn.p4, ipv4_forward.p4, scrambler.p4
+Group 2: ecmp.p4, flowlet.p4, heavy_hitter_1.p4, heavy_hitter_2.p4, load_balance.p4, sonata.p4
+
+=== Equivalence class validation ===
+All groups satisfy equivalence (transitivity holds).

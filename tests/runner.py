@@ -31,7 +31,6 @@ plt.rcParams.update({
 })
 
 RUNS_PER_BENCHMARK = 3
-WARMUP_RUNS = 1
 TIME_CMD = ["/usr/bin/time", "-v"]
 
 GEN_RE = re.compile(r"\[TIMING]\s*generation=(\d+\.\d+)")
@@ -65,60 +64,6 @@ def get_leapfrog_benchmarks() -> List[Benchmark]:
     """
     return [
         Benchmark(
-            "datacenter",
-            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
-            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
-        ),
-        Benchmark(
-            "edge_self",
-            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
-            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
-        ),
-        Benchmark(
-            "edge_optimised",
-            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
-            Path("tests/leapfrog_benchmarks/edge/optimised.p4"),
-        ),
-        Benchmark(
-            "enterprise",
-            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
-            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
-        ),
-        Benchmark(
-            "external_filtering",
-            Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
-            Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
-            arguments={
-                "filter-disagreeing-string":
-                    "hdr_r.hdr.eth.data[15:0] != '0x8600_16' and hdr_r.hdr.eth.data[15:0] != '0x86dd_16'"},
-        ),
-        Benchmark(
-            "relational_verification",
-            Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
-            Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
-            arguments={
-                "filter-accepting-string":
-                    "((hdr_l.hdr.eth.data[15:0] == '0x8600_16' and hdr_l.hdr.ipv4.data == hdr_r.hdr.ipv4.data) "
-                    "or (hdr_l.hdr.eth.data[15:0] == '0x86dd_16' and hdr_l.hdr.ipv6.data == hdr_r.hdr.ipv6.data))",
-                "filter-disagreeing-string": "True",
-            },
-        ),
-        Benchmark(
-            "header_initialisation",
-            Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
-            Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
-        ),
-        Benchmark(
-            "service_provider",
-            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
-            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
-        ),
-        Benchmark(
-            "speculative_extraction",
-            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls.p4"),
-            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls_vectorised.p4"),
-        ),
-        Benchmark(
             "state_rearrangement",
             Path("tests/leapfrog_benchmarks/state_rearrangement/combined_states.p4"),
             Path("tests/leapfrog_benchmarks/state_rearrangement/separate_states.p4"),
@@ -132,6 +77,60 @@ def get_leapfrog_benchmarks() -> List[Benchmark]:
             "variable_length_formats_3",
             Path("tests/leapfrog_benchmarks/variable_length_formats_3/ipoptions.p4"),
             Path("tests/leapfrog_benchmarks/variable_length_formats_3/timestamp.p4"),
+        ),
+        Benchmark(
+            "header_initialization",
+            Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
+            Path("tests/leapfrog_benchmarks/header_initialisation/correct.p4"),
+        ),
+        Benchmark(
+            "speculative_extraction",
+            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls.p4"),
+            Path("tests/leapfrog_benchmarks/speculative_extraction/mpls_vectorised.p4"),
+        ),
+        Benchmark(
+            "relational_verification",
+            Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
+            Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
+            arguments={
+                "filter-accepting-string":
+                    "((hdr_l.hdr.eth.data[15:0] == '0x8600_16' and hdr_l.hdr.ipv4.data == hdr_r.hdr.ipv4.data) "
+                    "or (hdr_l.hdr.eth.data[15:0] == '0x86dd_16' and hdr_l.hdr.ipv6.data == hdr_r.hdr.ipv6.data))",
+                "filter-disagreeing-string": "True",
+            },
+        ),
+        Benchmark(
+            "external_filtering",
+            Path("tests/leapfrog_benchmarks/external_filtering/sloppy.p4"),
+            Path("tests/leapfrog_benchmarks/external_filtering/strict.p4"),
+            arguments={
+                "filter-disagreeing-string":
+                    "hdr_r.hdr.eth.data[15:0] != '0x8600_16' and hdr_r.hdr.eth.data[15:0] != '0x86dd_16'"},
+        ),
+        Benchmark(
+            "edge",
+            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+        ),
+        Benchmark(
+            "service_provider",
+            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
+            Path("tests/leapfrog_benchmarks/service_provider/core_router.p4"),
+        ),
+        Benchmark(
+            "datacenter",
+            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
+            Path("tests/leapfrog_benchmarks/datacenter/switch.p4"),
+        ),
+        Benchmark(
+            "enterprise",
+            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
+            Path("tests/leapfrog_benchmarks/enterprise/router.p4"),
+        ),
+        Benchmark(
+            "translation_validation",
+            Path("tests/leapfrog_benchmarks/edge/plain.p4"),
+            Path("tests/leapfrog_benchmarks/edge/optimised.p4"),
         ),
     ]
 
@@ -286,13 +285,10 @@ def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun, tmp_path: str, pb
     val_times = []
     memory = []
 
-    for i in range(WARMUP_RUNS + RUNS_PER_BENCHMARK):
+    for i in range(RUNS_PER_BENCHMARK):
         if pbar:
-            if i < WARMUP_RUNS:
-                pbar.set_postfix_str(f"{benchmark.name} (cold_start)")
-            else:
-                run_idx = i - WARMUP_RUNS + 1
-                pbar.set_postfix_str(f"{benchmark.name} ({run_idx}/{RUNS_PER_BENCHMARK})")
+            run_idx = i + 1
+            pbar.set_postfix_str(f"{benchmark.name} ({run_idx}/{RUNS_PER_BENCHMARK})")
 
         cmd = TIME_CMD + [
             "python3", "-m", "octopus.main",
@@ -318,19 +314,18 @@ def run_benchmark(benchmark: Benchmark, variant: BenchmarkRun, tmp_path: str, pb
             text=True,
         )
 
-        if i >= WARMUP_RUNS:
-            out = result.stdout
-            err = result.stderr
+        out = result.stdout
+        err = result.stderr
 
-            g = GEN_RE.search(out)
-            if g:
-                gen_times.append(float(g.group(1)))
-            v = VAL_RE.search(out)
-            if v:
-                val_times.append(float(v.group(1)))
-            m = MEM_RE.search(err)
-            if m:
-                memory.append((int(m.group(1)) * 1000) / (1024 ** 2))
+        g = GEN_RE.search(out)
+        if g:
+            gen_times.append(float(g.group(1)))
+        v = VAL_RE.search(out)
+        if v:
+            val_times.append(float(v.group(1)))
+        m = MEM_RE.search(err)
+        if m:
+            memory.append((int(m.group(1)) * 1000) / (1024 ** 2))
 
         if pbar:
             pbar.update(1)
@@ -346,7 +341,7 @@ def run_leapfrog(benchmarks, variants):
     for variant in variants:
         results = []
 
-        total = len(benchmarks) * (WARMUP_RUNS + RUNS_PER_BENCHMARK)
+        total = len(benchmarks) * (RUNS_PER_BENCHMARK)
 
         with tempfile.NamedTemporaryFile() as tmp:
             with tqdm(total=total, desc="Leapfrog equiv. checks") as pbar:
@@ -364,7 +359,7 @@ def run_leapfrog(benchmarks, variants):
 def run_whippersnapper(benchmarks, variants):
     results = []
 
-    total = len(benchmarks) * (WARMUP_RUNS + RUNS_PER_BENCHMARK)
+    total = len(benchmarks) * (RUNS_PER_BENCHMARK)
 
     with tempfile.NamedTemporaryFile() as tmp:
         with tqdm(total=total, desc="Whippersnapper equiv. checks") as pbar:
@@ -552,15 +547,9 @@ def plot(results):
         prop={"size": 16, "weight": "bold"}
     )
 
-    plt.subplots_adjust(
-        left=0.06,
-        right=0.94,
-        top=0.85,
-        bottom=0.15,
-        wspace=0.5,
-    )
+    plt.tight_layout(rect=[0, 0, 1, 0.88])
 
-    plt.savefig("whippersnapper_plot.png", dpi=300, bbox_inches="tight")
+    plt.savefig("whippersnapper_plot.png", dpi=300)
     plt.close()
 
 
