@@ -169,7 +169,7 @@ Once all experiments have ran, a plot will be generated and saved as
 `whippersnapper_plot.png`. The second command moves the file to the `/output`
 directory. This will also make it available on the host in
 `octopus-results/` (or wherever you chose to bind the output directory). The
-plot should align with ours in `our_results/`2_Figure_3_Whippersnapper_plot.png`.
+plot should align with ours in `our_results/2_Figure_3_Whippersnapper_plot.png`.
 
     python3 tests/runner.py --suite whippersnapper_equiv
 
