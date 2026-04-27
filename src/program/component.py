@@ -165,8 +165,6 @@ class Extract(Component):
             else:
                 new_buf_expr = Concatenate(left=field_var, right=new_buf_expr)
 
-        pf.add_used_vars(set(substitution.values()))
-
         if len_after > 0:
             new_buf_var = self._program.get_buffer_var(len_after)
             new_buf_expr = Concatenate(left=new_buf_expr, right=new_buf_var)
