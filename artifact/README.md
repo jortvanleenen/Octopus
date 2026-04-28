@@ -97,33 +97,32 @@ experimental evaluation.
 It should be noted that, following the rebuttal phase, we were explicitly
 requested to extend Octopus with certificate validation. This addition required
 modest changes to the core algorithm and implementation, which in turn affect
-performance characteristics such as runtime and memory usage. As a result, the
-reported averages differ from those in the accepted paper, although the
-underlying methodology remains unchanged. We have submitted the original version
-of the accepted paper to the AE, as requested, but will use the updated results
-in the camera-ready version.
+performance characteristics such as runtime and memory usage. We also reduced
+memory usage by redesigning the internal handling of formulas, eliminating the
+need for expensive deep copies. Finally, we replaced the previously used cvc5
+SMT solver with Z3. While both solvers exhibited comparable performance (within
+approximately +/- 10%, as reported during the rebuttal phase), cvc5 triggered a
+race condition in PySMT, our SMT interface, which motivated the switch.
 
-The updated results are available under `/our_results` and cover all three
-evaluation components:
+As a result, the reported averages differ from those in the accepted paper,
+although the underlying methodology remains unchanged. We have submitted the
+original version of the accepted paper to the AE, as requested, but will use
+the updated results in the camera-ready version.
+
+We re-executed all experiments on the same hardware configuration as reported
+in the paper to ensure comparability. The previously included cold-start phase
+was removed, as it yielded only marginal improvements for very short runs while
+substantially increasing overall runtime. The updated results are available
+under `/our_results` and cover all three evaluation components:
 
 - (1) updated Octopus averages for Table 1,
 - (2) an updated version of Figure 3, and
 - (3) updated summary statistics for the public code experiment.
 
 For (1), we now report generation and validation times separately, whose sum is
-comparable to the previously reported total execution time. For (2), we plot the
-certificate generation time as well as the combined generation and validation
-time.
-
-We re-executed all experiments on the same hardware configuration as reported in
-the paper to ensure comparability. The previously included cold-start phase was
-removed, as it yielded only marginal improvements for very short runs while
-substantially increasing overall runtime. We also reduced memory usage by
-redesigning the internal handling of formulas, eliminating the need for
-expensive deep copies. Finally, we replaced the previously used cvc5 SMT solver
-with Z3. While both solvers exhibited comparable performance (within
-approximately +/- 10%, as reported during the rebuttal phase), cvc5 triggered a
-race condition in PySMT, our SMT interface, which motivated the switch.
+comparable to the previously reported total execution time. For (2), we plot
+the certificate generation time as well as the combined generation and
+validation time.
 
 Although specific measurements differ from those reported in the paper, the
 overall trends and conclusions remain unchanged.
