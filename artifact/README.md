@@ -56,7 +56,7 @@ Requirements:
 * RAM: 16 GiB
 * CPU cores: 4
 * Time (smoke test): 15 minutes
-* Time (full review): 7-8 hours (depending on hardware)
+* Time (full review): 2 hours
 
 external connectivity: NO
 
@@ -95,32 +95,35 @@ experimental evaluation.
 -------------------------------------------------------------------------------
 
 It should be noted that, following the rebuttal phase, we were explicitly
-requested to extend Octopus with certificate validation. This addition required 
-modest changes to the core algorithm and implementation, which in turn affect 
-performance characteristics such as runtime and memory usage. As a result, the 
-reported averages differ from those in the accepted paper, although the 
-underlying methodology remains unchanged. We have submitted the original version 
-of the accepted paper to the AE, as requested, but will use the updated results 
+requested to extend Octopus with certificate validation. This addition required
+modest changes to the core algorithm and implementation, which in turn affect
+performance characteristics such as runtime and memory usage. As a result, the
+reported averages differ from those in the accepted paper, although the
+underlying methodology remains unchanged. We have submitted the original version
+of the accepted paper to the AE, as requested, but will use the updated results
 in the camera-ready version.
 
-The updated results are available under `/our_results` and cover all three 
+The updated results are available under `/our_results` and cover all three
 evaluation components:
+
 - (1) updated Octopus averages for Table 1,
 - (2) an updated version of Figure 3, and
 - (3) updated summary statistics for the public code experiment.
 
-For (1), we now report generation and validation times separately, whose sum is 
-comparable to the previously reported total execution time. For (2), we plot the 
-certificate generation time as well as the combined generation and validation 
+For (1), we now report generation and validation times separately, whose sum is
+comparable to the previously reported total execution time. For (2), we plot the
+certificate generation time as well as the combined generation and validation
 time.
 
-To ensure a fair comparison, we re-executed all experiments on the same
-hardware configuration as used in the paper. We also removed the previously used 
-cold start for each run. In retrospect, this provided only marginal benefit for 
-very short runs while significantly increasing total experimental runtime.
-Finally, we switched from using the cvc5 SMT solver to z3. Both were found to be 
-near equally performant (+/- 10%), as we also stated in our rebuttal, however, 
-we found that cvc5 produces a race condition within PySMT, our SMT interface.
+We re-executed all experiments on the same hardware configuration as reported in
+the paper to ensure comparability. The previously included cold-start phase was
+removed, as it yielded only marginal improvements for very short runs while
+substantially increasing overall runtime. We also reduced memory usage by
+redesigning the internal handling of formulas, eliminating the need for
+expensive deep copies. Finally, we replaced the previously used cvc5 SMT solver
+with Z3. While both solvers exhibited comparable performance (within
+approximately +/- 10%, as reported during the rebuttal phase), cvc5 triggered a
+race condition in PySMT, our SMT interface, which motivated the switch.
 
 Although specific measurements differ from those reported in the paper, the
 overall trends and conclusions remain unchanged.
@@ -156,14 +159,14 @@ The following commands will print out progress as they execute the benchmarks.
 While concrete output values may differ, the overall trends (e.g., ratios)
 should stay the same.
 
-(1) To obtain the results in Table 1, run the following command: [~6 hours]
+(1) To obtain the results in Table 1, run the following command: [~1.5 hours]
 
     python3 tests/runner.py --suite leapfrog
 
 The experiment run averages will be printed out in the CLI. These should be
 consistent with those in `our_results/1_Table_1_Octopus_averages.txt`.
 
-(2) To obtain the results for the synthetic benchmarks experiment, run: [~2 hours]
+(2) To obtain the results for the synthetic benchmarks experiment, run: [~20 minutes]
 
     python3 tests/runner.py --suite whippersnapper
     mv whippersnapper_plot.png /output/whippersnapper_plot.png
@@ -180,7 +183,7 @@ The CLI output should confirm that the three pairs of parsers are indeed
 equivalent, as claimed in the paper (Section 5, page 9, final paragraph of the
 'Synthetic benchmarks' subsection).
 
-(3) To obtain the results for the public code experiment, run the following command: [~20 minutes]
+(3) To obtain the results for the public code experiment, run the following command: [~5 minutes]
 
     python3 tests/public-code-exp.py --directory tests/p4-programs-survey
 
