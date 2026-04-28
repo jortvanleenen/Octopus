@@ -8,6 +8,7 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 import logging
 
+from bisimulation.formula import Variable
 from octopus.utils import ReprMixin
 from program.parser_state import ParserState
 
@@ -204,6 +205,22 @@ class ParserProgram(ReprMixin):
             f"Parsed parameters. Input '{self._input_name}', output '{self._output_name}'"
         )
 
+        local_variables = obj["parserLocals"]["vec"]
+        node_id_map: dict[int, int] = dict()
+        for variable in local_variables:
+            var_type = variable["type"]
+            if "size" in var_type:
+                size = var_type["size"]
+                node_id_map[var_type["Node_ID"]] = size
+            else:
+                size = node_id_map[var_type["Node_ID"]]
+
+            self._types[variable["name"]] = size
+
+            logger.debug(
+                f"Parsed local variable '{variable['name']}' with size: {size}"
+            )
+
         states = obj["states"]["vec"]
         for state in states:
             name = state["name"]
@@ -232,14 +249,17 @@ class ParserProgram(ReprMixin):
         :param reference: a reference to a header or a field in a header
         :return: a dictionary of fields and their sizes, or a size
         """
-        type_content = self._types.get(self._output_type)
+        if reference.startswith(self._output_name + "."):
+            normalised_reference = reference.removeprefix(self._output_name + ".")
+            type_content = self._types.get(self._output_type)
+        else:
+            normalised_reference = reference
+            type_content = self._types
+
         if type_content is None:
             raise KeyError(f"Output type '{self._output_type}' not found in types")
 
-        if reference.startswith(self._output_name + "."):
-            reference_parts = reference.removeprefix(self._output_name + ".").split(".")
-        else:
-            reference_parts = reference.split(".")
+        reference_parts = normalised_reference.split(".")
         for part in reference_parts:
             if part not in type_content:
                 raise KeyError(f"Reference part '{part}' not found in type content")
@@ -248,8 +268,20 @@ class ParserProgram(ReprMixin):
                 # If found, then it is a reference to a type and not a field
                 type_content = self._types[type_content]
 
-        logger.info(f"Obtained header fields for '{reference}': {type_content}")
+        logger.debug(f"Obtained header fields for '{reference}': {type_content}")
         return type_content
+
+    def get_header_var(self, name: str):
+        prefix = "hdr_l." if self._is_left else "hdr_r."
+        size = self.get_header(name)
+        if isinstance(size, str):
+            size = self.typedefs[size]
+        return Variable(prefix + name, size)
+
+    def get_buffer_var(self, size: int):
+        name = "buf_l" if self._is_left else "buf_r"
+        return Variable(name, size)
+
 
     def get_all_fields(self) -> list[str]:
         """

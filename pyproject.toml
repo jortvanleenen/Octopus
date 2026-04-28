@@ -30,14 +30,16 @@ classifiers = [
 ]
 dependencies = [
     "pySMT ~= 0.9.6",
+    "psutil ~= 7.2.2",
 ]
 
 [project.optional-dependencies]
 dev = [
     "matplotlib ~= 3.10.8",
-    "numpy ~= 2.2.6",
-    "pre-commit ~= 4.5.1",
-    "ruff ~= 0.14.14",
+    "numpy ~= 2.4.4",
+    "pre-commit ~= 4.6.0",
+    "pytest~=9.0.3",
+    "ruff ~= 0.15.11",
     "tqdm ~= 4.67.1",
 ]
 
@@ -61,4 +63,4 @@ path = "src/octopus/__about__.py"
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["I"]
+select = ["I", "F401"]

@@ -38,7 +38,7 @@ COPY . /octopus
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir hatch && \
     pip install --no-cache-dir -e .[dev] && \
-    python3 -m pysmt install --cvc5 --confirm-agreement && \
+    python3 -m pysmt install --cvc5 --z3 --confirm-agreement && \
     python3 -m pysmt install --check
 
 ENTRYPOINT ["octopus"]

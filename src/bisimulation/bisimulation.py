@@ -6,6 +6,8 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import logging
+import time
+from collections import deque
 from typing import Any
 
 import pysmt.shortcuts as pysmt
@@ -18,6 +20,7 @@ from bisimulation.formula import (
     FormulaManager,
     GuardedFormula,
     PureFormula,
+    Variable,
 )
 from program.expression import Concatenate
 from program.parser_program import ParserProgram
@@ -67,13 +70,8 @@ def _get_trace(
             buffer_vars.append(g_form.pf.stream_var)
 
         lines.append(f"Step {step} (left, right):")
-        lines.append("  At start:")
         lines.append(f"  - State:   {g_form.state_l}, {g_form.state_r}")
         lines.append(f"  - Buffer:  {g_form.buf_len_l}, {g_form.buf_len_r}")
-        lines.append("  After operation(s):")
-        buf_l = len(g_form.pf.buf_vars[True] or "")
-        buf_r = len(g_form.pf.buf_vars[False] or "")
-        lines.append(f"  - Buffer:  {buf_l}, {buf_r}")
         lines.append("")
 
     solver.is_sat(
@@ -83,7 +81,7 @@ def _get_trace(
     )
     model = solver.get_model()
     if model is not None:
-        buffer_vars_smt = [var.to_smt(guarded_form.pf) for var in buffer_vars]
+        buffer_vars_smt = [v.to_smt() for v in buffer_vars]
 
         if len(buffer_vars_smt) == 0:
             counterexample = "N/A (no buffered input)"
@@ -114,7 +112,7 @@ def _is_terminal(state_name: str) -> bool:
 
 
 def _has_new_information(
-        solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula
+        solver: Any, relevant_pfs: set[PureFormula], guarded_form: GuardedFormula, manager: FormulaManager
 ) -> bool:
     """
     Check if the guarded formula contains new information.
@@ -124,10 +122,216 @@ def _has_new_information(
     :param guarded_form: the guarded formula to check
     :return: True if the guarded formula contains new information, False otherwise
     """
-    return not solver.is_valid(
-        pysmt.Implies(
-            guarded_form.pf.to_smt(), pysmt.Or(*[pf.to_smt() for pf in relevant_pfs])
+    lhs = pysmt.Exists(
+        [v.to_smt() for v in guarded_form.pf.exists_vars()],
+        guarded_form.pf.to_smt(),
+    )
+    rhs = pysmt.Or(*[
+        pysmt.Exists(
+            [v.to_smt() for v in pf.exists_vars()],
+            pf.to_smt(),
         )
+        for pf in relevant_pfs
+    ])
+    return not solver.is_valid(pysmt.Implies(lhs, rhs))
+
+
+def extend_buffer(
+        parser: ParserProgram, buf_size: int, pf: PureFormula, manager: FormulaManager, new_bits_var: Variable
+) -> PureFormula:
+    """
+    Extend the buffer variable in the current pure formula.
+
+    :param parser: the parser program to use for the extension
+    :param buf_size: the size of the buffer
+    :param pf: the pure formula to capture the extension in buffer size
+    :param manager: the formula manager for this execution
+    :param new_bits_var: the variable that represents the new bits being read
+    """
+    leap_size = len(new_bits_var)
+    if buf_size == 0:
+        new_buf_var = parser.get_buffer_var(leap_size)
+        return PureFormula(
+            And(
+                pf.root,
+                Equals(
+                    new_buf_var,
+                    new_bits_var,
+                ),
+            ),
+            pf.used_vars,
+            pf.stream_var
+        )
+    else:
+        buf_var = parser.get_buffer_var(buf_size)
+        fresh_var = manager.fresh_variable(buf_size)
+        new_buf_var = parser.get_buffer_var(buf_size + leap_size)
+
+        return PureFormula(
+            And(
+                pf.root.substitute({buf_var: fresh_var}),
+                Equals(
+                    new_buf_var,
+                    Concatenate(left=fresh_var, right=new_bits_var),
+                ),
+            ),
+            pf.used_vars | {fresh_var},
+            pf.stream_var
+        )
+
+
+def check_certificate(
+        knowledge: set[GuardedFormula],
+        parser1: ParserProgram,
+        parser2: ParserProgram,
+        solver: Any,
+        filter_accepting: Any = None,
+        filter_disagreeing: Any = None,
+) -> tuple[bool, str]:
+    """
+    Validate a bisimulation certificate produced by symbolic_bisimulation().
+
+    :param knowledge: the set of TGFs forming the certificate
+    :param parser1: the first P4 parser program
+    :param parser2: the second P4 parser program
+    :param solver: an open solver instance to use for SMT queries
+    :param filter_accepting: an optional filter for accepting pairs
+    :param filter_disagreeing: an optional filter for disagreeing pairs
+    :return: a tuple (valid, message) where valid is True iff the certificate
+             is a valid bisimulation witness, and message describes the outcome
+             or the violation found
+    """
+    # Check 1: the certificate contains the TGF for the initial states of both parsers
+    initial_guard = GuardedFormula.initial_guard()
+    if not any(initial_guard.has_equal_guard(gf) and gf.prev_guarded_formula is None for gf in knowledge):
+        return False, (
+            "Certificate is invalid: no TGF found for the initial configuration "
+            "(state_l='start', state_r='start', buf_len_l=0, buf_len_r=0)."
+        )
+
+    manager = FormulaManager(count_up=False)
+
+    for guarded_form in knowledge:
+        current_pf = guarded_form.pf
+        state_l = guarded_form.state_l
+        state_r = guarded_form.state_r
+
+        # Check 3: acceptance consistency
+        if (state_l == "accept") != (state_r == "accept"):
+            if filter_disagreeing is None:
+                relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
+                return False, (
+                        "Certificate is invalid: TGF has inconsistent acceptance.\n"
+                        + _get_trace(solver, relevant_pfs, guarded_form)
+                )
+
+            filter_smt = constraint_to_smt(filter_disagreeing, parser1, parser2)
+            if not solver.is_valid(pysmt.Implies(current_pf.to_smt(), filter_smt)):
+                relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
+                return False, (
+                        "Certificate is invalid: TGF violates the disagreement filter.\n"
+                        + _get_trace(solver, relevant_pfs, guarded_form)
+                )
+            continue
+
+        if state_l == "accept" and state_r == "accept" and filter_accepting is not None:
+            filter_smt = constraint_to_smt(filter_accepting, parser1, parser2)
+            if not solver.is_valid(pysmt.Implies(current_pf.to_smt(), filter_smt)):
+                relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
+                return False, (
+                        "Certificate is invalid: TGF violates the acceptance filter.\n"
+                        + _get_trace(solver, relevant_pfs, guarded_form)
+                )
+
+        terminal_l = _is_terminal(state_l)
+        terminal_r = _is_terminal(state_r)
+
+        if terminal_l and terminal_r:
+            continue
+
+        if not terminal_l:
+            buf_len_l = guarded_form.buf_len_l
+            op_block_l = parser1.states[state_l].operation_block
+            trans_block_l = parser1.states[state_l].transition_block
+            op_size_l = op_block_l.size
+
+        if not terminal_r:
+            buf_len_r = guarded_form.buf_len_r
+            op_block_r = parser2.states[state_r].operation_block
+            trans_block_r = parser2.states[state_r].transition_block
+            op_size_r = op_block_r.size
+
+        if not terminal_l and not terminal_r:
+            leap = min(op_size_l - buf_len_l, op_size_r - buf_len_r)
+        elif not terminal_l:
+            leap = op_size_l - buf_len_l
+        else:
+            leap = op_size_r - buf_len_r
+
+        new_bits_var = manager.fresh_variable(leap)
+        new_pf = PureFormula(
+            current_pf.root,
+            current_pf.used_vars | {new_bits_var},
+            current_pf.stream_var
+        )
+
+        if not terminal_l:
+            new_pf = extend_buffer(parser1, buf_len_l, new_pf, manager, new_bits_var)
+        if not terminal_r:
+            new_pf = extend_buffer(parser2, buf_len_r, new_pf, manager, new_bits_var)
+
+        transition_l = not terminal_l and (buf_len_l + leap == op_size_l)
+        transition_r = not terminal_r and (buf_len_r + leap == op_size_r)
+
+        if transition_l:
+            new_pf, _ = op_block_l.strongest_postcondition(manager, new_pf, buf_len_l + leap)
+        if transition_r:
+            new_pf, _ = op_block_r.strongest_postcondition(manager, new_pf, buf_len_r + leap)
+
+        true_form = TRUE()
+
+        if terminal_l:
+            left_trans = [(true_form, "reject")]
+        elif transition_l:
+            left_trans = trans_block_l.symbolic_transition()
+        else:
+            left_trans = [(true_form, state_l)]
+
+        if terminal_r:
+            right_trans = [(true_form, "reject")]
+        elif transition_r:
+            right_trans = trans_block_r.symbolic_transition()
+        else:
+            right_trans = [(true_form, state_r)]
+
+        # Check 2: every successor must be covered by the certificate
+        for form_l, to_l in left_trans:
+            for form_r, to_r in right_trans:
+                successor_pf = PureFormula(
+                    And(new_pf.root, And(form_l, form_r)),
+                    set(new_pf.used_vars),
+                    new_pf.stream_var,
+                )
+                successor_buf_len_l = 0 if transition_l or terminal_l else buf_len_l + leap
+                successor_buf_len_r = 0 if transition_r or terminal_r else buf_len_r + leap
+                successor = GuardedFormula(
+                    to_l, to_r,
+                    successor_buf_len_l, successor_buf_len_r,
+                    successor_pf, guarded_form,
+                )
+                relevant_pfs = _get_relevant_formulas(knowledge, successor)
+                if _has_new_information(solver, relevant_pfs, successor, manager):
+                    return False, (
+                            f"Certificate is invalid: successor "
+                            f"(state_l={to_l!r}, state_r={to_r!r}, "
+                            f"buf_len_l={successor_buf_len_l}, "
+                            f"buf_len_r={successor_buf_len_r}) "
+                            f"is not covered by the certificate.\n"
+                            + _get_trace(solver, relevant_pfs, successor)
+                    )
+
+    return True, (
+        f"Certificate is valid: all {len(knowledge)} TGF(s) checked successfully."
     )
 
 
@@ -137,7 +341,8 @@ def symbolic_bisimulation(
         solver_portfolio: Any,
         filter_accepting: Any = None,
         filter_disagreeing: Any = None,
-        enable_leaps: bool = True,
+        validate_certificate: bool = False,
+        to_time: bool = False,
 ) -> tuple[bool, str]:
     """
     Check whether two P4 packet parsers are bisimilar using symbolic execution.
@@ -153,26 +358,23 @@ def symbolic_bisimulation(
     :param solver_portfolio: the solver portfolio to use for symbolic execution
     :param filter_accepting: an optional filter for accepting pairs
     :param filter_disagreeing: an optional filter for disagreeing pairs
-    :param enable_leaps: whether to enable leaps in the bisimulation
+    :param validate_certificate: if True, validate the generated certificate via
+           check_certificate() before returning; raises AssertionError if the
+           certificate produced by this function is found to be invalid
+    :param to_time: whether to time certificate generation and validation
     :return: a boolean indicating bisimilarity, and seen formulas or a counterexample
     """
-
-    knowledge: set[GuardedFormula] = set()
     manager = FormulaManager()
-    work_queue = [GuardedFormula.initial_guard()]
-    for parser in [parser1, parser2]:
-        left = parser.is_left
-        for field in parser.get_all_fields():
-            field_size = parser.get_header(field)
-            var = manager.fresh_variable(field_size)
-            work_queue[0].pf.set_header_field_var(field, left, var)
+    knowledge: set[GuardedFormula] = set()
+    work_queue = deque([GuardedFormula.initial_guard()])
+    gen_start = time.perf_counter() if to_time else None
     with solver_portfolio as s:
         while len(work_queue) > 0:
-            guarded_form = work_queue.pop(0)
+            guarded_form = work_queue.popleft()
             current_pf = guarded_form.pf
             relevant_pfs = _get_relevant_formulas(knowledge, guarded_form)
 
-            if not _has_new_information(s, relevant_pfs, guarded_form):
+            if not _has_new_information(s, relevant_pfs, guarded_form, manager):
                 logger.debug(
                     f"Considered guarded formula information known: {guarded_form}"
                 )
@@ -184,81 +386,62 @@ def symbolic_bisimulation(
                 if filter_disagreeing is None:
                     return False, _get_trace(s, relevant_pfs, guarded_form)
 
-                constraint_smt = constraint_to_smt(filter_disagreeing, current_pf)
-                if not s.is_sat(constraint_smt):
+                filter_smt = constraint_to_smt(filter_disagreeing, parser1, parser2)
+                if not s.is_valid(pysmt.Implies(current_pf.to_smt(), filter_smt)):
+                    logger.debug(
+                        f"Guarded formula violates disagreement filter: {guarded_form}"
+                    )
                     return False, _get_trace(s, relevant_pfs, guarded_form)
                 else:
                     knowledge.add(guarded_form)
                     continue
 
             if state_l == "accept" and state_r == "accept" and filter_accepting is not None:
-                relation_smt = constraint_to_smt(filter_accepting, current_pf)
-                if not s.is_sat(relation_smt):
+                filter_smt = constraint_to_smt(filter_accepting, parser1, parser2)
+                if not s.is_valid(pysmt.Implies(current_pf.to_smt(), filter_smt)):
+                    logger.debug(
+                        f"Guarded formula violates accepting filter: {guarded_form}"
+                    )
                     return False, _get_trace(s, relevant_pfs, guarded_form)
-
-            if _is_terminal(state_l) and _is_terminal(state_r):
-                logger.debug("Both states are terminal, skipping further processing")
-                knowledge.add(guarded_form)
-                continue
 
             terminal_l = _is_terminal(state_l)
             terminal_r = _is_terminal(state_r)
 
+            if terminal_l and terminal_r:
+                logger.debug("Both states are terminal, skipping further processing")
+                knowledge.add(guarded_form)
+                continue
+
             if not terminal_l:
                 buf_len_l = guarded_form.buf_len_l
                 op_block_l = parser1.states[state_l].operation_block
-                trans_block_l = parser1.states[state_l].transition_block
                 op_size_l = op_block_l.size
+                trans_block_l = parser1.states[state_l].transition_block
 
             if not terminal_r:
                 buf_len_r = guarded_form.buf_len_r
                 op_block_r = parser2.states[state_r].operation_block
-                trans_block_r = parser2.states[state_r].transition_block
                 op_size_r = op_block_r.size
+                trans_block_r = parser2.states[state_r].transition_block
 
-            if enable_leaps:
-                if not terminal_l and not terminal_r:
-                    leap = min(op_size_l - buf_len_l, op_size_r - buf_len_r)
-                elif not terminal_l:
-                    leap = op_size_l - buf_len_l
-                elif not terminal_r:
-                    leap = op_size_r - buf_len_r
-            else:
-                leap = 1
+            if not terminal_l and not terminal_r:
+                leap = min(op_size_l - buf_len_l, op_size_r - buf_len_r)
+            elif not terminal_l:
+                leap = op_size_l - buf_len_l
+            elif not terminal_r:
+                leap = op_size_r - buf_len_r
 
             new_bits_var = manager.fresh_variable(leap)
-            new_pf = current_pf.deepcopy()
+            new_pf = PureFormula(
+                current_pf.root,
+                current_pf.used_vars | {new_bits_var},
+                current_pf.stream_var
+            )
 
-            def extend_buffer(parser: ParserProgram, *, left: bool) -> None:
-                """
-                Extend the buffer variable in the current pure formula.
-
-                :param parser: the parser program to use for the extension
-                :param left: whether to extend the left or right buffer
-                """
-                nonlocal terminal_l
-                if left and terminal_l:
-                    return
-                nonlocal terminal_r
-                if not left and terminal_r:
-                    return
-                nonlocal new_pf
-                old_buf = current_pf.get_buffer_var(left=left)
-                if old_buf is None:
-                    new_pf.set_buffer_var(left=left, var=new_bits_var)
-                else:
-                    new_buf = manager.fresh_variable(len(old_buf) + leap)
-                    new_pf.set_buffer_var(left=left, var=new_buf)
-                    new_pf.root = And(
-                        new_pf.root,
-                        Equals(
-                            new_buf,
-                            Concatenate(parser, left=old_buf, right=new_bits_var),
-                        ),
-                    )
-
-            extend_buffer(parser1, left=parser1.is_left)
-            extend_buffer(parser2, left=parser2.is_left)
+            if not terminal_l:
+                new_pf = extend_buffer(parser1, buf_len_l, new_pf, manager, new_bits_var)
+            if not terminal_r:
+                new_pf = extend_buffer(parser2, buf_len_r, new_pf, manager, new_bits_var)
 
             transition_l = not terminal_l and (buf_len_l + leap == op_size_l)
             transition_r = not terminal_r and (buf_len_r + leap == op_size_r)
@@ -266,45 +449,68 @@ def symbolic_bisimulation(
                 f"Equivalence checking loop status\n"
                 f"Left - state: {state_l}, op. size: {op_size_l}, transitioning: {transition_l}\n"
                 f"Right - state: {state_r}, op. size: {op_size_r}, transitioning: {transition_r}\n"
+                f"Leap size: {leap}\n"
             )
-            logger.debug(f"Buffers: {new_pf.buf_vars}")
 
             if transition_l:
-                new_pf = op_block_l.strongest_postcondition(manager, new_pf)
+                new_pf, _ = op_block_l.strongest_postcondition(manager, new_pf, buf_len_l + leap)
             if transition_r:
-                new_pf = op_block_r.strongest_postcondition(manager, new_pf)
+                new_pf, _ = op_block_r.strongest_postcondition(manager, new_pf, buf_len_r + leap)
 
             true_form = TRUE()
-            left_trans = (
-                trans_block_l.symbolic_transition(new_pf)
-                if transition_l
-                else [(true_form, "reject" if terminal_l else state_l)]
-            )
-            right_trans = (
-                trans_block_r.symbolic_transition(new_pf)
-                if transition_r
-                else [(true_form, "reject" if terminal_r else state_r)]
-            )
+
+            if terminal_l:
+                left_trans = [(true_form, "reject")]
+            elif transition_l:
+                left_trans = trans_block_l.symbolic_transition()
+            else:
+                left_trans = [(true_form, state_l)]
+
+            if terminal_r:
+                right_trans = [(true_form, "reject")]
+            elif transition_r:
+                right_trans = trans_block_r.symbolic_transition()
+            else:
+                right_trans = [(true_form, state_r)]
 
             for form_l, to_l in left_trans:
                 for form_r, to_r in right_trans:
-                    copy_pf = PureFormula.clone(
+                    copy_pf = PureFormula(
                         And(new_pf.root, And(form_l, form_r)),
-                        new_pf.header_field_vars,
-                        new_pf.buf_vars,
+                        set(new_pf.used_vars),
                         new_bits_var,
                     )
                     work_queue.append(
                         GuardedFormula(
                             to_l,
                             to_r,
-                            0 if transition_l else buf_len_l + leap,
-                            0 if transition_r else buf_len_r + leap,
+                            0 if transition_l or terminal_l else buf_len_l + leap,
+                            0 if transition_r or terminal_r else buf_len_r + leap,
                             copy_pf,
                             guarded_form,
                         )
                     )
 
             knowledge.add(guarded_form)
+
+        gen_time = (time.perf_counter() - gen_start) if to_time else None
+        val_time = None
+        if validate_certificate:
+            if to_time:
+                val_start = time.perf_counter()
+
+            valid, message = check_certificate(
+                knowledge, parser1, parser2, s,
+                filter_accepting, filter_disagreeing,
+            )
+
+            val_time = (time.perf_counter() - val_start) if to_time else None
+
+            assert valid, f"Certificate self-check failed: {message}"
+
+    if to_time:
+        print(f"[TIMING] generation={gen_time:.6f}")
+        if validate_certificate:
+            print(f"[TIMING] validation={val_time:.6f}")
 
     return True, "\n".join(str(f) for f in knowledge)

@@ -6,10 +6,6 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 """
 
 import logging
-import time
-import tracemalloc
-from contextlib import contextmanager
-from typing import Any, Generator
 
 logger = logging.getLogger(__name__)
 
@@ -42,29 +38,3 @@ def setup_logging(verbosity: int) -> None:
         )
     else:
         root_logger.setLevel(level)
-
-
-@contextmanager
-def stat_block(label: str) -> Generator[None, Any, None]:
-    """
-    Context manager to measure wall time, CPU time, and memory usage of a code block.
-
-    :param label: a label for the block of code that is being measured
-    :return: a generator that yields control to the block of code
-    """
-    tracemalloc.start()
-    start_wall = time.perf_counter()
-    start_cpu = time.process_time()
-    yield
-    end_wall = time.perf_counter()
-    end_cpu = time.process_time()
-    current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
-
-    duration_msg = (
-        f"{label} completed. Timing and memory results:\n"
-        f"  Wall time: {end_wall - start_wall:.4f} s\n"
-        f"  CPU time:  {end_cpu - start_cpu:.4f} s\n"
-        f"  Peak memory: {peak / 1024:.2f} KiB"
-    )
-    print(duration_msg)

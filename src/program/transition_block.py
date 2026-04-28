@@ -120,7 +120,7 @@ class TransitionBlock:
 
             logger.info(f"Parsed transition to '{to_state_name}' for '{for_exprs}'")
 
-    def symbolic_transition(self, pf) -> set[tuple[FormulaNode, str]]:
+    def symbolic_transition(self) -> set[tuple[FormulaNode, str]]:
         """
         Generate symbolic transitions based on the transition block.
 
@@ -137,9 +137,7 @@ class TransitionBlock:
             for i, expr in enumerate(for_exprs):
                 if not isinstance(expr, DontCare):
                     expr_copy = copy.deepcopy(expr)
-                    expr_copy.to_formula(pf)
                     selector_copy = copy.deepcopy(self._selectors[i])
-                    selector_copy.to_formula(pf)
                     formula = And(formula, Equals(expr_copy, selector_copy))
             appended_formula = formula
             for seen_formula in seen:

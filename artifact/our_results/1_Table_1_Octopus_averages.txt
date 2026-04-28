@@ -1,0 +1,15 @@
+=== octopus_default ===
+Benchmark                              Gen (s)    Val (s)    Mem (MiB)
+----------------------------------------------------------------------
+state_rearrangement                     0.1222     0.1019        48.53
+variable_length_formats_2              16.0746    20.4274        57.58
+variable_length_formats_3             728.9580   653.0840       257.76
+header_initialization                   0.2209     0.2018        48.76
+speculative_extraction                  0.2032     0.1863        48.50
+relational_verification                 0.1928     0.1733        49.03
+external_filtering                      0.1655     0.1425        48.50
+edge                                    4.5138     4.8731        50.55
+service_provider                        2.4060     2.4507        49.94
+datacenter                             70.5889   116.9550        63.58
+enterprise                             53.2288    76.3494        59.03
+translation_validation                  7.2145     7.8737        56.78

@@ -13,7 +13,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +22,7 @@ from pysmt.shortcuts import Portfolio, get_env
 from bisimulation.bisimulation import symbolic_bisimulation
 from octopus import constants
 from octopus.__about__ import __version__
-from octopus.utils import setup_logging, stat_block
+from octopus.utils import setup_logging
 from program.parser_program import ParserProgram
 
 logger = logging.getLogger(__name__)
@@ -58,10 +57,10 @@ def parse_arguments() -> argparse.Namespace:
         help="increase output verbosity (-v, -vv, -vvv)",
     )
     parser.add_argument(
-        "-L",
-        "--disable-leaps",
+        "-t",
+        "--time",
         action="store_true",
-        help="disable leaps; only use single-step bisimulation",
+        help="measure and print the time taken for certificate generation and validation",
     )
     parser.add_argument(
         "-o",
@@ -70,22 +69,26 @@ def parse_arguments() -> argparse.Namespace:
         help="write the bisimulation certificate or counterexample to this file",
     )
     parser.add_argument(
+        "--no-conclusion",
+        action="store_true",
+        help="suppress parser equivalence message before certificate/counterexample",
+    )
+    parser.add_argument(
+        "--no-validation",
+        action="store_true",
+        help="do not validate correctness of the certificate (if found bisimilar)"
+    )
+    parser.add_argument(
         "-f",
         "--fail-on-mismatch",
         action="store_true",
         help="exit with code 1 if the parsers are not equivalent",
     )
     parser.add_argument(
-        "-S",
-        "--stat",
-        action="store_true",
-        help="measure and print bisimulation execution time and memory usage",
-    )
-    parser.add_argument(
         "-s",
         "--solvers",
         type=str,
-        default="['cvc5']",
+        default="['z3']",
         help="list of solvers, possibly with options, to use for bisimulation",
     )
     parser.add_argument(
@@ -309,7 +312,6 @@ def main(args: Any = None) -> None:
 
     portfolio = create_portfolio(args)
     filter_accepting, filter_disagreeing = parse_filters(args)
-    logger.info(f"Leaps are {'disabled' if args.disable_leaps else 'enabled'}")
 
     logger.info("Reading P4 files...")
     ir_jsons = read_p4_files([args.file1, args.file2], args.json)
@@ -326,16 +328,15 @@ def main(args: Any = None) -> None:
     logger.debug(f"Parser object 2 (repr):\n{parsers[1]!r}")
     logger.debug(f"Parser object 2 (str)\n{parsers[1]}")
 
-    ctx = stat_block("Symbolic bisimulation") if args.stat else nullcontext()
-    with ctx:
-        are_equal, certificate = symbolic_bisimulation(
-            parsers[0],
-            parsers[1],
-            filter_accepting=filter_accepting,
-            filter_disagreeing=filter_disagreeing,
-            enable_leaps=not args.disable_leaps,
-            solver_portfolio=portfolio,
-        )
+    are_equal, certificate = symbolic_bisimulation(
+        parsers[0],
+        parsers[1],
+        filter_accepting=filter_accepting,
+        filter_disagreeing=filter_disagreeing,
+        solver_portfolio=portfolio,
+        validate_certificate=not args.no_validation,
+        to_time=args.time
+    )
 
     if are_equal:
         message = "The two parsers are equivalent."
@@ -344,7 +345,8 @@ def main(args: Any = None) -> None:
         message = "The two parsers are NOT equivalent."
         header = "--- Counterexample ---"
 
-    print(f"{message}")
+    if not args.no_conclusion:
+        print(f"{message}")
     if args.output:
         try:
             with open(args.output, "w", encoding="utf-8") as f:

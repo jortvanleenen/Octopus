@@ -7,12 +7,18 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 from __future__ import annotations
 
-import copy
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable
 
-from bisimulation.formula import And, Equals, FormulaManager, PureFormula
+from bisimulation.formula import (
+    And,
+    Equals,
+    FormulaManager,
+    FormulaNode,
+    PureFormula,
+    Variable,
+)
 from program.expression import (
     Concatenate,
     Expression,
@@ -41,14 +47,15 @@ class Component(ABC):
 
     @abstractmethod
     def strongest_postcondition(
-            self, manager: FormulaManager, pf: PureFormula
-    ) -> PureFormula:
+            self, manager: FormulaManager, pf: PureFormula, buf_size: int
+    ) -> tuple[PureFormula, int]:
         """
         Generate the strongest postcondition for this component.
 
         :param manager: the FormulaManager to use for generating the postcondition
         :param pf: the PureFormula representing what we currently know
-        :return: a PureFormula representing the strongest postcondition
+        :param buf_size: the size of the parser's buffer
+        :return: a PureFormula representing the SP, and remaining buffer size
         """
         pass
 
@@ -62,17 +69,18 @@ class Assignment(Component):
             self.parse(component)
 
     def parse(self, component: dict) -> None:
-        self.left = parse_expression(self._program, component["left"])
-        self.right = parse_expression(self._program, component["right"], len(self.left))
+        left = parse_expression(self._program, component["left"])
+        if not isinstance(left, (Slice, Reference)):
+            raise ValueError(
+                "Assignment left-hand side must be a Slice or Reference, "
+                f"but got {type(left).__name__}"
+            )
+        self.left = left
+        self.right = parse_expression(self._program, component["right"], len(left))
 
     def strongest_postcondition(
-            self, manager: FormulaManager, pf: PureFormula
-    ) -> PureFormula:
-        left = self._program.is_left
-        logger.debug(
-            f"Header variables at start of assignment SP (left: {left}): {pf.header_field_vars}"
-        )
-
+            self, manager: FormulaManager, pf: PureFormula, buf_size: int
+    ) -> tuple[PureFormula, int]:
         if isinstance(self.left, Slice):
             raise NotImplementedError(
                 "Assignment with left-hand slice is not yet supported"
@@ -86,22 +94,17 @@ class Assignment(Component):
                 f"but got {type(self.left).__name__}"
             )
 
-        new_var = manager.fresh_variable(len(reference))
-        new_pf = pf.deepcopy()
-        new_pf.set_header_field_var(reference.reference, self._program.is_left, new_var)
-
-        right_copy = copy.deepcopy(self.right)
-        right_copy.to_formula(pf)
-
-        logger.debug(
-            f"Header variables at end of assignment SP (left: {left}): {new_pf.header_field_vars}"
-        )
+        fresh_var = manager.fresh_variable(len(reference))
+        right_subst = self.right.substitute({reference.reference: fresh_var})
 
         return PureFormula(
-            And(new_pf.root, Equals(new_var, right_copy)),
-            new_pf.header_field_vars,
-            new_pf.buf_vars,
-        )
+            And(
+                pf.root.substitute({reference.reference: fresh_var}),
+                Equals(reference.reference, right_subst)
+            ),
+            pf.used_vars | right_subst.used_vars() | {fresh_var},
+            pf.stream_var,
+        ), buf_size
 
     def __repr__(self):
         return f"Assignment(left={self.left!r}, right={self.right!r})"
@@ -114,7 +117,7 @@ class Extract(Component):
     """A class representing an extract method call in a P4 parser state."""
 
     def __init__(self, program: ParserProgram, call: dict = None):
-        self.program: ParserProgram = program
+        self._program: ParserProgram = program
         self.header_reference: str | None = None
         self.header_content: dict[str, int] | None = None
         self.size: int | None = None
@@ -123,8 +126,8 @@ class Extract(Component):
 
     def parse(self, call: dict) -> None:
         header_name = call["arguments"]["vec"][0]["expression"]["member"]
-        self.header_reference = self.program.output_name + "." + header_name
-        self.header_content: dict = self.program.get_header(self.header_reference)
+        self.header_reference = self._program.output_name + "." + header_name
+        self.header_content: dict = self._program.get_header(self.header_reference)
 
         sizes = []
         for val in self.header_content.values():
@@ -132,57 +135,46 @@ class Extract(Component):
                 sizes.append(val)
             else:
                 try:
-                    sizes.append(self.program.typedefs[val])
+                    sizes.append(self._program.typedefs[val])
                 except KeyError:
                     raise KeyError(f"Missing typedef: '{val}'") from None
 
         self.size = sum(sizes)
 
     def strongest_postcondition(
-            self, manager: FormulaManager, pf: PureFormula
-    ) -> PureFormula:
-        left = self.program.is_left
-        buffer_var = pf.get_buffer_var(left)
-        logger.debug(
-            f"Buffer variables at start of extract SP (left: {left}): {pf.buf_vars}"
-        )
-        if buffer_var is None:
-            raise ValueError("No buffer variable found for the pure formula")
+            self, manager: FormulaManager, pf: PureFormula, buf_size: int
+    ) -> tuple[PureFormula, int]:
+        buf_var = self._program.get_buffer_var(buf_size)
 
-        length = len(buffer_var) - self.size
-        if length < 0:
+        len_after = len(buf_var) - self.size
+        if len_after < 0:
             raise ValueError("Invalid buffer length")
-        elif length == 0:
-            pf.set_buffer_var(left, None)
-            new_buffer = None
-        else:
-            new_buffer = manager.fresh_variable(len(buffer_var) - self.size)
-            pf.set_buffer_var(left, new_buffer)
 
+        new_buf_expr = None
+        substitution: dict[Variable, FormulaNode] = {}
+        new_vars: set = set()
         for field, field_size in self.header_content.items():
+            field_var = self._program.get_header_var(self.header_reference + '.' + field)
             if isinstance(field_size, str):
-                field_size = self.program.typedefs[field_size]
-            variable = manager.fresh_variable(field_size)
-
-            store_name = self.header_reference + "." + field
-            pf.set_header_field_var(store_name, left, variable)
-
-            if new_buffer is None:
-                new_buffer = variable
+                field_size = self._program.typedefs[field_size]
+            fresh_var = manager.fresh_variable(field_size)
+            substitution[field_var] = fresh_var
+            new_vars |= {fresh_var}
+            if new_buf_expr is None:
+                new_buf_expr = field_var
             else:
-                new_buffer = Concatenate(self.program, left=variable, right=new_buffer)
+                new_buf_expr = Concatenate(left=field_var, right=new_buf_expr)
 
-        new_pf = PureFormula(
-            And(pf.root, Equals(buffer_var, new_buffer)),
-            pf.header_field_vars,
-            pf.buf_vars,
-        )
+        if len_after > 0:
+            new_buf_var = self._program.get_buffer_var(len_after)
+            new_buf_expr = Concatenate(left=new_buf_expr, right=new_buf_var)
+        substitution[buf_var] = new_buf_expr
 
-        logger.debug(
-            f"Buffer variables at end of extract SP (left: {left}): {new_pf.buf_vars}"
-        )
-
-        return new_pf
+        return PureFormula(
+            pf.root.substitute(substitution),
+            pf.used_vars | new_vars,
+            pf.stream_var
+        ), len_after
 
     def __repr__(self):
         return f"Extract(header_reference={self.header_reference!r}, header_content={self.header_content!r}, size={self.size!r})"

@@ -9,7 +9,6 @@ License: MIT (See LICENSE file or https://opensource.org/licenses/MIT for detail
 
 from __future__ import annotations
 
-import copy
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
@@ -28,28 +27,26 @@ class FormulaNode(ABC, ReprMixin):
     """An abstract base class for formula nodes in symbolic execution."""
 
     @abstractmethod
-    def to_smt(self, pf: PureFormula) -> Any:
+    def to_smt(self) -> Any:
         """
         Get the SMT representation of the formula.
 
-        :param pf: the PureFormula in which the expression occurs
         :return: the SMT representation of the expression
         """
         pass
 
     @abstractmethod
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
+    def used_vars(self) -> set[Variable]:
         """
         Get the set of variables used in this formula node.
 
-        :param pf: the PureFormula in which the expression occurs
         :return: a set of Variable instances used in this formula node
         """
         pass
 
     @abstractmethod
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         """
         Substitute variables in the formula with the given mapping.
@@ -72,16 +69,18 @@ class Variable(FormulaNode):
         self.name = name
         self._size = size
 
-    def to_smt(self, pf: PureFormula) -> Any:
-        return pysmt.Symbol(self.name, pysmt.BVType(self._size))
+    def to_smt(self) -> Any:
+        return pysmt.Symbol(f'{self.name}_{self._size}', pysmt.BVType(self._size))
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
+    def used_vars(self) -> set[Variable]:
         return {self}
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        return mapping.get(self, self)
+        if self in mapping:
+            return mapping[self]
+        return self
 
     def __len__(self):
         return self._size
@@ -104,16 +103,16 @@ class Not(FormulaNode):
     def __init__(self, subformula: FormulaNode):
         self.subformula = subformula
 
-    def to_smt(self, pf: PureFormula) -> Any:
-        return pysmt.Not(self.subformula.to_smt(pf))
+    def to_smt(self) -> Any:
+        return pysmt.Not(self.subformula.to_smt())
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return self.subformula.used_vars(pf)
+    def used_vars(self) -> set[Variable]:
+        return self.subformula.used_vars()
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
-        return Not(self.subformula.substitute(pf, mapping))
+        return Not(self.subformula.substitute(mapping))
 
     def __str__(self):
         return f"~({self.subformula})"
@@ -124,18 +123,18 @@ class And(FormulaNode):
         self.left = left
         self.right = right
 
-    def to_smt(self, pf) -> Any:
-        return pysmt.And(self.left.to_smt(pf), self.right.to_smt(pf))
+    def to_smt(self) -> Any:
+        return pysmt.And(self.left.to_smt(), self.right.to_smt())
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return self.left.used_vars(pf) | self.right.used_vars(pf)
+    def used_vars(self) -> set[Variable]:
+        return self.left.used_vars() | self.right.used_vars()
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return And(
-            self.left.substitute(pf, mapping),
-            self.right.substitute(pf, mapping),
+            self.left.substitute(mapping),
+            self.right.substitute(mapping),
         )
 
     def __str__(self):
@@ -143,14 +142,14 @@ class And(FormulaNode):
 
 
 class TRUE(FormulaNode):
-    def to_smt(self, pf) -> Any:
+    def to_smt(self) -> Any:
         return pysmt.TRUE()
 
-    def used_vars(self, pf) -> set[Variable]:
+    def used_vars(self) -> set[Variable]:
         return set()
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return TRUE()
 
@@ -166,29 +165,30 @@ class Equals(FormulaNode):
     def __str__(self):
         return f"({self.left}) == ({self.right})"
 
-    def to_smt(self, pf: PureFormula) -> Any:
-        return pysmt.Equals(self.left.to_smt(pf), self.right.to_smt(pf))
+    def to_smt(self) -> Any:
+        return pysmt.Equals(self.left.to_smt(), self.right.to_smt())
 
-    def used_vars(self, pf: PureFormula) -> set[Variable]:
-        return self.left.used_vars(pf) | self.right.used_vars(pf)
+    def used_vars(self) -> set[Variable]:
+        return self.left.used_vars() | self.right.used_vars()
 
     def substitute(
-            self, pf: PureFormula, mapping: dict[Variable, FormulaNode]
+            self, mapping: dict[Variable, FormulaNode]
     ) -> FormulaNode:
         return Equals(
-            self.left.substitute(pf, mapping),
-            self.right.substitute(pf, mapping),
+            self.left.substitute(mapping),
+            self.right.substitute(mapping),
         )
 
 
 class FormulaManager(ReprMixin):
-    def __init__(self):
+    def __init__(self, *, count_up=True):
         """
         Initialise a FormulaManager instance.
 
         This manager is responsible for generating fresh variable names.
         """
-        self._next_free_var_name: int = 0
+        self._count_up = count_up
+        self._next_free_var_name: int = 1 if self._count_up else -1
 
     def fresh_name(self) -> str:
         """
@@ -197,7 +197,7 @@ class FormulaManager(ReprMixin):
         :return: a unique variable name as a string
         """
         name = str(self._next_free_var_name)
-        self._next_free_var_name += 1
+        self._next_free_var_name += 1 if self._count_up else -1
         return name
 
     def fresh_variable(self, size: int) -> Variable:
@@ -214,8 +214,6 @@ class PureFormula(ReprMixin):
     def __init__(
             self,
             root: FormulaNode = TRUE(),
-            header_field_vars: dict[tuple[str, bool], Variable] = None,
-            buf_vars: dict[bool, Variable] = None,
             used_vars: set[Variable] = None,
             stream_var: Variable = None,
     ):
@@ -223,63 +221,14 @@ class PureFormula(ReprMixin):
         Initialise a PureFormula instance.
 
         :param root: the root formula node, defaults to TRUE()
-        :param header_field_vars: the header field variables used in this formula
-        :param buf_vars: the buffer variables used in this formula
         :param used_vars: the set of variables used in this formula, defaults to those used by the root node
         :param stream_var: the variable representing input stream slice
         """
         self.root = root
-        self._header_field_vars = (
-            header_field_vars if header_field_vars is not None else {}
-        )
-
-        self._buf_vars = buf_vars if buf_vars is not None else {True: None, False: None}
         self._used_vars = (
-            used_vars if used_vars is not None else self.root.used_vars(self)
+            used_vars if used_vars is not None else self.root.used_vars()
         )
         self.stream_var = stream_var if stream_var is not None else None
-
-    @classmethod
-    def clone(
-            cls,
-            root: FormulaNode,
-            header_field_vars: dict[tuple[str, bool], Variable],
-            buf_vars: dict[bool, Variable],
-            stream_var: Variable,
-    ):
-        """
-        Create a clone of the PureFormula with deep copies of its components.
-
-        :param root: the root formula node
-        :param header_field_vars: the header field variables used in this formula
-        :param buf_vars: the buffer variables used in this formula
-        :param stream_var: the variable representing input stream slice
-        :return: PureFormula instance with deep copies of the components
-        """
-        return cls(
-            copy.deepcopy(root),
-            copy.deepcopy(header_field_vars),
-            copy.deepcopy(buf_vars),
-            stream_var=stream_var,
-        )
-
-    @property
-    def header_field_vars(self) -> dict[tuple[str, bool], Variable]:
-        """
-        Get the header field variables used in this formula.
-
-        :return: dict mapping (header field name, left/right) to Variable instances
-        """
-        return self._header_field_vars
-
-    @property
-    def buf_vars(self) -> dict[bool, Variable]:
-        """
-        Get the buffer variables used in this formula.
-
-        :return: dict mapping left/right buffer to Variable instances
-        """
-        return self._buf_vars
 
     @property
     def used_vars(self) -> set[Variable]:
@@ -290,70 +239,16 @@ class PureFormula(ReprMixin):
         """
         return self._used_vars
 
-    def deepcopy(self) -> PureFormula:
+    def exists_vars(self) -> set[Variable]:
         """
-        Create a deep copy of the PureFormula instance.
-        """
-        return PureFormula.clone(
-            self.root,
-            self.header_field_vars,
-            self.buf_vars,
-            self.stream_var,
-        )
+        Get the set of variables that should be existentially quantified out.
 
-    def get_header_field_var(self, name: str, left: bool) -> Variable | None:
+        :return: set of such Variable instances
         """
-        Get the Variable object for the given header field name.
+        return {var for var in self._used_vars if var.name.lstrip("+-").isdigit()}
 
-        :param name: name of the header field
-        :param left: whether to get the header field for the left or right parser
-        :return: the Variable object if found, else None
-        """
-        return self.header_field_vars.get((name, left))
-
-    def set_header_field_var(self, name: str, left: bool, variable: Variable) -> None:
-        """
-        Set the Variable object for the given header field name.
-
-        :param name: name of the header field
-        :param left: whether to set the header field for the left or right parser
-        :param variable: the Variable object to set for the header field
-        """
-        self.header_field_vars[(name, left)] = variable
-        if variable is None:
-            logger.warning(
-                "Setting header field variable to None, this may cause issues"
-            )
-        self.used_vars.add(variable)
-
-    def get_buffer_var(self, left: bool) -> Variable | None:
-        """
-        Get the Variable object for the given buffer field name.
-
-        :param left: whether to get the buffer field for the left or right parser
-        :return: the Variable object if found, else None
-        """
-        return self._buf_vars.get(left)
-
-    def set_buffer_var(self, left: bool, var: Variable | None) -> None:
-        """
-        Set the Variable object for the given buffer field name.
-
-        :param left: whether to set the buffer field for the left or right parser
-        :param var: the Variable object to set for the buffer field
-        """
-        self._buf_vars[left] = var
-        if var is not None:
-            self.used_vars.add(var)
-
-    def substitute(self, mapping: dict[Variable, FormulaNode]) -> None:
-        """
-        Substitute variables in the formula with the given mapping.
-
-        :param mapping: a dictionary mapping Variable to FormulaNode
-        """
-        self.root = self.root.substitute(self, mapping)
-        self._used_vars = {v for v in self.used_vars if v not in mapping}
+    def add_used_vars(self, vars: set[Variable]) -> None:
+        self._used_vars |= vars
 
     def to_smt(self):
         """
@@ -361,10 +256,10 @@ class PureFormula(ReprMixin):
 
         :return: an SMT object representing the formula
         """
-        return self.root.to_smt(self)
+        return self.root.to_smt()
 
     def __str__(self):
-        return "E " + ", ".join(str(v) for v in self.used_vars) + f". {self.root}"
+        return f"{self.root}"
 
 
 class GuardedFormula:
