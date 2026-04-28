@@ -52,7 +52,7 @@ def test_extend_buffer_empty_buffer(manager, parser):
     new_bits = manager.fresh_variable(8)
     pf.add_used_vars({new_bits})
 
-    extend_buffer(parser, 0, pf, manager, new_bits)
+    pf = extend_buffer(parser, 0, pf, manager, new_bits)
 
     eqs = collect_equals(pf.root)
     assert len(eqs) == 1
@@ -71,7 +71,7 @@ def test_extend_buffer_non_empty_buffer(manager, parser):
     new_bits = manager.fresh_variable(4)
     pf.add_used_vars({new_bits})
 
-    extend_buffer(parser, 4, pf, manager, new_bits)
+    pf = extend_buffer(parser, 4, pf, manager, new_bits)
 
     eqs = collect_equals(pf.root)
     assert len(eqs) == 1
@@ -93,9 +93,13 @@ def test_extend_buffer_substitution_occurs(manager, parser):
     new_bits = manager.fresh_variable(4)
     pf.add_used_vars({new_bits})
 
-    extend_buffer(parser, 4, pf, manager, new_bits)
+    pf = extend_buffer(parser, 4, pf, manager, new_bits)
 
-    assert old_buf not in pf.used_vars
+    eqs = collect_equals(pf.root)
+    concat = eqs[0].right
+
+    assert isinstance(concat, Concatenate)
+    assert concat.left != old_buf
 
 
 def test_extend_buffer_fresh_variable_introduced(manager, parser):
@@ -107,7 +111,7 @@ def test_extend_buffer_fresh_variable_introduced(manager, parser):
     new_bits = manager.fresh_variable(4)
     pf.add_used_vars({new_bits})
 
-    extend_buffer(parser, 4, pf, manager, new_bits)
+    pf = extend_buffer(parser, 4, pf, manager, new_bits)
 
     eqs = collect_equals(pf.root)
     assert len(eqs) == 1
@@ -115,7 +119,7 @@ def test_extend_buffer_fresh_variable_introduced(manager, parser):
     concat = eqs[0].right
     assert isinstance(concat, Concatenate)
 
-    assert concat.left != old_buf
+    assert any(v != old_buf and len(v) == 4 for v in pf.used_vars)
 
 
 def test_extend_buffer_smt_satisfiable(manager, parser, solver):
@@ -124,7 +128,7 @@ def test_extend_buffer_smt_satisfiable(manager, parser, solver):
     new_bits = manager.fresh_variable(4)
     pf.add_used_vars({new_bits})
 
-    extend_buffer(parser, 0, pf, manager, new_bits)
+    pf = extend_buffer(parser, 0, pf, manager, new_bits)
 
     solver.add_assertion(pf.to_smt())
     assert solver.solve()
@@ -135,14 +139,13 @@ def test_extend_buffer_multiple_extensions(manager, parser):
 
     new_bits1 = manager.fresh_variable(4)
     pf.add_used_vars({new_bits1})
-    extend_buffer(parser, 0, pf, manager, new_bits1)
+    pf = extend_buffer(parser, 0, pf, manager, new_bits1)
 
     new_bits2 = manager.fresh_variable(4)
     pf.add_used_vars({new_bits2})
-    extend_buffer(parser, 4, pf, manager, new_bits2)
+    pf = extend_buffer(parser, 4, pf, manager, new_bits2)
 
     eqs = collect_equals(pf.root)
 
     assert len(eqs) >= 1
-
     assert any(len(eq.left) == 8 for eq in eqs)
