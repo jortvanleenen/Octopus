@@ -24,8 +24,8 @@ from matplotlib.ticker import MaxNLocator, ScalarFormatter
 from tqdm import tqdm
 
 plt.rcParams.update({
-    "axes.titlesize": 20,
-    "axes.labelsize": 18,
+    "axes.titlesize": 26,
+    "axes.labelsize": 22,
     "xtick.labelsize": 18,
     "ytick.labelsize": 18,
 })
@@ -444,7 +444,7 @@ def plot(results):
 
         data[kind].append((x, gen, total, m, label))
 
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5.5))
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5.5), constrained_layout=True)
 
     titles = {
         "field": "parse-field",
@@ -495,10 +495,10 @@ def plot(results):
         ax_mem.scatter(xs, ms, marker='s',
                        color=MEM_COLOUR, zorder=4, s=100)
 
-        ax_time.set_title(titles[kind], fontweight="bold", pad=10)
-        ax_time.set_xlabel(x_axes[kind], fontweight="bold")
-        ax_time.set_ylabel("Time (s)", fontweight="bold")
-        ax_mem.set_ylabel("Memory (MiB)", fontweight="bold")
+        ax_time.set_title(titles[kind], fontweight="bold", pad=18)
+        ax_time.set_xlabel(x_axes[kind])
+        ax_time.set_ylabel("Time (s)")
+        ax_mem.set_ylabel("Memory (MiB)")
 
         ax_time.set_yscale("linear")
         ax_mem.set_yscale("linear")
@@ -519,16 +519,18 @@ def plot(results):
                      linewidth=0.3, color="#CCCCCC", zorder=0)
         for x, gen, total, m, lbl in data[kind]:
             if kind == "complex":
-                if lbl not in {"4,3", "6,2"}:
-                    offset = (-24, 10)
-                else:
+                if lbl == "4,3":
                     offset = (-40, -2)
+                elif lbl == "2,4":
+                    offset = (-10, 0)
+                else:
+                    offset = (-24, 10)
 
                 ax_time.annotate(
                     lbl, (x, total),
                     textcoords="offset points",
                     xytext=offset,
-                    fontsize=16,
+                    fontsize=18,
                     fontweight="bold",
                     zorder=10
                 )
@@ -537,21 +539,19 @@ def plot(results):
         Line2D([0], [0], marker='o', linestyle='-',
                color=TIME_COLOUR, label='Generation time', markersize=7),
         Line2D([0], [0], marker='x', linestyle='--',
-               color=TIME_COLOUR, label='Total time (gen+val)', markersize=7),
+               color=TIME_COLOUR, label='Total time (gen. + val.)', markersize=7),
         Line2D([0], [0], marker='s', linestyle='--',
                color=MEM_COLOUR, label='Memory', markersize=7),
     ]
 
     fig.legend(
         handles=legend_elements,
-        loc="upper center",
+        loc="outside upper center",
         ncol=2,
         frameon=False,
         markerscale=1.4,
-        prop={"size": 16, "weight": "bold"}
+        prop={"size": 22}
     )
-
-    plt.tight_layout(rect=[0, 0, 1, 0.88])
 
     plt.savefig("whippersnapper_plot.png", dpi=300)
     plt.close()
