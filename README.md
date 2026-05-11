@@ -32,6 +32,45 @@ of P4 programs.
 Ensure `p4c-graphs` is available on your system's `PATH` if you provide P4
 programs as input.
 
+<details>
+
+<summary>Installing <code>p4c-graphs</code></summary>
+
+Octopus relies on the `p4c-graphs` CLI tool to generate the IR JSON
+representation of P4 programs. `p4c-graphs` is part of
+[P4C](https://github.com/p4lang/p4c), the reference compiler for P4.
+
+### Recommended Installation Methods
+
+Prebuilt packages of P4C are available for several commonly used operating
+systems and are generally the easiest way to obtain `p4c-graphs`. Refer to 
+their `README.md` for more information.
+
+If a packaged version is unavailable for your platform, or if you prefer a more
+minimal installation, you can also build only the required components from
+source.
+
+### Minimal Build Configuration
+
+Octopus only depends on the `p4c-graphs` backend and does not require a full
+P4C installation. A minimal build configuration, as also used for the Docker 
+image, can be found in the project's
+[Dockerfile](https://github.com/jortvanleenen/Octopus/blob/main/Dockerfile).
+
+### Verifying the Installation
+
+After installation, ensure that `p4c-graphs` is available on your system
+`PATH`. Then, execute:
+
+```bash
+p4c-graphs --help
+```
+
+If the command executes successfully, Octopus should be able to invoke
+`p4c-graphs` automatically when given `.p4` source files as input.
+
+</details>
+
 ## Docker
 
 Octopus is [available as a prebuilt Docker image](https://hub.docker.com/repository/docker/jortvanleenen/octopus),
