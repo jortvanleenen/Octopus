@@ -42,9 +42,9 @@ representation of P4 programs. `p4c-graphs` is part of
 
 ### Recommended Installation Methods
 
-Prebuilt packages of P4C are available for several commonly used operating
-systems and are generally the easiest way to obtain `p4c-graphs`. Refer to 
-their `README.md` for more information.
+[Prebuilt packages of P4C are available](https://github.com/jortvanleenen/Octopus#dependencies-and-compatibility) 
+for several commonly used operating systems and are generally the easiest way 
+to obtain `p4c-graphs`. Refer to P4C's `README.md` for more information.
 
 If a packaged version is unavailable for your platform, or if you prefer a more
 minimal installation, you can also build only the required components from
@@ -52,10 +52,12 @@ source.
 
 ### Minimal Build Configuration
 
-Octopus only depends on the `p4c-graphs` backend and does not require a full
-P4C installation. A minimal build configuration, as also used for the Docker 
-image, can be found in the project's
+To [install P4C from source](https://github.com/p4lang/p4c#installing-p4c-from-source), 
+follow the steps outlined in the P4C `README.md`. Octopus only depends on the 
+`p4c-graphs` backend and does not require a full P4C installation. A minimal 
+build configuration, as also used for the Docker image, can be found in our 
 [Dockerfile](https://github.com/jortvanleenen/Octopus/blob/main/Dockerfile).
+Specifically, its call to `cmake` can be used when following P4C's steps.
 
 ### Verifying the Installation
 
