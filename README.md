@@ -42,7 +42,7 @@ representation of P4 programs. `p4c-graphs` is part of
 
 ### Recommended Installation Methods
 
-[Prebuilt packages of P4C are available](https://github.com/jortvanleenen/Octopus#dependencies-and-compatibility) 
+[Prebuilt packages of P4C are available](https://github.com/p4lang/p4c#installing-p4c-from-source) 
 for several commonly used operating systems and are generally the easiest way 
 to obtain `p4c-graphs`. Refer to P4C's `README.md` for more information.
 
