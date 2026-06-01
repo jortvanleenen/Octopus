@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+## [v1.3.1]
+
+### Added
+
+- Added `p4c-graphs` installation instructions to README.
+- Added `presentation.p4` program file, matching the one used in the paper and its talk.
+
+### Changed
+
+### Removed
+
 ## [v1.3.0] - 2026-04-22
 
 This release marks the codebase version as used with the accompanying paper.
