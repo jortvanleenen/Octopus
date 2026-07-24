@@ -242,7 +242,7 @@ for accepting pairs:
 
 ```shell
 octopus p1.p4 p2.p4 \
-"hdr_l.hdr.field0 == (hdr_r.hdr.field1 + hdr_r.hdr.field2) and hdr_l.hdr.field0[15:0] == '0xABCD_16' and True or False"
+--filter-accepting-string "hdr_l.hdr.field0 == (hdr_r.hdr.field1 + hdr_r.hdr.field2) and hdr_l.hdr.field0[15:0] == '0xABCD_16' and True or False"
 ```
 
 > **Note**

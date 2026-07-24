@@ -168,7 +168,10 @@ class Constant(Expression):
 
     def __eq__(self, other) -> bool:
         if isinstance(other, Constant):
-            return self.numeric_value == other.numeric_value
+            return (
+                self.numeric_value == other.numeric_value
+                and self._size == other._size
+            )
         elif isinstance(other, str):
             return self.numeric_value == int(other, 2)
         else:

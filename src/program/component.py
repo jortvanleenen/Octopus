@@ -163,7 +163,7 @@ class Extract(Component):
             if new_buf_expr is None:
                 new_buf_expr = field_var
             else:
-                new_buf_expr = Concatenate(left=field_var, right=new_buf_expr)
+                new_buf_expr = Concatenate(left=new_buf_expr, right=field_var)
 
         if len_after > 0:
             new_buf_var = self._program.get_buffer_var(len_after)
