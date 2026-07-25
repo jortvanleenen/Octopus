@@ -163,19 +163,19 @@ def extend_buffer(
             pf.stream_var
         )
     else:
-        buf_var = parser.get_buffer_var(buf_size)
-        fresh_var = manager.fresh_variable(buf_size)
+        old_buf_var = parser.get_buffer_var(buf_size)
+        fresh_old_buf_var = manager.fresh_variable(buf_size)
         new_buf_var = parser.get_buffer_var(buf_size + leap_size)
 
         return PureFormula(
             And(
-                pf.root.substitute({buf_var: fresh_var}),
+                pf.root.substitute({old_buf_var: fresh_old_buf_var}),
                 Equals(
                     new_buf_var,
-                    Concatenate(left=fresh_var, right=new_bits_var),
+                    Concatenate(left=fresh_old_buf_var, right=new_bits_var),
                 ),
             ),
-            pf.used_vars | {fresh_var},
+            pf.used_vars | {fresh_old_buf_var},
             pf.stream_var
         )
 
