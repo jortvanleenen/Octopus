@@ -3,8 +3,9 @@
 Octopus is an equivalence checker for P4 packet parsers, implemented in Python.  
 Its implementation uses symbolic bisimulation to compare parser behavior.
 
-Octopus is accompanied by the paper *"Octopus: Practical Equivalence Checking of
-P4 Packet Parsers"* by Jort van Leenen and Dr. Tobias Kappé. This work builds on
+Octopus is accompanied by the paper "[*Octopus: Practical Equivalence Checking of
+P4 Packet Parsers*](https://doi.org/10.1007/978-3-032-32519-8_11)" by Jort van Leenen and Dr. Tobias Kappé. This work
+builds on
 the first author's bachelor's thesis "[*Practical Equivalence Checking of P4
 Packet Parsers*](https://theses.liacs.nl/3410)", supervised by Dr. Tobias Kappé and Jan Martens. The
 implementation builds on theoretical work from [Leapfrog](https://doi.org/10.48550/arXiv.2205.08762), a Rocq-based
@@ -43,7 +44,7 @@ representation of P4 programs. `p4c-graphs` is part of
 ### Recommended Installation Methods
 
 [Prebuilt packages of P4C are available](https://github.com/p4lang/p4c#installing-packaged-versions-of-p4c)
-for several commonly used operating systems and are generally the easiest way 
+for several commonly used operating systems and are generally the easiest way
 to obtain `p4c-graphs`. Refer to P4C's `README.md` for more information.
 
 If a packaged version is unavailable for your platform, or if you prefer a more
@@ -52,10 +53,10 @@ source.
 
 ### Minimal Build Configuration
 
-To [install P4C from source](https://github.com/p4lang/p4c#installing-p4c-from-source), 
-follow the steps outlined in the P4C `README.md`. Octopus only depends on the 
-`p4c-graphs` backend and does not require a full P4C installation. A minimal 
-build configuration, as also used for the Docker image, can be found in our 
+To [install P4C from source](https://github.com/p4lang/p4c#installing-p4c-from-source),
+follow the steps outlined in the P4C `README.md`. Octopus only depends on the
+`p4c-graphs` backend and does not require a full P4C installation. A minimal
+build configuration, as also used for the Docker image, can be found in our
 [Dockerfile](https://github.com/jortvanleenen/Octopus/blob/main/Dockerfile).
 Specifically, its call to `cmake` can be used when following P4C's steps.
 
